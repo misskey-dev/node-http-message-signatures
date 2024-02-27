@@ -4,6 +4,25 @@ export type RequestLike = {
 	headers: Record<string, string>;
 };
 
+export type SignInfoRSA = {
+	keyAlg: 'rsa';
+	hashAlg: NonNullable<SignatureHashAlgorithm>;
+}
+export type SignInfoEC = {
+	keyAlg: 'ec';
+	hashAlg: NonNullable<SignatureHashAlgorithm>;
+}
+export type SignInfoEd25519 = {
+	keyAlg: 'ed25519';
+	hashAlg: null;
+}
+export type SignInfoEd448 = {
+	keyAlg: 'ed448';
+	hashAlg: null;
+}
+
+export type SignInfo = SignInfoRSA | SignInfoEC | SignInfoEd25519 | SignInfoEd448;
+
 export type PrivateKey = {
 	privateKeyPem: string;
 	keyId: string;
