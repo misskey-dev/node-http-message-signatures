@@ -4,7 +4,17 @@
   "description": "",
   "type": "module",
   "keywords": [],
-  "author": "tamaina <tamaina@hotmail.co.jp>",
+  "author": "mei23 <m@m544.net>",
+  "contributors": [
+    {
+      "name": "mei23",
+      "email": "m@m544.net"
+    },
+    {
+      "name": "tamaina",
+      "email": "tamaina@hotmail.co.jp"
+    }
+  ],
   "license": "ISC",
   "repository": "https://github.com/misskey-dev/node-http-message-signatures.git",
   "bugs": "https://github.com/misskey-dev/node-http-message-signatures/issues",
