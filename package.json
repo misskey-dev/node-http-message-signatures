@@ -15,7 +15,7 @@
       "email": "tamaina@hotmail.co.jp"
     }
   ],
-  "license": "ISC",
+  "license": "MIT",
   "repository": "https://github.com/misskey-dev/node-http-message-signatures.git",
   "bugs": "https://github.com/misskey-dev/node-http-message-signatures/issues",
   "main": "built/index.js",
