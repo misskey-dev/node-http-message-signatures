@@ -34,6 +34,7 @@ declare function genDraftSignatureHeader(includeHeaders: string[], keyId: string
 declare function signAsDraftToRequest(request: RequestLike, key: PrivateKey, includeHeaders: string[], opts?: {
     hashAlgorithm?: SignatureHashAlgorithm;
 }): {
+    request: RequestLike;
     signingString: string;
     signature: string;
     signatureHeader: string;

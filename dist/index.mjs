@@ -84,6 +84,7 @@ function signAsDraftToRequest(request, key, includeHeaders, opts = {}) {
     Signature: signatureHeader
   });
   return {
+    request,
     signingString,
     signature,
     signatureHeader
