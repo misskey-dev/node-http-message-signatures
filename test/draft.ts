@@ -61,14 +61,14 @@ describe('draft', () => {
 				const request = {
 					headers: {
 						signature: 'keyId="test",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="test"',
-						date: 'Wed, 28 Feb 2024 17:44:06 GMT',
+						date: theDate.toUTCString(),
 						host: 'example.com',
 						accept: '*/*',
 					},
 					method: 'GET',
 					url: '/foo/bar',
 				};
-				const result = parseDraftRequest(request);
+				const result = parseDraftRequest(request, { clockSkew: { now: theDate } });
 				expect(result).toEqual({
 					version: 'draft',
 					value: {
@@ -81,7 +81,7 @@ describe('draft', () => {
 						},
 						keyId: 'test',
 						algorithm: 'RSA-SHA256',
-						signingString: '(request-target): get /foo/bar\nhost: example.com\ndate: Wed, 28 Feb 2024 17:44:06 GMT',
+						signingString: `(request-target): get /foo/bar\nhost: example.com\ndate: ${theDate.toUTCString()}\naccept: */*`,
 					},
 				});
 			});
@@ -154,7 +154,7 @@ describe('draft', () => {
 				expect(verifyResult).toBe(true);
 			});
 			test('verify by itself (failed)', () => {
-				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="aaaaaaaa"';
+				(request.headers as any)['signature'] = `keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="${Array.from({ length: 86 }, () => 'A').join('')}=="`;
 				// Check clock skew error
 				expect(() => parseDraftRequest(request)).toThrow(ClockSkewInvalidError);
 				const parsed = parseDraftRequest(request, { clockSkew: { now: theDate } });
@@ -162,7 +162,8 @@ describe('draft', () => {
 				expect(verifyResult).toBe(false);
 			});
 			test('verify by http-signature (failed)', () => {
-				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="aaaaaaaa"';
+				// tweetnaclがバイト数でエラーを吐くため、signatureの長さをちゃんとしたものにしておく
+				(request.headers as any)['signature'] = `keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="${Array.from({ length: 86 }, () => 'A').join('')}=="`;
 				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
