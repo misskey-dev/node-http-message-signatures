@@ -1,6 +1,12 @@
 import * as crypto from 'crypto';
 import type { SignatureHashAlgorithm } from '@/types.js';
 
+export class SignatureMissmatchWithProvidedAlgorithmError extends Error {
+	constructor(providedAlgorithm: string, detectedAlgorithm: string, realKeyType: string) {
+		super(`Provided algorithm does not match the public key type: provided=${detectedAlgorithm}(${providedAlgorithm}}, real=${realKeyType}`);
+	}
+}
+
 /**
  * ヘッダーのアルゴリズムから鍵とハッシュアルゴリズムを認識する
  * 提供されたアルゴリズムと呼び出しの公開鍵の種類が一致しない場合はエラーを投げる
@@ -14,10 +20,10 @@ export function detectAndVerifyAlgorithm(algorithm: string | undefined, publicKe
 	if (algorithm && algorithm !== 'hs2019' && realKeyType) {
 		const providedKeyAlgorithm = algorithm.split('-')[0];
 		if (
-			providedKeyAlgorithm[0] !== realKeyType.toLowerCase() &&
+			providedKeyAlgorithm !== realKeyType.toLowerCase() &&
 			!(providedKeyAlgorithm === 'ecdsa' && realKeyType === 'ec')
 		) {
-			throw new Error('Provided algorithm does not match the public key type');
+			throw new SignatureMissmatchWithProvidedAlgorithmError(algorithm, providedKeyAlgorithm, realKeyType);
 		}
 	}
 

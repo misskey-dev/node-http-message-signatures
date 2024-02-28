@@ -1,5 +1,6 @@
 import { parseDraftRequest } from '@/draft/parse.js';
 import type { IncomingRequest } from '@/types.js';
+import { lcObjectKey } from './utils.js';
 
 export class SignatureHeaderNotFoundError extends Error {
 	constructor() { super('Signature header not found'); }
@@ -25,7 +26,7 @@ export function signatureHeaderIsDraft(signatureHeader: string) {
 
 export function validateRequestAndGetSignatureHeader(request: IncomingRequest): string {
 	if (!request.headers) throw new SignatureHeaderNotFoundError();
-	const signatureHeader = request.headers['signature'];
+	const signatureHeader = request.headers['signature'] || request.headers['Signature'];
 	if (!signatureHeader) throw new SignatureHeaderNotFoundError();
 	if (Array.isArray(signatureHeader)) throw new RequestHasMultipleSignatureHeadersError();
 

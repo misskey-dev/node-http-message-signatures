@@ -9,9 +9,9 @@ export function genDraftSigningString(request: RequestLike, includeHeaders: stri
 
 	for (const key of includeHeaders.map(x => x.toLowerCase())) {
 		if (key === '(request-target)') {
-			results.push(`(request-target): ${request.method.toLowerCase()} ${new URL(request.url).pathname}`);
+			results.push(`(request-target): ${request.method.toLowerCase()} ${request.url.startsWith('/') ? request.url : new URL(request.url).pathname}`);
 		} else {
-			if (key === 'date' && !request.headers[key] && request.headers['x-date']) {
+			if (key === 'date' && !request.headers['date'] && request.headers['x-date']) {
 				results.push(`date: ${request.headers['x-date']}`);
 			} else {
 				results.push(`${key}: ${request.headers[key]}`);
