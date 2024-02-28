@@ -1,4 +1,4 @@
-import { checkClockSkew } from "./parse.js";
+import { checkClockSkew } from '@/parse.js';
 
 describe('parse', () => {
 	describe(checkClockSkew, () => {

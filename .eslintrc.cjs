@@ -9,8 +9,4 @@ module.exports = {
 	extends: [
 		'plugin:@misskey-dev/recommended',
 	],
-	rules: {
-		'@typescript-eslint/prefer-nullish-coalescing': 'off',
-		'import/no-default-export': 'off',
-	},
 };

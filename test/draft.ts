@@ -2,7 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import httpSignature from '@peertube/http-signature';
 
 import { genDraftSigningString, signAsDraftToRequest } from '@/draft/sign.js';
-import { parseDraftRequestSignatureHeader } from '@/draft/parse.js';
+import { parseDraftRequest, parseDraftRequestSignatureHeader } from '@/draft/parse.js';
 import { verifySignature } from '@/draft/verify.js';
 import { parseRequest } from '@/parse.js';
 import * as keys from './keys.js';
