@@ -83,9 +83,12 @@ function validateAndProcessParsedDraftSignatureHeader(parsed: Record<string, str
 	};
 }
 
-export function parseDraftRequest(request: IncomingRequest, headers?: string[]): DraftParsedSignature {
+export function parseDraftRequest(
+	request: IncomingRequest,
+	options: { headers?: string[]; clockSkew?: number } = { clockSkew: 300 },
+): DraftParsedSignature {
 	const signatureHeader = validateRequestAndGetSignatureHeader(request);
-	const parsedSignatureHeader = validateAndProcessParsedDraftSignatureHeader(parseDraftRequestSignatureHeader(signatureHeader), headers);
+	const parsedSignatureHeader = validateAndProcessParsedDraftSignatureHeader(parseDraftRequestSignatureHeader(signatureHeader), options.headers);
 	const signingString = genDraftSigningString(request as RequestLike, parsedSignatureHeader.headers);
 	return {
 		version: 'draft',

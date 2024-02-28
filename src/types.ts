@@ -9,6 +9,25 @@ export type RequestLike = {
 
 export type IncomingRequest = RequestLike | IncomingMessage | Http2ServerRequest;
 
+export type ClockSkewSettings = {
+	/**
+	 * 基準とする時刻
+	 */
+	now?: Date;
+
+	/**
+	 * Toleration of time difference between the sender and me, when the sender's time is faster (gained) than mine
+	 * In milliseconds
+	 */
+	forward: number;
+
+	/**
+	 * Toleration of time difference between the sender and me, when the sender's time is slower (losed) than mine.
+	 * In milliseconds
+	 */
+	delay: number;
+}
+
 export type SignInfoRSA = {
 	keyAlg: 'rsa';
 	hashAlg: NonNullable<SignatureHashAlgorithm>;
