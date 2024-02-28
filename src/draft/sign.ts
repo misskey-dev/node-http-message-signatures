@@ -1,6 +1,6 @@
 import * as crypto from 'crypto';
 import type { PrivateKey, RequestLike, SignatureAlgorithm, SignatureHashAlgorithm } from '@/types.js';
-import { getDraftAlgoString, prepareSignInfo } from '@/utils.js';
+import { getDraftAlgoString, lcObjectKey, prepareSignInfo } from '@/utils.js';
 
 export function genDraftSigningString(request: RequestLike, includeHeaders: string[]) {
 	request.headers = lcObjectKey(request.headers);
@@ -11,17 +11,15 @@ export function genDraftSigningString(request: RequestLike, includeHeaders: stri
 		if (key === '(request-target)') {
 			results.push(`(request-target): ${request.method.toLowerCase()} ${new URL(request.url).pathname}`);
 		} else {
-			results.push(`${key}: ${request.headers[key]}`);
+			if (key === 'date' && !request.headers[key] && request.headers['x-date']) {
+				results.push(`date: ${request.headers['x-date']}`);
+			} else {
+				results.push(`${key}: ${request.headers[key]}`);
+			}
 		}
 	}
 
 	return results.join('\n');
-}
-
-function lcObjectKey(src: Record<string, string>) {
-	const dst: Record<string, string> = {};
-	for (const key of Object.keys(src).filter(x => x !== '__proto__' && typeof src[x] === 'string')) dst[key.toLowerCase()] = src[key];
-	return dst;
 }
 
 export function genDraftSignature(signingString: string, privateKey: string, hashAlgorithm: SignatureHashAlgorithm | null) {

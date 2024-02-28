@@ -53,3 +53,14 @@ export function getDraftAlgoString(signInfo: SignInfo) {
 	}
 	throw new Error(`unsupported keyAlgorithm`);
 }
+
+/**
+ * Convert object keys to lowercase
+ */
+export function lcObjectKey<T extends Record<string, string>>(src: T): T {
+	return Object.entries(src).reduce((dst, [key, value]) => {
+		if (key === '__proto__') return dst;
+		dst[key.toLowerCase()] = value;
+		return dst;
+	}, {} as any);
+}
