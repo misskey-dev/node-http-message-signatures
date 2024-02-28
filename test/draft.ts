@@ -10,6 +10,11 @@ import { ClockSkewInvalidError } from '@/parse.js';
 //#region data
 const theDate = new Date('2024-02-28T17:44:06.000Z');
 
+/**
+ * Infiniteはエラーになるので1000年にしておく
+ */
+const ThousandYearsBySeconds = 60/*s*/ * 60/*m*/ * 24/*h*/ * 365/*d*/ * 1000/*y*/;
+
 const getBasicOutgoingRequest = () => ({
 	headers: {
 		Date: theDate.toUTCString(),
@@ -110,7 +115,7 @@ describe('draft', () => {
 				expect(verifyResult).toBe(true);
 			});
 			test('verify by http-signature', () => {
-				const parsed = httpSignature.parseRequest(request, { clockSkew: 60/*s*/ * 60/*m*/ * 24/*h*/ * 365/*d*/ * 100/*y*/ });
+				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
@@ -122,7 +127,7 @@ describe('draft', () => {
 			});
 			test('verify by http-signature (failed)', () => {
 				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#main-key",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="aaaaaaaa"';
-				const parsed = httpSignature.parseRequest(request, { clockSkew: 60/*s*/ * 60/*m*/ * 24/*h*/ * 365/*d*/ * 100/*y*/ });
+				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
 			});
@@ -144,7 +149,7 @@ describe('draft', () => {
 				expect(verifyResult).toBe(true);
 			});
 			test('verify by http-signature', () => {
-				const parsed = httpSignature.parseRequest(request, { clockSkew: 60/*s*/ * 60/*m*/ * 24/*h*/ * 365/*d*/ * 100/*y*/ });
+				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
@@ -158,7 +163,7 @@ describe('draft', () => {
 			});
 			test('verify by http-signature (failed)', () => {
 				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="aaaaaaaa"';
-				const parsed = httpSignature.parseRequest(request, { clockSkew: 60/*s*/ * 60/*m*/ * 24/*h*/ * 365/*d*/ * 100/*y*/ });
+				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
 			});
