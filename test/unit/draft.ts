@@ -5,7 +5,7 @@ import { genDraftSigningString, signAsDraftToRequest } from '@/draft/sign.js';
 import { parseDraftRequest, parseDraftRequestSignatureHeader } from '@/draft/parse.js';
 import { verifySignature } from '@/draft/verify.js';
 import { parseRequest, ClockSkewInvalidError } from '@/parse.js';
-import * as keys from '../scripts/keys.js';
+import * as keys from '../keys.js';
 
 //#region data
 const theDate = new Date('2024-02-28T17:44:06.000Z');
