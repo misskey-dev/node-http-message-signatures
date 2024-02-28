@@ -1,6 +1,10 @@
 import { parseDraftRequest } from '@/draft/parse.js';
 import type { ClockSkewSettings, IncomingRequest } from '@/types.js';
-import { lcObjectKey } from './utils.js';
+
+export type RequestParseOptions = {
+	headers?: string[];
+	clockSkew?: ClockSkewSettings;
+};
 
 export class SignatureHeaderNotFoundError extends Error {
 	constructor() { super('Signature header not found'); }
@@ -73,15 +77,16 @@ export function validateRequestAndGetSignatureHeader(
  * Parse the request headers
  * DraftとRFCをうまく区別してリクエストをパースする
  * @param request http.IncomingMessage | http2.Http2ServerRequest
+ * @param options
  */
-export function parseRequest(request: IncomingRequest) {
+export function parseRequest(request: IncomingRequest, options?: RequestParseOptions) {
 	console.log(request.headers);
 	const signatureHeader = validateRequestAndGetSignatureHeader(request);
 
 	if (signatureHeaderIsDraft(signatureHeader)) {
-		return parseDraftRequest(request);
+		return parseDraftRequest(request, options);
 	} else {
 		throw new Error('Not implemented');
-		// return parseRFC9421Request(request);
+		// return parseRFC9421Request(request, options);
 	}
 }

@@ -1,5 +1,5 @@
-import { validateRequestAndGetSignatureHeader } from "@/parse.js";
-import type { ClockSkewSettings, DraftParsedSignature, IncomingRequest, RequestLike } from '@/types.js';
+import { RequestParseOptions, validateRequestAndGetSignatureHeader } from "@/parse.js";
+import type { DraftParsedSignature, IncomingRequest, RequestLike } from '@/types.js';
 import { genDraftSigningString } from "@/draft/sign.js";
 
 export class SignatureHeaderContentLackedError extends Error {
@@ -85,7 +85,7 @@ function validateAndProcessParsedDraftSignatureHeader(parsed: Record<string, str
 
 export function parseDraftRequest(
 	request: IncomingRequest,
-	options?: { headers?: string[]; clockSkew?: ClockSkewSettings },
+	options?: RequestParseOptions,
 ): DraftParsedSignature {
 	const signatureHeader = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
 	const parsedSignatureHeader = validateAndProcessParsedDraftSignatureHeader(parseDraftRequestSignatureHeader(signatureHeader), options?.headers);
