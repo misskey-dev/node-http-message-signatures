@@ -1,6 +1,6 @@
-import * as crypto from 'crypto';
-import type { PrivateKey, RequestLike, SignatureAlgorithm, SignatureHashAlgorithm } from '@/types.js';
-import { getDraftAlgoString, lcObjectKey, prepareSignInfo } from '@/utils.js';
+import * as crypto from 'node:crypto';
+import type { PrivateKey, RequestLike, SignatureAlgorithm, SignatureHashAlgorithm } from '../types.js';
+import { getDraftAlgoString, lcObjectKey, prepareSignInfo } from '../utils.js';
 
 export function genDraftSigningString(request: RequestLike, includeHeaders: string[]) {
 	request.headers = lcObjectKey(request.headers);

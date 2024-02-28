@@ -1,6 +1,6 @@
+/**
 import * as kp from '@/keypair.js';
 
-/**
 describe('a', () => {
 	test('a', async () => {
 		console.log(await kp.genRsaKeyPair(4096));

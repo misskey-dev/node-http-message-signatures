@@ -1,6 +1,6 @@
-import { RequestParseOptions, validateRequestAndGetSignatureHeader } from "@/parse.js";
-import type { DraftParsedSignature, IncomingRequest, RequestLike } from '@/types.js';
-import { genDraftSigningString } from "@/draft/sign.js";
+import { RequestParseOptions, validateRequestAndGetSignatureHeader } from "../parse.js";
+import type { DraftParsedSignature, IncomingRequest, RequestLike } from '../types.js';
+import { genDraftSigningString } from "../draft/sign.js";
 
 export class SignatureHeaderContentLackedError extends Error {
 	constructor(lackedContent: string) { super(`Signature header content lacked: ${lackedContent}`); }

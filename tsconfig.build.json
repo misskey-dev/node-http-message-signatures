@@ -1,0 +1,11 @@
+{
+	"extends": "./tsconfig.json",
+	"include": [
+		"./src/index.ts"
+	],
+	"compilerOptions": {
+		"emitDeclarationOnly": true,
+		"isolatedModules": true,
+		"declaration": true,
+	},
+}

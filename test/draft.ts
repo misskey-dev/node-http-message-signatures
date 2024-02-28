@@ -4,9 +4,8 @@ import httpSignature from '@peertube/http-signature';
 import { genDraftSigningString, signAsDraftToRequest } from '@/draft/sign.js';
 import { parseDraftRequest, parseDraftRequestSignatureHeader } from '@/draft/parse.js';
 import { verifySignature } from '@/draft/verify.js';
-import { parseRequest } from '@/parse.js';
-import * as keys from './keys.js';
-import { ClockSkewInvalidError } from '@/parse.js';
+import { parseRequest, ClockSkewInvalidError } from '@/parse.js';
+import * as keys from './meta/keys.js';
 
 //#region data
 const theDate = new Date('2024-02-28T17:44:06.000Z');

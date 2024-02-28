@@ -1,36 +1,29 @@
 {
 	"compilerOptions": {
 		"allowJs": true,
-		"noEmitOnError": true,
-		"noImplicitAny": true,
+		"noEmitOnError": false,
+		"noImplicitAny": false,
 		"noImplicitReturns": true,
 		"noUnusedParameters": false,
-		"noUnusedLocals": false,
+		"noUnusedLocals": true,
 		"noFallthroughCasesInSwitch": true,
-		"declaration": true,
-		"sourceMap": true,
-		"target": "ES2022",
-		"module": "nodenext",
-		"moduleResolution": "nodenext",
-		"allowSyntheticDefaultImports": true,
+		"declaration": false,
+		"sourceMap": false,
+		"target": "es2020",
+		"module": "esnext",
+		"moduleResolution": "node",
 		"removeComments": false,
 		"noLib": false,
 		"strict": true,
 		"strictNullChecks": true,
-		"strictPropertyInitialization": false,
-		"skipLibCheck": true,
 		"experimentalDecorators": true,
-		"emitDecoratorMetadata": true,
 		"resolveJsonModule": true,
 		"isolatedModules": true,
 		"rootDir": "./src",
 		"baseUrl": ".",
 		"paths": {
-			"@/*": [
-				"./src/*"
-			]
 		},
-		"outDir": "./built",
+		"outDir": "./dist",
 		"types": [
 			"node"
 		],
@@ -48,6 +41,7 @@
 	],
 	"exclude": [
 		"./src/**/*.impl.ts",
-		"./src/**/*.test.ts"
+		"./src/**/*.test.ts",
+		"./dist/**/*",
 	]
 }

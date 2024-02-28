@@ -1,5 +1,5 @@
-import { parseDraftRequest } from '@/draft/parse.js';
-import type { ClockSkewSettings, IncomingRequest } from '@/types.js';
+import { parseDraftRequest } from './draft/parse.js';
+import type { ClockSkewSettings, IncomingRequest } from './types.js';
 
 export type RequestParseOptions = {
 	headers?: string[];
@@ -33,7 +33,7 @@ export class ClockSkewInvalidError extends Error {
  * @returns boolean
  */
 export function signatureHeaderIsDraft(signatureHeader: string) {
-	return !signatureHeader.includes('signature="');
+	return signatureHeader.includes('signature="');
 }
 
 /**
@@ -80,8 +80,7 @@ export function validateRequestAndGetSignatureHeader(
  * @param options
  */
 export function parseRequest(request: IncomingRequest, options?: RequestParseOptions) {
-	console.log(request.headers);
-	const signatureHeader = validateRequestAndGetSignatureHeader(request);
+	const signatureHeader = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
 
 	if (signatureHeaderIsDraft(signatureHeader)) {
 		return parseDraftRequest(request, options);

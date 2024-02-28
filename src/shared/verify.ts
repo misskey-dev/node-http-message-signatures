@@ -1,5 +1,5 @@
-import * as crypto from 'crypto';
-import type { SignatureHashAlgorithm } from '@/types.js';
+import * as crypto from 'node:crypto';
+import type { SignatureHashAlgorithm } from '../types.js';
 
 export class SignatureMissmatchWithProvidedAlgorithmError extends Error {
 	constructor(providedAlgorithm: string, detectedAlgorithm: string, realKeyType: string) {
