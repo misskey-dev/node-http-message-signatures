@@ -51,7 +51,6 @@ export function signAsDraftToRequest(request: RequestLike, key: PrivateKey, incl
 	});
 
 	return {
-		request,
 		signingString,
 		signature,
 		signatureHeader,
