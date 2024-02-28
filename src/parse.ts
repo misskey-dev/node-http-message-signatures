@@ -47,6 +47,7 @@ export function parseRequest(request: IncomingRequest) {
 	if (signatureHeaderIsDraft(signatureHeader)) {
 		return parseDraftRequest(request);
 	} else {
-		return parseRFC9421Request(request);
+		throw new Error('Not implemented');
+		// return parseRFC9421Request(request);
 	}
 }
