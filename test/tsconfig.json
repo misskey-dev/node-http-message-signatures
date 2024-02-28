@@ -22,7 +22,9 @@
 	},
 	"include": [
 		"./**/*.ts",
-		"../src/**/*.test.ts",
+		"../src/**/*.test.ts", "import/index.js", "require/index.js",
 	],
-	"exclude": []
+	"exclude": [
+		"./require/**/*"
+	]
 }
