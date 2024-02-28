@@ -1,4 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
+import httpSignature from '@peertube/http-signature';
 
 import { genDraftSigningString, signAsDraftToRequest } from '@/draft/sign.js';
 import { parseDraftRequestSignatureHeader, parseDraftRequest } from '@/draft/parse.js';
@@ -16,19 +17,10 @@ const getBasicOutgoingRequest = () => ({
 	url: '/foo/bar',
 });
 
-const getBasicIncomingRequestWithDraft = () => ({
-	headers: {
-		signature: 'keyId="test",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="test"',
-		date: 'Wed, 28 Feb 2024 17:44:06 GMT',
-		host: 'example.com',
-		accept: '*/*',
-	},
-	method: 'GET',
-	url: '/foo/bar',
-});
-
 const basicIncludeHeaders = ['(request-target)', 'host', 'date', 'accept'];
 //#endregion
+
+const errorLogger = (...e: any) => console.error(...e);
 
 describe('draft', () => {
 	describe('parse', () => {
@@ -57,8 +49,17 @@ describe('draft', () => {
 		});
 
 		describe(parseDraftRequest, () => {
-			test('basic', () => {
-				const request = getBasicIncomingRequestWithDraft();
+			test('basic sha256', () => {
+				const request = {
+					headers: {
+						signature: 'keyId="test",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="test"',
+						date: 'Wed, 28 Feb 2024 17:44:06 GMT',
+						host: 'example.com',
+						accept: '*/*',
+					},
+					method: 'GET',
+					url: '/foo/bar',
+				};
 				const result = parseDraftRequest(request);
 				expect(result).toEqual({
 					version: 'draft',
@@ -102,10 +103,28 @@ describe('draft', () => {
 			});
 			test('verify by itself', () => {
 				const parsed = parseDraftRequest(request);
-				const verifyResult = verifySignature(parsed.value, keys.rsa4096.publicKey);
+				const verifyResult = verifySignature(parsed.value, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
+			test('verify by http-signature', () => {
+				const parsed = httpSignature.parseRequest(request, { clockSkew: 60/*s*/ * 60/*m*/ * 24/*h*/ * 365/*d*/ * 100/*y*/ });
+				const verifyResult = httpSignature.verifySignature(parsed, keys.rsa4096.publicKey, errorLogger);
+				expect(verifyResult).toBe(true);
+			});
+			test('verify by itself (failed)', () => {
+				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#main-key",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="aaaaaaaa"';
+				const parsed = parseDraftRequest(request);
+				const verifyResult = verifySignature(parsed.value, keys.rsa4096.publicKey, errorLogger);
+				expect(verifyResult).toBe(false);
+			});
+			test('verify by http-signature (failed)', () => {
+				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#main-key",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="aaaaaaaa"';
+				const parsed = httpSignature.parseRequest(request, { clockSkew: 60/*s*/ * 60/*m*/ * 24/*h*/ * 365/*d*/ * 100/*y*/ });
+				const verifyResult = httpSignature.verifySignature(parsed, keys.rsa4096.publicKey, errorLogger);
+				expect(verifyResult).toBe(false);
+			});
 		});
+
 		describe('ed25519', () => {
 			const request = getBasicOutgoingRequest();
 			const key = {
@@ -118,8 +137,25 @@ describe('draft', () => {
 			});
 			test('verify by itself', () => {
 				const parsed = parseDraftRequest(request);
-				const verifyResult = verifySignature(parsed.value, keys.ed25519.publicKey);
+				const verifyResult = verifySignature(parsed.value, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
+			});
+			test('verify by http-signature', () => {
+				const parsed = httpSignature.parseRequest(request, { clockSkew: 60/*s*/ * 60/*m*/ * 24/*h*/ * 365/*d*/ * 100/*y*/ });
+				const verifyResult = httpSignature.verifySignature(parsed, keys.ed25519.publicKey, errorLogger);
+				expect(verifyResult).toBe(true);
+			});
+			test('verify by itself (failed)', () => {
+				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="aaaaaaaa"';
+				const parsed = parseDraftRequest(request);
+				const verifyResult = verifySignature(parsed.value, keys.ed25519.publicKey, errorLogger);
+				expect(verifyResult).toBe(false);
+			});
+			test('verify by http-signature (failed)', () => {
+				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="aaaaaaaa"';
+				const parsed = httpSignature.parseRequest(request, { clockSkew: 60/*s*/ * 60/*m*/ * 24/*h*/ * 365/*d*/ * 100/*y*/ });
+				const verifyResult = httpSignature.verifySignature(parsed, keys.ed25519.publicKey, errorLogger);
+				expect(verifyResult).toBe(false);
 			});
 		});
 	});

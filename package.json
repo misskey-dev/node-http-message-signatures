@@ -35,7 +35,7 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent=false --verbose false",
     "build": "tsc"
   },
-	"packageManager": "pnpm@8.15.4",
+  "packageManager": "pnpm@8.15.4",
   "files": [
     "built",
     "LICENSE"
@@ -43,6 +43,7 @@
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@misskey-dev/eslint-plugin": "^1.0.0",
+    "@peertube/http-signature": "^1.7.0",
     "@swc/core": "^1.4.2",
     "@swc/jest": "^0.2.36",
     "@types/jest": "^29.5.12",
