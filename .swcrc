@@ -14,7 +14,9 @@
             "keepImportAssertions": true
         },
         "baseUrl": ".",
-        "paths": {},
+        "paths": {
+					"@/*": ["./src/*"]
+				},
         "target": "es2021"
     },
     "module": {

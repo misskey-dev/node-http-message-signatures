@@ -1,0 +1,27 @@
+{
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "./",
+		"paths": {
+			"@/*": [
+				"../src/*"
+			]
+		},
+		"types": [
+			"jest",
+			"node"
+		],
+		"typeRoots": [
+			"../node_modules/@types",
+			"../src/@types"
+		],
+		"lib": [
+			"esnext"
+		]
+	},
+	"include": [
+		"./**/*.ts",
+		"../src/**/*.test.ts",
+	],
+	"exclude": []
+}

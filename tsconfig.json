@@ -1,17 +1,17 @@
 {
 	"compilerOptions": {
 		"allowJs": true,
-		"noEmitOnError": false,
+		"noEmitOnError": true,
 		"noImplicitAny": true,
 		"noImplicitReturns": true,
 		"noUnusedParameters": false,
 		"noUnusedLocals": false,
 		"noFallthroughCasesInSwitch": true,
-		"declaration": true,
+		"declaration": false,
 		"sourceMap": false,
-		"target": "es2021",
-		"module": "esnext",
-		"moduleResolution": "node",
+		"target": "ES2022",
+		"module": "nodenext",
+		"moduleResolution": "nodenext",
 		"allowSyntheticDefaultImports": true,
 		"removeComments": false,
 		"noLib": false,
@@ -23,7 +23,7 @@
 		"emitDecoratorMetadata": true,
 		"resolveJsonModule": true,
 		"isolatedModules": true,
-		"rootDir": "./src",
+		"rootDir": ".",
 		"baseUrl": "./",
 		"paths": {
 			"@/*": [
@@ -46,4 +46,8 @@
 	"include": [
 		"./src/**/*.ts"
 	],
+	"exclude": [
+		"./src/**/*.impl.ts",
+		"./src/**/*.test.ts"
+	]
 }

@@ -20,21 +20,22 @@
   "bugs": "https://github.com/misskey-dev/node-http-message-signatures/issues",
   "main": "built/index.js",
   "types": "built/index.d.ts",
-	"exports": {
-		".": {
-			"import": "./built/index.js",
-			"types": "./built/index.d.ts"
-		},
-		"./*": {
-			"import": "./built/*.js",
-			"types": "./built/*.d.ts"
-		}
-	},
+  "exports": {
+    ".": {
+      "import": "./built/index.js",
+      "types": "./built/index.d.ts"
+    },
+    "./*": {
+      "import": "./built/*.js",
+      "types": "./built/*.d.ts"
+    }
+  },
   "scripts": {
     "eslint": "eslint --quiet \"src/**/*.ts\"",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent=false --verbose false",
     "build": "tsc"
   },
+	"packageManager": "pnpm@8.15.4",
   "files": [
     "built",
     "LICENSE"
@@ -44,6 +45,7 @@
     "@misskey-dev/eslint-plugin": "^1.0.0",
     "@swc/core": "^1.4.2",
     "@swc/jest": "^0.2.36",
+    "@types/jest": "^29.5.12",
     "@types/node": "^20.11.20",
     "@typescript-eslint/eslint-plugin": "^7.1.0",
     "@typescript-eslint/parser": "^7.1.0",

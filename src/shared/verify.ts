@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { SignatureHashAlgorithm } from '@/types.js';
+import type { SignatureHashAlgorithm } from '@/types.js';
 
 /**
  * ヘッダーのアルゴリズムから鍵とハッシュアルゴリズムを認識する
