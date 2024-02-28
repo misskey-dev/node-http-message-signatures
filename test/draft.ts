@@ -5,11 +5,14 @@ import { genDraftSigningString, signAsDraftToRequest } from '@/draft/sign.js';
 import { parseDraftRequestSignatureHeader, parseDraftRequest } from '@/draft/parse.js';
 import { verifySignature } from '@/draft/verify.js';
 import * as keys from './keys.js';
+import { ClockSkewInvalidError } from '@/parse.js';
 
 //#region data
+const theDate = new Date('2024-02-28T17:44:06.000Z');
+
 const getBasicOutgoingRequest = () => ({
 	headers: {
-		Date: 'Wed, 28 Feb 2024 17:44:06 GMT',
+		Date: theDate.toUTCString(),
 		Host: 'example.com',
 		Accept: '*/*',
 	},
@@ -102,7 +105,7 @@ describe('draft', () => {
 				expect((request.headers as any)['Signature']).toBe('keyId="https://example.com/users/012345678abcdef#main-key",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="ocCFDJtL100/4ug4nkfTVy17rV/H4gXKwrN9o82g89zEt2012ueg4RYlWwtF1waiRhEGXNXoiIbAsO2k0hFlD8/Vhm6BeRlqpgKzs0bd3XFKTRVIUACyg7efblKJ6o8DU+gdu6SlRx9V08n8i2ZEoLim2N0iMbjmDME9oh8rY8bM8uH3RnRIxpLwCmSLDSaPAop0rPQryZQQwoFhsTPvS9JhiyHmSqU1FiIX3Sz4ExcHFyO9MK/kvFmwMLQDJ3Z64npGACo155vBUahUH0RFe1mwRgHBZPyg3PJHomQXaGxc3Jb3PJL1zMQDAofw/hSB0YlN1WM5EApSUfJieOqdbbDeEf5qfpm3Vza3DVRpvQtSeok+X0TOBh6cPCfYmW7gIxKondxmwdP9d5g3pHXQuASE/bOmogh00+zFJGy7AS35j95rgzEUfjzuWOQDUs5pRnuAUDMQ2Q3+woWJGgp4C1YPdO8dL9pR2sBusZYeeIQieQRJIJib1wiXLyL8qgO3ukrECH8FPON6DKmlA3CcyQfUpFw4pVZUArukUKVGt3g4rH6BDJTVHdbeCvKyxG30tzI4jfbuMpj7Ekrj16gHjKwyhhH5vqcJ19ibeg2SoARmipUfRt+ufZGn3tZX3efaBEaTbOAkFGgG0voJjo1Q3+7EFwreHv2ABKXOJiSAIow="');
 			});
 			test('verify by itself', () => {
-				const parsed = parseDraftRequest(request);
+				const parsed = parseDraftRequest(request, { clockSkew: { now: theDate } });
 				const verifyResult = verifySignature(parsed.value, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
@@ -113,7 +116,7 @@ describe('draft', () => {
 			});
 			test('verify by itself (failed)', () => {
 				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#main-key",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="aaaaaaaa"';
-				const parsed = parseDraftRequest(request);
+				const parsed = parseDraftRequest(request, { clockSkew: { now: theDate } });
 				const verifyResult = verifySignature(parsed.value, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
 			});
@@ -136,7 +139,7 @@ describe('draft', () => {
 				expect((request.headers as any)['Signature']).toBe('keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="nFz8cgJ+p8ImwCokRbfcQj34d1GZn9uw1l+Fu+NvAn268kEvjMMgljtS/SZlnyY3dW0RaXf9Lmz0UVAA0bZXDQ=="');
 			});
 			test('verify by itself', () => {
-				const parsed = parseDraftRequest(request);
+				const parsed = parseDraftRequest(request, { clockSkew: { now: theDate } });
 				const verifyResult = verifySignature(parsed.value, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
@@ -147,7 +150,9 @@ describe('draft', () => {
 			});
 			test('verify by itself (failed)', () => {
 				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="aaaaaaaa"';
-				const parsed = parseDraftRequest(request);
+				// Check clock skew error
+				expect(() => parseDraftRequest(request)).toThrow(ClockSkewInvalidError);
+				const parsed = parseDraftRequest(request, { clockSkew: { now: theDate } });
 				const verifyResult = verifySignature(parsed.value, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
 			});

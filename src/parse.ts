@@ -32,12 +32,18 @@ export function signatureHeaderIsDraft(signatureHeader: string) {
 	return !signatureHeader.includes('signature="');
 }
 
-export function checkClockSkew(reqDate: Date, options: ClockSkewSettings = { delay: 300 * 1e3, forward: 100 }) {
+/**
+ * Check the clock skew of the request
+ * @param reqDate Request date
+ * @param nowDate Now date
+ * @param delay Tolerance of Request's delay (ms)
+ * @param forward Tolerance of request's forward (ms)
+ */
+export function checkClockSkew(reqDate: Date, nowDate: Date, delay: number = 300 * 1e3, forward: number = 100) {
 	const reqTime = reqDate.getTime();
-	const nowDate = options.now || new Date();
 	const nowTime = nowDate.getTime();
-	if (reqTime > nowTime + options.forward) throw new ClockSkewInvalidError(reqDate, nowDate);
-	if (reqTime < nowTime - options.delay) throw new ClockSkewInvalidError(reqDate, nowDate);
+	if (reqTime > nowTime + forward) throw new ClockSkewInvalidError(reqDate, nowDate);
+	if (reqTime < nowTime - delay) throw new ClockSkewInvalidError(reqDate, nowDate);
 }
 
 export function validateRequestAndGetSignatureHeader(
@@ -51,10 +57,10 @@ export function validateRequestAndGetSignatureHeader(
 
 	if (request.headers['date']) {
 		if (Array.isArray(request.headers['date'])) throw new RequestHasMultipleDateHeadersError();
-		checkClockSkew(new Date(request.headers['date']), clock);
+		checkClockSkew(new Date(request.headers['date']), clock?.now || new Date(), clock?.delay, clock?.forward);
 	} else if (request.headers['x-date']) {
 		if (Array.isArray(request.headers['x-date'])) throw new RequestHasMultipleDateHeadersError();
-		checkClockSkew(new Date(request.headers['x-date']), clock);
+		checkClockSkew(new Date(request.headers['x-date']), clock?.now || new Date(), clock?.delay, clock?.forward);
 	}
 
 	if (!request.method) throw new InvalidRequestError('Request method not found');

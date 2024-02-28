@@ -19,13 +19,13 @@ export type ClockSkewSettings = {
 	 * Toleration of time difference between the sender and me, when the sender's time is faster (gained) than mine
 	 * In milliseconds
 	 */
-	forward: number;
+	forward?: number;
 
 	/**
 	 * Toleration of time difference between the sender and me, when the sender's time is slower (losed) than mine.
 	 * In milliseconds
 	 */
-	delay: number;
+	delay?: number;
 }
 
 export type SignInfoRSA = {
