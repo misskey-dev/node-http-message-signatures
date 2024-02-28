@@ -1,5 +1,5 @@
 import * as crypto from 'crypto';
-import { SignInfo, SignatureHashAlgorithm } from "@/types.js";
+import { SignInfo, SignatureHashAlgorithm } from "./types.js";
 
 /**
  * privateKeyPemからhashAlgorithmを推測する

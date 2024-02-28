@@ -1,4 +1,4 @@
-import { detectAndVerifyAlgorithm } from '@/shared/verify.js';
+import { detectAndVerifyAlgorithm } from '../shared/verify.js';
 import * as crypto from 'crypto';
 
 type ParsedSignature = {

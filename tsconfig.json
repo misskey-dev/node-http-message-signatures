@@ -30,7 +30,7 @@
 				"./src/*"
 			]
 		},
-		"outDir": "./built",
+		"outDir": "./dist",
 		"types": [
 			"node"
 		],
