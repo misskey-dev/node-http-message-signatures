@@ -19,7 +19,7 @@ Since ActivityPub also needs digest validation, this library also implements fun
 
 ## Compatibility
 ### HTTP Message Signatures Implementation Level
-As a way of expressing the HTTP Message Signatures support status of software, I propose to express it as an implementation level (a string of two-digit numbers).
+As a way of expressing the HTTP Message Signatures support status of software, I propose to express it as an implementation level (`string` of two-digit numbers).
 
 ~~Newer versions of Misskey have this string in `metadata.httpMessageSignaturesImplementationLevel` of nodeinfo.~~
 
