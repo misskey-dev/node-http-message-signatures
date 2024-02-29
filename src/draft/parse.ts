@@ -1,5 +1,5 @@
 import { RequestParseOptions, validateRequestAndGetSignatureHeader } from "../parse.js";
-import type { DraftParsedSignature, IncomingRequest, RequestLike } from '../types.js';
+import type { ParsedDraftSignature, IncomingRequest, RequestLike } from '../types.js';
 import { genDraftSigningString } from "../draft/sign.js";
 
 export class SignatureHeaderContentLackedError extends Error {
@@ -124,7 +124,7 @@ export function validateAndProcessParsedDraftSignatureHeader(parsed: DraftSignat
 export function parseDraftRequest(
 	request: IncomingRequest,
 	options?: RequestParseOptions,
-): DraftParsedSignature {
+): ParsedDraftSignature {
 	const signatureHeader = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
 	const parsedSignatureHeader = validateAndProcessParsedDraftSignatureHeader(parseDraftRequestSignatureHeader(signatureHeader), options);
 	const signingString = genDraftSigningString(
