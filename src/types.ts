@@ -69,6 +69,7 @@ export type DraftParsedSignature = {
 			keyId: string;
 
 			/**
+			 * lower-case
 			 * @example 'rsa-sha256'
 			 */
 			algorithm?: string;
@@ -82,6 +83,7 @@ export type DraftParsedSignature = {
 		signingString: string;
 
 		/**
+		 * UPPER-CASE
 		 * @example 'RSA-SHA256'
 		 */
 		algorithm?: string;

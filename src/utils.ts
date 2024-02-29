@@ -57,7 +57,7 @@ export function getDraftAlgoString(signInfo: SignInfo) {
 /**
  * Convert object keys to lowercase
  */
-export function lcObjectKey<T extends Record<string, string>>(src: T): T {
+export function lcObjectKey<T extends Record<string, any>>(src: T): T {
 	return Object.entries(src).reduce((dst, [key, value]) => {
 		if (key === '__proto__') return dst;
 		dst[key.toLowerCase()] = value;

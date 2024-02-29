@@ -1,5 +1,6 @@
 import { parseDraftRequest } from './draft/parse.js';
 import type { ClockSkewSettings, IncomingRequest } from './types.js';
+import { lcObjectKey } from './utils.js';
 
 export type RequestParseOptions = {
 	headers?: string[];
@@ -37,6 +38,14 @@ export function signatureHeaderIsDraft(signatureHeader: string) {
 }
 
 /**
+ * Check if request is based on RFC 9421
+ */
+export function requestIsRFC9421(request: IncomingRequest) {
+	const headers = lcObjectKey(request.headers);
+	return 'signature-input' in headers;
+}
+
+/**
  * Check the clock skew of the request
  * @param reqDate Request date
  * @param nowDate Now date
@@ -55,16 +64,17 @@ export function validateRequestAndGetSignatureHeader(
 	clock?: ClockSkewSettings,
 ): string {
 	if (!request.headers) throw new SignatureHeaderNotFoundError();
-	const signatureHeader = request.headers['signature'] || request.headers['Signature'];
+	const headers = lcObjectKey(request.headers);
+	const signatureHeader = headers['signature'];
 	if (!signatureHeader) throw new SignatureHeaderNotFoundError();
 	if (Array.isArray(signatureHeader)) throw new RequestHasMultipleSignatureHeadersError();
 
-	if (request.headers['date']) {
-		if (Array.isArray(request.headers['date'])) throw new RequestHasMultipleDateHeadersError();
-		checkClockSkew(new Date(request.headers['date']), clock?.now || new Date(), clock?.delay, clock?.forward);
-	} else if (request.headers['x-date']) {
-		if (Array.isArray(request.headers['x-date'])) throw new RequestHasMultipleDateHeadersError();
-		checkClockSkew(new Date(request.headers['x-date']), clock?.now || new Date(), clock?.delay, clock?.forward);
+	if (headers['date']) {
+		if (Array.isArray(headers['date'])) throw new RequestHasMultipleDateHeadersError();
+		checkClockSkew(new Date(headers['date']), clock?.now || new Date(), clock?.delay, clock?.forward);
+	} else if (headers['x-date']) {
+		if (Array.isArray(headers['x-date'])) throw new RequestHasMultipleDateHeadersError();
+		checkClockSkew(new Date(headers['x-date']), clock?.now || new Date(), clock?.delay, clock?.forward);
 	}
 
 	if (!request.method) throw new InvalidRequestError('Request method not found');
@@ -82,10 +92,11 @@ export function validateRequestAndGetSignatureHeader(
 export function parseRequest(request: IncomingRequest, options?: RequestParseOptions) {
 	const signatureHeader = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
 
-	if (signatureHeaderIsDraft(signatureHeader)) {
-		return parseDraftRequest(request, options);
-	} else {
+	if (requestIsRFC9421(request)) {
 		throw new Error('Not implemented');
 		// return parseRFC9421Request(request, options);
+	} else if (signatureHeaderIsDraft(signatureHeader)) {
+		return parseDraftRequest(request, options);
 	}
+	return null;
 }
