@@ -8,6 +8,7 @@ export * from './parse.js';
 export * from './utils.js';
 export * from './keypair.js';
 
+export * from './digest/digest.js';
 export * from './digest/digest-rfc3230.js';
 
 export * from './shared/verify.js';

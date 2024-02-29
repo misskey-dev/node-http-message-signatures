@@ -1,6 +1,6 @@
 import { parseDraftRequest } from './draft/parse.js';
 import type { ClockSkewSettings, IncomingRequest } from './types.js';
-import { lcObjectKey } from './utils.js';
+import { lcObjectKey, objectLcKeys } from './utils.js';
 
 export type RequestParseOptions = {
 	headers?: string[];
@@ -41,8 +41,7 @@ export function signatureHeaderIsDraft(signatureHeader: string) {
  * Check if request is based on RFC 9421
  */
 export function requestIsRFC9421(request: IncomingRequest) {
-	const headers = lcObjectKey(request.headers);
-	return 'signature-input' in headers;
+	return objectLcKeys(request.headers).has('signature-input');
 }
 
 /**

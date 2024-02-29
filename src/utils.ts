@@ -64,3 +64,25 @@ export function lcObjectKey<T extends Record<string, any>>(src: T): T {
 		return dst;
 	}, {} as any);
 }
+
+/**
+ * Get value from object, key is case-insensitive
+ */
+export function lcObjectGet<T extends Record<string, any>>(src: T, key: string): T[keyof T] | undefined {
+	key = key.toLowerCase();
+	for (const [k, v] of Object.entries(src)) {
+		if (k.toLowerCase() === key) return v;
+	}
+	return undefined;
+}
+
+/**
+ *  Get the Set of keys of the object, lowercased
+ */
+export function objectLcKeys<T extends Record<string, any>>(src: T): Set<string> {
+	return Object.keys(src).reduce((dst, key) => {
+		if (key === '__proto__') return dst;
+		dst.add(key.toLowerCase());
+		return dst;
+	}, new Set<string>() as any);
+}

@@ -1,4 +1,4 @@
-import { lcObjectKey } from '../utils';
+import { lcObjectGet } from '../utils';
 import { createBase64Digest } from './utils';
 import { DigestHashAlgorithm, IncomingRequest } from '../types';
 import { BinaryLike } from 'node:crypto';
@@ -32,8 +32,7 @@ export function verifyRFC3230DigestHeader(
 	failOnNoDigest = true,
 	errorLogger?: ((message: any) => any)
 ) {
-	const headers = lcObjectKey(request.headers);
-	let digestHeader = headers['digest'];
+	let digestHeader = lcObjectGet(request.headers, 'digest');
 	if (!digestHeader) {
 		if (failOnNoDigest) {
 			if (errorLogger) errorLogger('Digest header not found');

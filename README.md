@@ -16,7 +16,7 @@ Parse and verify in fastify web server, implements ActivityPub inbox
 ```ts
 import Fastify from 'fastify';
 import fastifyRawBody from 'fastify-raw-body';
-import { parseRequest, verifyDraftSignature, verifyRFC3230DigestHeader } from '@misskey-dev/node-http-message-signatures';
+import { parseRequest, verifyDraftSignature, verifyDigestHeader } from '@misskey-dev/node-http-message-signatures';
 
 /**
  * Prepare keyId-publicKeyPem Map
@@ -32,15 +32,16 @@ await fastify.register(fastifyRawBody, {
 	runFirst: true,
 });
 fastify.post('/inbox', { confog: { rawBody: true } }, async (request, reply) => {
+	const verifyDigest = verifyDigestHeader(request.raw,request.rawBody, true);
+	if (!verifyDigest) {
+		reply.code(401);
+		return;
+	}
+
 	// Parse raw request
 	const parsedSignature = parseRequest(request.raw);
 
 	if (parsedSignature && parsedSignature.version === 'draft') {
-		const verifyDigest = verifyRFC3230DigestHeader(request.raw, request.rawBody, true);
-		if (!verifyDigest) {
-			reply.code(401);
-			return;
-		}
 
 		// Get public key by keyId
 		const publicKeyPem = publicKeyMap.get(parsedSignature.keyId)
