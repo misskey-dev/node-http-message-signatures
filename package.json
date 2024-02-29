@@ -5,6 +5,8 @@
   "type": "module",
   "keywords": [
     "rfc9421",
+		"rfc3230",
+		"rfc9530",
     "http",
     "signature",
     "signing",

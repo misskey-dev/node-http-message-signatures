@@ -1,29 +1,39 @@
-import { lcObjectKey } from 'src/utils';
-import { createDigest } from '../digest';
+import { lcObjectKey } from '../utils';
+import { createBase64Digest } from './utils';
 import { DigestHashAlgorithm, IncomingRequest } from '../types';
 import { BinaryLike } from 'node:crypto';
 
-const digestHashAlgos = {
-	'sha1': 'SHA-1',
+const digestHashAlgosForEncoding = {
+	'sha1': 'SHA',
 	'sha256': 'SHA-256',
 	'sha384': 'SHA-384',
 	'sha512': 'SHA-512',
+	'md5': 'MD5',
 } as const satisfies Record<DigestHashAlgorithm, string>;
 
-export function genDraftDigestHeader(body: string, hashAlgorithm: DigestHashAlgorithm = 'sha256') {
-	return `${digestHashAlgos[hashAlgorithm]}=${createDigest(body, hashAlgorithm)}`;
+const digestHashAlgosForDecoding = {
+	'SHA': 'sha1',
+	'SHA-1': 'sha1',
+	'SHA-256': 'sha256',
+	'SHA-384': 'sha384',
+	'SHA-512': 'sha512',
+	'MD5': 'md5',
+} as const satisfies Record<string, DigestHashAlgorithm>;
+
+export function genRFC3230DigestHeader(body: string, hashAlgorithm: DigestHashAlgorithm = 'sha256') {
+	return `${digestHashAlgosForEncoding[hashAlgorithm]}=${createBase64Digest(body, hashAlgorithm)}`;
 }
 
-const digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=(.+)$/;
+export const digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
 
-export function verifyDraftDigestHeader(
+export function verifyRFC3230DigestHeader(
 	request: IncomingRequest,
 	rawBody: BinaryLike,
 	failOnNoDigest = true,
 	errorLogger?: ((message: any) => any)
 ) {
 	const headers = lcObjectKey(request.headers);
-	const digestHeader = headers['digest'];
+	let digestHeader = headers['digest'];
 	if (!digestHeader) {
 		if (failOnNoDigest) {
 			if (errorLogger) errorLogger('Digest header not found');
@@ -32,8 +42,7 @@ export function verifyDraftDigestHeader(
 		return true;
 	}
 	if (Array.isArray(digestHeader)) {
-		if (errorLogger) errorLogger('Multiple Digest headers found');
-		return false;
+		digestHeader = digestHeader[0];
 	}
 
 	const match = digestHeader.match(digestHeaderRegEx);
@@ -48,16 +57,13 @@ export function verifyDraftDigestHeader(
 		return false;
 	}
 
-	const algo = Object.entries(digestHashAlgos).reduce((acc, [key, value]) => {
-		if (value === match[1]) return key as DigestHashAlgorithm;
-		return acc;
-	}, null as DigestHashAlgorithm | null);
+	const algo = digestHashAlgosForDecoding[match[1].toUpperCase()] as DigestHashAlgorithm | undefined;
 	if (!algo) {
 		if (errorLogger) errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
 		return false;
 	}
 
-	const hash = createDigest(rawBody, algo);
+	const hash = createBase64Digest(rawBody, algo);
 	if (hash !== value) {
 		if (errorLogger) errorLogger(`Digest header hash mismatch`);
 		return false;

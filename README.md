@@ -16,7 +16,7 @@ Parse and verify in fastify web server, implements ActivityPub inbox
 ```ts
 import Fastify from 'fastify';
 import fastifyRawBody from 'fastify-raw-body';
-import { parseRequest, verifyDraftSignature, verifyDraftDigestHeader } from '@misskey-dev/node-http-message-signatures';
+import { parseRequest, verifyDraftSignature, verifyRFC3230DigestHeader } from '@misskey-dev/node-http-message-signatures';
 
 /**
  * Prepare keyId-publicKeyPem Map
@@ -36,7 +36,7 @@ fastify.post('/inbox', { confog: { rawBody: true } }, async (request, reply) => 
 	const parsedSignature = parseRequest(request.raw);
 
 	if (parsedSignature && parsedSignature.version === 'draft') {
-		const verifyDigest = verifyDraftDigestHeader(request.raw, request.rawBody, true);
+		const verifyDigest = verifyRFC3230DigestHeader(request.raw, request.rawBody, true);
 		if (!verifyDigest) {
 			reply.code(401);
 			return;
@@ -61,9 +61,9 @@ fastify.post('/inbox', { confog: { rawBody: true } }, async (request, reply) => 
 });
 ```
 
-### Sign and Post ()
+### Sign and Post
 ```ts
-import { signAsDraftToRequest, genDraftDigestHeader, RequestLike } from '@misskey-dev/node-http-message-signatures';
+import { signAsDraftToRequest, genRFC3230DigestHeader, RequestLike } from '@misskey-dev/node-http-message-signatures';
 
 /**
  * Prepare keyId-privateKeyPem Map
@@ -73,12 +73,15 @@ const privateKeyMap = new Map([
 	...
 ]);
 
+function targetSupportsRFC9421(url) {
+	return true;
+}
+
 const includeHeaders = ['(request-target)', 'date', 'host', 'digest'];
 
 export function send(url: string, body: string, keyId: string) {
 	const privateKeyPem = privateKeyMap.get(keyId);
 	const u = new URL(url);
-	const digestHeader = genDraftDigestHeader(body);
 
 	const request: RequestLike = {
 		headers: {
@@ -91,12 +94,19 @@ export function send(url: string, body: string, keyId: string) {
 		body,
 	};
 
-	signAsDraftToRequest(request, { keyId, privateKeyPem }, includeHeaders);
+	if (targetSupportsRFC9421(url)) {
+		// TODO
+	} else {
+		// Draft
+		request.headers['Digest'] = genRFC3230DigestHeader(body);
 
-	fetch(u, {
-		method: request.method,
-		headers: request.headers,
-		body,
-	})
+		signAsDraftToRequest(request, { keyId, privateKeyPem }, includeHeaders);
+
+		fetch(u, {
+			method: request.method,
+			headers: request.headers,
+			body,
+		});
+	}
 }
 ```
