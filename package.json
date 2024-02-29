@@ -1,6 +1,6 @@
 {
   "name": "@misskey-dev/node-http-message-signatures",
-  "version": "0.0.0-alpha.6",
+  "version": "0.0.0-alpha.7",
   "description": "",
   "type": "module",
   "keywords": [
@@ -30,7 +30,8 @@
   "types": "dist/index.d.ts",
 	"exports": {
 		"import": "./dist/index.mjs",
-		"require": "./dist/index.cjs"
+		"require": "./dist/index.cjs",
+		"types": "./dist/index.d.ts"
 	},
   "scripts": {
     "eslint": "eslint --quiet \"src/**/*.ts\"",
