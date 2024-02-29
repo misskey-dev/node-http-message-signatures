@@ -16,7 +16,7 @@ Parse and verify in fastify web server, implements ActivityPub inbox
 ```ts
 import Fastify from 'fastify';
 import fastifyRawBody from 'fastify-raw-body';
-import { parseRequest, verifyDraftSignature } from '@misskey-dev/node-http-message-signatures';
+import { parseRequest, verifyDraftSignature, verifyDraftDigestHeader } from '@misskey-dev/node-http-message-signatures';
 
 /**
  * Prepare keyId-publicKeyPem Map
@@ -36,6 +36,12 @@ fastify.post('/inbox', { confog: { rawBody: true } }, async (request, reply) => 
 	const parsedSignature = parseRequest(request.raw);
 
 	if (parsedSignature && parsedSignature.version === 'draft') {
+		const verifyDigest = verifyDraftDigestHeader(request.raw, request.rawBody, true);
+		if (!verifyDigest) {
+			reply.code(401);
+			return;
+		}
+
 		// Get public key by keyId
 		const publicKeyPem = publicKeyMap.get(parsedSignature.keyId)
 		if (!publicKeyPem) {
@@ -57,7 +63,7 @@ fastify.post('/inbox', { confog: { rawBody: true } }, async (request, reply) => 
 
 ### Sign and Post ()
 ```ts
-import { signAsDraftToRequest, RequestLike } from '@misskey-dev/node-http-message-signatures';
+import { signAsDraftToRequest, genDraftDigestHeader, RequestLike } from '@misskey-dev/node-http-message-signatures';
 
 /**
  * Prepare keyId-privateKeyPem Map
@@ -67,17 +73,18 @@ const privateKeyMap = new Map([
 	...
 ]);
 
-const includeHeaders = ['(request-target)', 'host', 'date', 'accept'];
+const includeHeaders = ['(request-target)', 'date', 'host', 'digest'];
 
 export function send(url: string, body: string, keyId: string) {
 	const privateKeyPem = privateKeyMap.get(keyId);
 	const u = new URL(url);
+	const digestHeader = genDraftDigestHeader(body);
 
 	const request: RequestLike = {
 		headers: {
 			Date: (new Date()).toUTCString(),
 			Host: u.host,
-			Accept: '*/*',
+			Digest: digestHeader,
 		},
 		method: 'POST',
 		url: u.href,
@@ -92,7 +99,4 @@ export function send(url: string, body: string, keyId: string) {
 		body,
 	})
 }
-
-
-
 ```
