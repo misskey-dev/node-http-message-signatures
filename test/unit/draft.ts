@@ -64,7 +64,7 @@ describe('draft', () => {
 				const request = getBasicOutgoingRequest();
 				signAsDraftToRequest(request, key, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
 				request.headers = lcObjectKey(request.headers);
-				const parsed = httpSignature.parseRequestSignature(request, { clockSkew: ThousandYearsBySeconds });
+				const parsed = httpSignature.parseSignature(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
@@ -80,7 +80,7 @@ describe('draft', () => {
 				const request = getBasicOutgoingRequest();
 				request.headers = lcObjectKey(request.headers);
 				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#main-key",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="aaaaaaaa"';
-				const parsed = httpSignature.parseRequestSignature(request, { clockSkew: ThousandYearsBySeconds });
+				const parsed = httpSignature.parseSignature(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
 			});
@@ -108,7 +108,7 @@ describe('draft', () => {
 				const request = getBasicOutgoingRequest();
 				signAsDraftToRequest(request, key, basicIncludeHeaders, { hashAlgorithm: null });
 				request.headers = lcObjectKey(request.headers);
-				const parsed = httpSignature.parseRequestSignature(request, { clockSkew: ThousandYearsBySeconds });
+				const parsed = httpSignature.parseSignature(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
@@ -128,7 +128,7 @@ describe('draft', () => {
 				request.headers = lcObjectKey(request.headers);
 				// tweetnaclがバイト数でエラーを吐くため、signatureの長さをちゃんとしたものにしておく
 				(request.headers as any)['signature'] = `keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="${Array.from({ length: 86 }, () => 'A').join('')}=="`;
-				const parsed = httpSignature.parseRequestSignature(request, { clockSkew: ThousandYearsBySeconds });
+				const parsed = httpSignature.parseSignature(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
 			});
