@@ -24,6 +24,7 @@ As a way of expressing the HTTP Message Signatures support status of software, I
 ~~Newer versions of Misskey have this string in `metadata.httpMessageSignaturesImplementationLevel` of nodeinfo.~~
 
 |Level|Definition|
+|:-:|:--|
 |`00`|"Draft", RFC 3230, RSA-SHA256 Only|
 |`01`|"Draft", RFC 3230, Supports EdDSA|
 |`11`|RFC 9421, RFC 9530, Supports EdDSA|
