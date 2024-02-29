@@ -1,7 +1,32 @@
 @misskey-dev/node-http-message-signatures
 ----
 
-(WIP) Implementation of RFC 9421 for Node.js, for Misskey.
+(WIP) Implementation of [HTTP Signatures "Draft", RFC 9421](https://datatracker.ietf.org/doc/rfc9421/), [RFC 3230](https://datatracker.ietf.org/doc/rfc3230/) and [RFC 9530](https://datatracker.ietf.org/doc/rfc9530/) for Node.js.
+
+It is created for Misskey's ActivityPub implementation.
+
+## Context
+### HTTP Signatures "Draft" and RFC 9421
+[RFC 9421](https://datatracker.ietf.org/doc/rfc9421/) is the standard used for signing HTTP communications, but has been used since draft in the world of ActivityPub server-to-server communications with Misskey, Mastodon, and others.
+The title "HTTP Signatures" in the draft was changed to "HTTP Message Signatures" in the RFC.
+
+This library allows both the draft and RFC to be used.
+
+### RFC 3230 and RFC 9530
+[RFC 3230](https://datatracker.ietf.org/doc/rfc3230/) and [RFC 9530](https://datatracker.ietf.org/doc/rfc9530/) are standards used for expressing the digest of the body of an HTTP communication. RFC 9530 was released at the same time as RFC 9421 and obsoletes RFC 3230.
+
+Since ActivityPub also needs digest validation, this library also implements functions to create and validate digests.
+
+## Compatibility
+### HTTP Message Signatures Implementation Level
+As a way of expressing the HTTP Message Signatures support status of software, I propose to express it as an implementation level (a string of two-digit numbers).
+
+~~Newer versions of Misskey have this string in `metadata.httpMessageSignaturesImplementationLevel` of nodeinfo.~~
+
+|Level|Definition|
+|`00`|"Draft", RFC 3230, RSA-SHA256 Only|
+|`01`|"Draft", RFC 3230, Supports EdDSA|
+|`11`|RFC 9421, RFC 9530, Supports EdDSA|
 
 ## Usage
 
@@ -21,7 +46,10 @@ import { parseRequest, verifyDraftSignature, verifyDigestHeader } from '@misskey
 /**
  * Prepare keyId-publicKeyPem Map
  */
-const publicKeyMap = new Map([[ 'test', '-----BEGIN PUBLIC KEY...' ], ... ]);
+const publicKeyMap = new Map([
+	[ 'test', '-----BEGIN PUBLIC KEY...' ],
+	...
+]);
 
 const fastify = Fastify({
 	logger: true,
