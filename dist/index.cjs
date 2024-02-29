@@ -31,37 +31,45 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var src_exports = {};
 __export(src_exports, {
   ClockSkewInvalidError: () => ClockSkewInvalidError,
+  HttpSignatureDraft: () => HttpSignatureDraft,
   InvalidRequestError: () => InvalidRequestError,
   RequestHasMultipleDateHeadersError: () => RequestHasMultipleDateHeadersError,
   RequestHasMultipleSignatureHeadersError: () => RequestHasMultipleSignatureHeadersError,
-  SignatureHeaderContentLackedError: () => SignatureHeaderContentLackedError,
   SignatureHeaderNotFoundError: () => SignatureHeaderNotFoundError,
   SignatureMissmatchWithProvidedAlgorithmError: () => SignatureMissmatchWithProvidedAlgorithmError,
   checkClockSkew: () => checkClockSkew,
   detectAndVerifyAlgorithm: () => detectAndVerifyAlgorithm,
-  genDraftAuthorizationHeader: () => genDraftAuthorizationHeader,
-  genDraftSignature: () => genDraftSignature,
-  genDraftSignatureHeader: () => genDraftSignatureHeader,
-  genDraftSigningString: () => genDraftSigningString,
   genEcKeyPair: () => genEcKeyPair,
   genEd25519KeyPair: () => genEd25519KeyPair,
   genEd448KeyPair: () => genEd448KeyPair,
   genRsaKeyPair: () => genRsaKeyPair,
   getDraftAlgoString: () => getDraftAlgoString,
   lcObjectKey: () => lcObjectKey,
-  parseDraftRequest: () => parseDraftRequest,
-  parseDraftRequestSignatureHeader: () => parseDraftRequestSignatureHeader,
   parseRequest: () => parseRequest,
   prepareSignInfo: () => prepareSignInfo,
-  signAsDraftToRequest: () => signAsDraftToRequest,
   signatureHeaderIsDraft: () => signatureHeaderIsDraft,
   toSpkiPublicKey: () => toSpkiPublicKey,
-  validateRequestAndGetSignatureHeader: () => validateRequestAndGetSignatureHeader,
-  verifySignature: () => verifySignature
+  validateRequestAndGetSignatureHeader: () => validateRequestAndGetSignatureHeader
 });
 module.exports = __toCommonJS(src_exports);
 
+// src/draft/parse.ts
+var parse_exports = {};
+__export(parse_exports, {
+  SignatureHeaderContentLackedError: () => SignatureHeaderContentLackedError,
+  parseDraftRequest: () => parseDraftRequest,
+  parseDraftRequestSignatureHeader: () => parseDraftRequestSignatureHeader
+});
+
 // src/draft/sign.ts
+var sign_exports = {};
+__export(sign_exports, {
+  genDraftAuthorizationHeader: () => genDraftAuthorizationHeader,
+  genDraftSignature: () => genDraftSignature,
+  genDraftSignatureHeader: () => genDraftSignatureHeader,
+  genDraftSigningString: () => genDraftSigningString,
+  signAsDraftToRequest: () => signAsDraftToRequest
+});
 var crypto2 = __toESM(require("node:crypto"), 1);
 
 // src/utils.ts
@@ -448,6 +456,10 @@ function detectAndVerifyAlgorithm(algorithm, publicKey) {
 }
 
 // src/draft/verify.ts
+var verify_exports = {};
+__export(verify_exports, {
+  verifySignature: () => verifySignature
+});
 var crypto4 = __toESM(require("node:crypto"), 1);
 function verifySignature(parsed, publicKeyPem, errorLogger) {
   const publicKey = crypto4.createPublicKey(publicKeyPem);
@@ -460,34 +472,33 @@ function verifySignature(parsed, publicKeyPem, errorLogger) {
     return false;
   }
 }
+
+// src/index.ts
+var HttpSignatureDraft = {
+  ...parse_exports,
+  ...sign_exports,
+  ...verify_exports
+};
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   ClockSkewInvalidError,
+  HttpSignatureDraft,
   InvalidRequestError,
   RequestHasMultipleDateHeadersError,
   RequestHasMultipleSignatureHeadersError,
-  SignatureHeaderContentLackedError,
   SignatureHeaderNotFoundError,
   SignatureMissmatchWithProvidedAlgorithmError,
   checkClockSkew,
   detectAndVerifyAlgorithm,
-  genDraftAuthorizationHeader,
-  genDraftSignature,
-  genDraftSignatureHeader,
-  genDraftSigningString,
   genEcKeyPair,
   genEd25519KeyPair,
   genEd448KeyPair,
   genRsaKeyPair,
   getDraftAlgoString,
   lcObjectKey,
-  parseDraftRequest,
-  parseDraftRequestSignatureHeader,
   parseRequest,
   prepareSignInfo,
-  signAsDraftToRequest,
   signatureHeaderIsDraft,
   toSpkiPublicKey,
-  validateRequestAndGetSignatureHeader,
-  verifySignature
+  validateRequestAndGetSignatureHeader
 });
