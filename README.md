@@ -17,6 +17,12 @@ This library allows both the draft and RFC to be used.
 
 Since ActivityPub also needs digest validation, this library also implements functions to create and validate digests.
 
+## Comparison
+### With http-signature
+Previously, we used `http-signature` (`@peertube/http-signature` to be exact) to parse and verify (Draft) signatures, and this library replaces those implementations as well.
+
+This is because `TritonDataCenter/node-sshpk` (formerly `joient/node-sshpk`), on which http-signature depends, is slower than `node:crypto`.
+
 ## Compatibility
 ### HTTP Message Signatures Implementation Level
 As a way of expressing the HTTP Message Signatures support status of software, I propose to express it as an implementation level (`string` of two-digit numbers).
@@ -42,7 +48,7 @@ Parse and verify in fastify web server, implements ActivityPub inbox
 ```ts
 import Fastify from 'fastify';
 import fastifyRawBody from 'fastify-raw-body';
-import { parseRequest, verifyDraftSignature, verifyDigestHeader } from '@misskey-dev/node-http-message-signatures';
+import { parseRequestSignature, verifyDraftSignature, verifyDigestHeader } from '@misskey-dev/node-http-message-signatures';
 
 /**
  * Prepare keyId-publicKeyPem Map
@@ -61,14 +67,14 @@ await fastify.register(fastifyRawBody, {
 	runFirst: true,
 });
 fastify.post('/inbox', { confog: { rawBody: true } }, async (request, reply) => {
-	const verifyDigest = verifyDigestHeader(request.raw,request.rawBody, true);
+	const verifyDigest = verifyDigestHeader(request.raw, request.rawBody, true);
 	if (!verifyDigest) {
 		reply.code(401);
 		return;
 	}
 
 	// Parse raw request
-	const parsedSignature = parseRequest(request.raw);
+	const parsedSignature = parseRequestSignature(request.raw);
 
 	if (parsedSignature && parsedSignature.version === 'draft') {
 

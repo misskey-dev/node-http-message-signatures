@@ -3,7 +3,7 @@ import httpSignature from '@peertube/http-signature';
 
 import { genDraftSigningString, signAsDraftToRequest } from '@/draft/sign.js';
 import { verifyDraftSignature } from '@/draft/verify.js';
-import { parseRequest, ClockSkewInvalidError } from '@/parse.js';
+import { parseRequestSignature, ClockSkewInvalidError } from '@/parse.js';
 import * as keys from '../keys.js';
 import { lcObjectKey } from '@/utils.js';
 
@@ -56,7 +56,7 @@ describe('draft', () => {
 			test('verify by itself', () => {
 				const request = getBasicOutgoingRequest();
 				signAsDraftToRequest(request, key, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
-				const parsed = parseRequest(request, { clockSkew: { now: theDate } });
+				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 				const verifyResult = verifyDraftSignature(parsed!.value, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
@@ -64,7 +64,7 @@ describe('draft', () => {
 				const request = getBasicOutgoingRequest();
 				signAsDraftToRequest(request, key, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
 				request.headers = lcObjectKey(request.headers);
-				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });
+				const parsed = httpSignature.parseRequestSignature(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
@@ -72,7 +72,7 @@ describe('draft', () => {
 				const request = getBasicOutgoingRequest();
 				request.headers = lcObjectKey(request.headers);
 				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#main-key",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="aaaaaaaa"';
-				const parsed = parseRequest(request, { clockSkew: { now: theDate } });
+				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 				const verifyResult = verifyDraftSignature(parsed!.value, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
 			});
@@ -80,7 +80,7 @@ describe('draft', () => {
 				const request = getBasicOutgoingRequest();
 				request.headers = lcObjectKey(request.headers);
 				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#main-key",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="aaaaaaaa"';
-				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });
+				const parsed = httpSignature.parseRequestSignature(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
 			});
@@ -100,7 +100,7 @@ describe('draft', () => {
 			test('verify by itself', () => {
 				const request = getBasicOutgoingRequest();
 				signAsDraftToRequest(request, key, basicIncludeHeaders, { hashAlgorithm: null });
-				const parsed = parseRequest(request, { clockSkew: { now: theDate } });
+				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 				const verifyResult = verifyDraftSignature(parsed!.value, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
@@ -108,7 +108,7 @@ describe('draft', () => {
 				const request = getBasicOutgoingRequest();
 				signAsDraftToRequest(request, key, basicIncludeHeaders, { hashAlgorithm: null });
 				request.headers = lcObjectKey(request.headers);
-				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });
+				const parsed = httpSignature.parseRequestSignature(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
@@ -117,8 +117,8 @@ describe('draft', () => {
 				signAsDraftToRequest(request, key, basicIncludeHeaders, { hashAlgorithm: null });
 				(request.headers as any)['signature'] = `keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="${Array.from({ length: 86 }, () => 'A').join('')}=="`;
 				// Check clock skew error
-				expect(() => parseRequest(request)).toThrow(ClockSkewInvalidError);
-				const parsed = parseRequest(request, { clockSkew: { now: theDate } });
+				expect(() => parseRequestSignature(request)).toThrow(ClockSkewInvalidError);
+				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 				const verifyResult = verifyDraftSignature(parsed!.value, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
 			});
@@ -128,7 +128,7 @@ describe('draft', () => {
 				request.headers = lcObjectKey(request.headers);
 				// tweetnaclがバイト数でエラーを吐くため、signatureの長さをちゃんとしたものにしておく
 				(request.headers as any)['signature'] = `keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="${Array.from({ length: 86 }, () => 'A').join('')}=="`;
-				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });
+				const parsed = httpSignature.parseRequestSignature(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
 			});

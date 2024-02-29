@@ -83,12 +83,11 @@ export function validateRequestAndGetSignatureHeader(
 }
 
 /**
- * Parse the request headers
- * DraftとRFCをうまく区別してリクエストをパースする
+ * Parse request headers with Draft and RFC discrimination
  * @param request http.IncomingMessage | http2.Http2ServerRequest
  * @param options
  */
-export function parseRequest(request: IncomingRequest, options?: RequestParseOptions) {
+export function parseRequestSignature(request: IncomingRequest, options?: RequestParseOptions) {
 	const signatureHeader = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
 
 	if (requestIsRFC9421(request)) {
