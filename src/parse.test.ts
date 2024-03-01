@@ -1,4 +1,6 @@
-import { checkClockSkew } from './parse.js';
+import { ClockSkewInvalidError, SignatureHeaderNotFoundError, checkClockSkew, validateRequestAndGetSignatureHeader } from './parse.js';
+
+const theDate = new Date('2024-02-28T17:44:06.000Z');
 
 describe('parse', () => {
 	describe(checkClockSkew, () => {
@@ -25,6 +27,75 @@ describe('parse', () => {
 			const now = new Date('2024-02-28T17:44:05.500Z');
 			expect(() => checkClockSkew(req, now, 300 * 1e3, 100))
 				.toThrow('Clock skew is invalid: request="2024-02-28T17:44:06.000Z",now="2024-02-28T17:44:05.500Z",diff="-500"');
+		});
+	});
+
+	describe(validateRequestAndGetSignatureHeader, () => {
+		test('normal', () => {
+			const request = {
+				headers: {
+					signature: 'test',
+					date: theDate.toUTCString(),
+					host: 'example.com',
+					accept: '*/*',
+				},
+				method: 'GET',
+				url: '/foo/bar',
+			};
+			const result = validateRequestAndGetSignatureHeader(request, { now: theDate });
+			expect(result).toBe('test');
+		});
+		test('invalid skew', () => {
+			const request = {
+				headers: {
+					signature: 'test',
+					date: (new Date(theDate.getTime() + 1000)).toUTCString(),
+					host: 'example.com',
+					accept: '*/*',
+				},
+				method: 'GET',
+				url: '/foo/bar',
+			};
+			expect(() => validateRequestAndGetSignatureHeader(request, { now: theDate })).toThrow(ClockSkewInvalidError);
+		});
+		test('authorization header', () => {
+			const request = {
+				headers: {
+					authorization: 'Signature test',
+					date: theDate.toUTCString(),
+					host: 'example.com',
+					accept: '*/*',
+				},
+				method: 'GET',
+				url: '/foo/bar',
+			};
+			const result = validateRequestAndGetSignatureHeader(request, { now: theDate });
+			expect(result).toBe('test');
+		});
+		test('no signature', () => {
+			const request = {
+				headers: {
+					date: theDate.toUTCString(),
+					host: 'example.com',
+					accept: '*/*',
+				},
+				method: 'GET',
+				url: '/foo/bar',
+			};
+			expect(() => validateRequestAndGetSignatureHeader(request, { now: theDate })).toThrow(SignatureHeaderNotFoundError);
+		});
+		test('authorization header, no signature', () => {
+			const request = {
+				headers: {
+					authorization: 'Bearer test',
+					date: theDate.toUTCString(),
+					host: 'example.com',
+					accept: '*/*',
+				},
+				method: 'GET',
+				url: '/foo/bar',
+			};
+			expect(() => validateRequestAndGetSignatureHeader(request, { now: theDate })).toThrow(SignatureHeaderNotFoundError);
 		});
 	});
 });

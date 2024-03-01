@@ -91,9 +91,6 @@ export function validateRequestAndGetSignatureHeader(
 ): string {
 	if (!request.headers) throw new SignatureHeaderNotFoundError();
 	const headers = lcObjectKey(request.headers);
-	const signatureHeader = headers['signature'];
-	if (!signatureHeader) throw new SignatureHeaderNotFoundError();
-	if (Array.isArray(signatureHeader)) throw new RequestHasMultipleSignatureHeadersError();
 
 	if (headers['date']) {
 		if (Array.isArray(headers['date'])) throw new RequestHasMultipleDateHeadersError();
@@ -106,7 +103,22 @@ export function validateRequestAndGetSignatureHeader(
 	if (!request.method) throw new InvalidRequestError('Request method not found');
 	if (!request.url) throw new InvalidRequestError('Request URL not found');
 
-	return signatureHeader;
+	const signatureHeader = headers['signature'];
+	if (signatureHeader) {
+		if (Array.isArray(signatureHeader)) throw new RequestHasMultipleSignatureHeadersError();
+		return signatureHeader;
+	}
+
+	/**
+	 * Joyent spec uses `Authorization` header
+	 * https://github.com/TritonDataCenter/node-http-signature/blob/master/http_signing.md#default-parameterization
+	 */
+	const authorizationHeader = headers['authorization'];
+	if (authorizationHeader) {
+		if (authorizationHeader.startsWith('Signature ')) return authorizationHeader.slice(10);
+	}
+
+	throw new SignatureHeaderNotFoundError();
 }
 
 /**
