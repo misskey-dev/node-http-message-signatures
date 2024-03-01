@@ -1,19 +1,17 @@
 import * as crypto from 'node:crypto';
 import type { SignatureHashAlgorithm } from '../types.js';
 
-export class SignatureMissmatchWithProvidedAlgorithmError extends Error {
-	constructor(providedAlgorithm: string, detectedAlgorithm: string, realKeyType: string) {
-		super(`Provided algorithm does not match the public key type: provided=${detectedAlgorithm}(${providedAlgorithm}}, real=${realKeyType}`);
-	}
+function buildErrorMessage(providedAlgorithm: string, detectedAlgorithm: string, realKeyType: string) {
+	return `Provided algorithm does not match the public key type: provided=${detectedAlgorithm}(${providedAlgorithm}}, real=${realKeyType}`;
 }
 
 /**
  * ヘッダーのアルゴリズムから鍵とハッシュアルゴリズムを認識する
  * 提供されたアルゴリズムと呼び出しの公開鍵の種類が一致しない場合はエラーを投げる
  * @param algorithm ヘッダーのアルゴリズム
- * @param key 実際の公開鍵
+ * @param publicKey 実際の公開鍵
  */
-export function detectAndVerifyAlgorithm(algorithm: string | undefined, publicKey: crypto.KeyObject ): { keyAlg: crypto.KeyType, hashAlg: SignatureHashAlgorithm | null } {
+export function detectAndVerifyAlgorithm(algorithm: string | undefined, publicKey: crypto.KeyObject, errorLogger?: ((message: any) => any)): { keyAlg: crypto.KeyType, hashAlg: SignatureHashAlgorithm | null } | null {
 	algorithm = algorithm?.toLowerCase();
 	const realKeyType = publicKey.asymmetricKeyType;
 
@@ -23,7 +21,8 @@ export function detectAndVerifyAlgorithm(algorithm: string | undefined, publicKe
 			providedKeyAlgorithm !== realKeyType.toLowerCase() &&
 			!(providedKeyAlgorithm === 'ecdsa' && realKeyType === 'ec')
 		) {
-			throw new SignatureMissmatchWithProvidedAlgorithmError(algorithm, providedKeyAlgorithm, realKeyType);
+			if (errorLogger) errorLogger(buildErrorMessage(providedKeyAlgorithm, realKeyType, realKeyType));
+			return null;
 		}
 	}
 
@@ -63,5 +62,7 @@ export function detectAndVerifyAlgorithm(algorithm: string | undefined, publicKe
 			hashAlg: algoSplitted.length === 1 ? null : algoSplitted[algoSplitted.length - 1] as SignatureHashAlgorithm,
 		};
 	}
-	throw new Error('Algorithm not found');
+
+	if (errorLogger) errorLogger('Algorithm is not detected');
+	return null;
 }

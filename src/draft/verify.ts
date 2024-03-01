@@ -6,6 +6,7 @@ export function verifyDraftSignature(parsed: ParsedDraftSignature['value'], publ
 	const publicKey = crypto.createPublicKey(publicKeyPem);
 	try {
 		const detected = detectAndVerifyAlgorithm(parsed.params.algorithm, publicKey);
+		if (!detected) return false;
 		return crypto.verify(detected.hashAlg, Buffer.from(parsed.signingString), publicKey, Buffer.from(parsed.params.signature, 'base64'));
 	} catch (e) {
 		if (errorLogger) errorLogger(e);
