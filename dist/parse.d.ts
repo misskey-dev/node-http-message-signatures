@@ -1,4 +1,4 @@
-import type { ClockSkewSettings, IncomingRequest } from './types.js';
+import type { ClockSkewSettings, IncomingRequest, ParsedSignature } from './types.js';
 export type RequestParseOptions = {
     /**
      * Headers should be included in the signature string
@@ -61,4 +61,4 @@ export declare function validateRequestAndGetSignatureHeader(request: IncomingRe
  * @param request http.IncomingMessage | http2.Http2ServerRequest
  * @param options
  */
-export declare function parseRequestSignature(request: IncomingRequest, options?: RequestParseOptions): import("./types.js").ParsedDraftSignature;
+export declare function parseRequestSignature(request: IncomingRequest, options?: RequestParseOptions): ParsedSignature;

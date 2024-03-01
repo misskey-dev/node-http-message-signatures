@@ -43,7 +43,6 @@ __export(src_exports, {
   checkClockSkew: () => checkClockSkew,
   detectAndVerifyAlgorithm: () => detectAndVerifyAlgorithm,
   digestHeaderRegEx: () => digestHeaderRegEx,
-  genDraftAuthorizationHeader: () => genDraftAuthorizationHeader,
   genDraftSignature: () => genDraftSignature,
   genDraftSignatureHeader: () => genDraftSignatureHeader,
   genDraftSigningString: () => genDraftSigningString,
@@ -177,9 +176,6 @@ function genDraftSigningString(request, includeHeaders, additional) {
 function genDraftSignature(signingString, privateKey, hashAlgorithm) {
   const r = crypto2.sign(hashAlgorithm, Buffer.from(signingString), privateKey);
   return r.toString("base64");
-}
-function genDraftAuthorizationHeader(includeHeaders, keyId, signature, hashAlgorithm = "rsa-sha256") {
-  return `Signature ${genDraftSignatureHeader(includeHeaders, keyId, signature, hashAlgorithm)}`;
 }
 function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
   return `keyId="${keyId}",algorithm="${algorithm}",headers="${includeHeaders.join(" ")}",signature="${signature}"`;
@@ -404,11 +400,6 @@ function validateRequestAndGetSignatureHeader(request, clock) {
   if (!request.headers)
     throw new SignatureHeaderNotFoundError();
   const headers = lcObjectKey(request.headers);
-  const signatureHeader = headers["signature"];
-  if (!signatureHeader)
-    throw new SignatureHeaderNotFoundError();
-  if (Array.isArray(signatureHeader))
-    throw new RequestHasMultipleSignatureHeadersError();
   if (headers["date"]) {
     if (Array.isArray(headers["date"]))
       throw new RequestHasMultipleDateHeadersError();
@@ -422,7 +413,18 @@ function validateRequestAndGetSignatureHeader(request, clock) {
     throw new InvalidRequestError("Request method not found");
   if (!request.url)
     throw new InvalidRequestError("Request URL not found");
-  return signatureHeader;
+  const signatureHeader = headers["signature"];
+  if (signatureHeader) {
+    if (Array.isArray(signatureHeader))
+      throw new RequestHasMultipleSignatureHeadersError();
+    return signatureHeader;
+  }
+  const authorizationHeader = headers["authorization"];
+  if (authorizationHeader) {
+    if (authorizationHeader.startsWith("Signature "))
+      return authorizationHeader.slice(10);
+  }
+  throw new SignatureHeaderNotFoundError();
 }
 function parseRequestSignature(request, options) {
   const signatureHeader = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
@@ -668,7 +670,6 @@ function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   checkClockSkew,
   detectAndVerifyAlgorithm,
   digestHeaderRegEx,
-  genDraftAuthorizationHeader,
   genDraftSignature,
   genDraftSignatureHeader,
   genDraftSigningString,

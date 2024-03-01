@@ -1,4 +1,4 @@
-import type { PrivateKey, RequestLike, SignatureAlgorithm, SignatureHashAlgorithm } from '../types.js';
+import type { PrivateKey, RequestLike, SignatureHashAlgorithm } from '../types.js';
 export declare function genDraftSigningString(request: RequestLike, includeHeaders: string[], additional?: {
     keyId: string;
     algorithm: string;
@@ -7,7 +7,6 @@ export declare function genDraftSigningString(request: RequestLike, includeHeade
     opaque?: string;
 }): string;
 export declare function genDraftSignature(signingString: string, privateKey: string, hashAlgorithm: SignatureHashAlgorithm | null): string;
-export declare function genDraftAuthorizationHeader(includeHeaders: string[], keyId: string, signature: string, hashAlgorithm?: SignatureAlgorithm): string;
 export declare function genDraftSignatureHeader(includeHeaders: string[], keyId: string, signature: string, algorithm: string): string;
 export declare function signAsDraftToRequest(request: RequestLike, key: PrivateKey, includeHeaders: string[], opts?: {
     hashAlgorithm?: SignatureHashAlgorithm;
