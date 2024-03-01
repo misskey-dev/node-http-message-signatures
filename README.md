@@ -23,7 +23,9 @@ Previously, we used `http-signature` (`@peertube/http-signature` to be exact) to
 
 This is because `TritonDataCenter/node-sshpk` (formerly `joient/node-sshpk`), on which http-signature depends, is slower than `node:crypto`.
 
-## Compatibility
+## ActivityPub Compatibility
+One of the motivations for creating this package is to make Misskey compatible with the Ed25519 signature instead of RSA. In doing so, there is a need to ensure compatibility.
+
 ### HTTP Message Signatures Implementation Level
 As a way of expressing the HTTP Message Signatures support status of software, I propose to express it as an implementation level (`string` of two-digit numbers).
 
@@ -32,8 +34,38 @@ As a way of expressing the HTTP Message Signatures support status of software, I
 |Level|Definition|
 |:-:|:--|
 |`00`|"Draft", RFC 3230, RSA-SHA256 Only|
-|`01`|"Draft", RFC 3230, Supports EdDSA|
-|`11`|RFC 9421, RFC 9530, Supports EdDSA|
+|`01`|"Draft", RFC 3230, Supports multiple public keys and Ed25519|
+|`11`|RFC 9421, RFC 9530, Supports multiple public keys and Ed25519|
+
+### `additionalPublicKeys`
+Misskey added the `additionalPublicKeys` property to Actor to allow it to have multiple public keys. This is an array of [publicKey](https://docs.joinmastodon.org/spec/activitypub/#publicKey)s.
+
+```json
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://w3id.org/security/v1",
+		{
+			"Key": "sec:Key",
+			"additionalPublicKeys": "misskey:additionalPublicKeys"
+		}
+  ],
+  "id": "https://misskey.io/users/7rkrarq81i",
+  "type": "Person",
+  "publicKey": {
+    "id": "https://misskey.io/users/7rkrarq81i#main-key",
+		"type": "Key",
+    "owner": "https://misskey.io/users/7rkrarq81i",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----..."
+  },
+	"additionalPublicKeys": [{
+    "id": "https://misskey.io/users/7rkrarq81i#ed25519-key",
+		"type": "Key",
+    "owner": "https://misskey.io/users/7rkrarq81i",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----..."
+	}]
+}
+```
 
 ## Usage
 
