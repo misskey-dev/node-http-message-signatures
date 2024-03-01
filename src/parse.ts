@@ -3,7 +3,13 @@ import type { ClockSkewSettings, IncomingRequest } from './types.js';
 import { lcObjectKey, objectLcKeys } from './utils.js';
 
 export type RequestParseOptions = {
-	headers?: string[];
+	/**
+	 * Headers should be included in the signature string
+	 */
+	requiredInputs?: {
+		draft?: string[];
+		rfc9421?: string[];
+	};
 	clockSkew?: ClockSkewSettings;
 };
 

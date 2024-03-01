@@ -91,7 +91,19 @@ export function validateAndProcessParsedDraftSignatureHeader(parsed: DraftSignat
 	if (!parsed.keyId) throw new SignatureHeaderContentLackedError('keyId');
 	if (!parsed.algorithm) throw new SignatureHeaderContentLackedError('algorithm');
 	if (!parsed.signature) throw new SignatureHeaderContentLackedError('signature');
-	if (!parsed.headers && !options?.headers) throw new SignatureHeaderContentLackedError('headers');
+	if (!parsed.headers) throw new SignatureHeaderContentLackedError('headers');
+	const headersArray = parsed.headers.split(' ');
+	if (options?.requiredInputs?.draft) {
+		for (const requiredInput of options.requiredInputs.draft) {
+			if (requiredInput === 'x-date' || requiredInput === 'date') {
+				// dateとx-dateは相互に読み替える
+				if (headersArray.includes('date')) continue;
+				if (headersArray.includes('x-date')) continue;
+				throw new SignatureHeaderContentLackedError(`headers.${requiredInput}`);
+			}
+			if (!headersArray.includes(requiredInput)) throw new SignatureHeaderContentLackedError(`headers.${requiredInput}`);
+		}
+	}
 
 	if (parsed.created) {
 		const createdSec = parseInt(parsed.created);
@@ -114,7 +126,7 @@ export function validateAndProcessParsedDraftSignatureHeader(parsed: DraftSignat
 		keyId: parsed.keyId!,
 		algorithm: parsed.algorithm!.toLowerCase(),
 		signature: parsed.signature!,
-		headers: parsed.headers ? parsed.headers.split(' ') : options!.headers!,
+		headers: headersArray,
 		created: parsed.created,
 		expires: parsed.expires,
 		opaque: parsed.opaque,
