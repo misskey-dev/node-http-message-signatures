@@ -9,20 +9,32 @@ export type RequestParseOptions = {
     };
     clockSkew?: ClockSkewSettings;
 };
-export declare class SignatureHeaderNotFoundError extends Error {
-    constructor();
-}
-export declare class InvalidRequestError extends Error {
+export declare class HTTPMessageSignaturesParseError extends Error {
     constructor(message: string);
 }
-export declare class RequestHasMultipleSignatureHeadersError extends Error {
+export declare class SignatureHeaderNotFoundError extends HTTPMessageSignaturesParseError {
     constructor();
 }
-export declare class RequestHasMultipleDateHeadersError extends Error {
+export declare class InvalidRequestError extends HTTPMessageSignaturesParseError {
+    constructor(message: string);
+}
+export declare class RequestHasMultipleSignatureHeadersError extends HTTPMessageSignaturesParseError {
     constructor();
 }
-export declare class ClockSkewInvalidError extends Error {
+export declare class RequestHasMultipleDateHeadersError extends HTTPMessageSignaturesParseError {
+    constructor();
+}
+export declare class ClockSkewInvalidError extends HTTPMessageSignaturesParseError {
     constructor(reqDate: Date, nowDate: Date);
+}
+export declare class UnknownSignatureHeaderFormatError extends HTTPMessageSignaturesParseError {
+    constructor();
+}
+export declare class DraftSignatureHeaderContentLackedError extends HTTPMessageSignaturesParseError {
+    constructor(lackedContent: string);
+}
+export declare class DraftSignatureHeaderClockInvalidError extends HTTPMessageSignaturesParseError {
+    constructor(prop: 'created' | 'expires');
 }
 /**
  * Check if request signature is based on draft
@@ -39,8 +51,8 @@ export declare function requestIsRFC9421(request: IncomingRequest): boolean;
  * Check the clock skew of the request
  * @param reqDate Request date
  * @param nowDate Now date
- * @param delay Tolerance of Request's delay (ms)
- * @param forward Tolerance of request's forward (ms)
+ * @param delay Tolerance of request's clock delay (ms)
+ * @param forward Tolerance of request's clock forwarding (ms)
  */
 export declare function checkClockSkew(reqDate: Date, nowDate: Date, delay?: number, forward?: number): void;
 export declare function validateRequestAndGetSignatureHeader(request: IncomingRequest, clock?: ClockSkewSettings): string;
@@ -49,4 +61,4 @@ export declare function validateRequestAndGetSignatureHeader(request: IncomingRe
  * @param request http.IncomingMessage | http2.Http2ServerRequest
  * @param options
  */
-export declare function parseRequestSignature(request: IncomingRequest, options?: RequestParseOptions): import("./types.js").ParsedDraftSignature | null;
+export declare function parseRequestSignature(request: IncomingRequest, options?: RequestParseOptions): import("./types.js").ParsedDraftSignature;

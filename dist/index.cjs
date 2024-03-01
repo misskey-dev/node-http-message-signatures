@@ -31,13 +31,15 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var src_exports = {};
 __export(src_exports, {
   ClockSkewInvalidError: () => ClockSkewInvalidError,
+  DraftSignatureHeaderClockInvalidError: () => DraftSignatureHeaderClockInvalidError,
+  DraftSignatureHeaderContentLackedError: () => DraftSignatureHeaderContentLackedError,
   DraftSignatureHeaderKeys: () => DraftSignatureHeaderKeys,
+  HTTPMessageSignaturesParseError: () => HTTPMessageSignaturesParseError,
   InvalidRequestError: () => InvalidRequestError,
   RequestHasMultipleDateHeadersError: () => RequestHasMultipleDateHeadersError,
   RequestHasMultipleSignatureHeadersError: () => RequestHasMultipleSignatureHeadersError,
-  SignatureHeaderClockInvalidError: () => SignatureHeaderClockInvalidError,
-  SignatureHeaderContentLackedError: () => SignatureHeaderContentLackedError,
   SignatureHeaderNotFoundError: () => SignatureHeaderNotFoundError,
+  UnknownSignatureHeaderFormatError: () => UnknownSignatureHeaderFormatError,
   checkClockSkew: () => checkClockSkew,
   detectAndVerifyAlgorithm: () => detectAndVerifyAlgorithm,
   digestHeaderRegEx: () => digestHeaderRegEx,
@@ -200,16 +202,6 @@ function signAsDraftToRequest(request, key, includeHeaders, opts = {}) {
 }
 
 // src/draft/parse.ts
-var SignatureHeaderContentLackedError = class extends Error {
-  constructor(lackedContent) {
-    super(`Signature header content lacked: ${lackedContent}`);
-  }
-};
-var SignatureHeaderClockInvalidError = class extends Error {
-  constructor(prop) {
-    super(`Clock skew is invalid (${prop})`);
-  }
-};
 var DraftSignatureHeaderKeys = ["keyId", "algorithm", "created", "expires", "opaque", "headers", "signature"];
 function parseDraftRequestSignatureHeader(signatureHeader) {
   const result = {};
@@ -273,13 +265,13 @@ function parseDraftRequestSignatureHeader(signatureHeader) {
 }
 function validateAndProcessParsedDraftSignatureHeader(parsed, options) {
   if (!parsed.keyId)
-    throw new SignatureHeaderContentLackedError("keyId");
+    throw new DraftSignatureHeaderContentLackedError("keyId");
   if (!parsed.algorithm)
-    throw new SignatureHeaderContentLackedError("algorithm");
+    throw new DraftSignatureHeaderContentLackedError("algorithm");
   if (!parsed.signature)
-    throw new SignatureHeaderContentLackedError("signature");
+    throw new DraftSignatureHeaderContentLackedError("signature");
   if (!parsed.headers)
-    throw new SignatureHeaderContentLackedError("headers");
+    throw new DraftSignatureHeaderContentLackedError("headers");
   const headersArray = parsed.headers.split(" ");
   if (options?.requiredInputs?.draft) {
     for (const requiredInput of options.requiredInputs.draft) {
@@ -288,28 +280,28 @@ function validateAndProcessParsedDraftSignatureHeader(parsed, options) {
           continue;
         if (headersArray.includes("x-date"))
           continue;
-        throw new SignatureHeaderContentLackedError(`headers.${requiredInput}`);
+        throw new DraftSignatureHeaderContentLackedError(`headers.${requiredInput}`);
       }
       if (!headersArray.includes(requiredInput))
-        throw new SignatureHeaderContentLackedError(`headers.${requiredInput}`);
+        throw new DraftSignatureHeaderContentLackedError(`headers.${requiredInput}`);
     }
   }
   if (parsed.created) {
     const createdSec = parseInt(parsed.created);
     if (isNaN(createdSec))
-      throw new SignatureHeaderClockInvalidError("created");
+      throw new DraftSignatureHeaderClockInvalidError("created");
     const nowTime = (options?.clockSkew?.now || /* @__PURE__ */ new Date()).getTime();
     if (createdSec * 1e3 > nowTime + (options?.clockSkew?.forward ?? 100)) {
-      throw new SignatureHeaderClockInvalidError("created");
+      throw new DraftSignatureHeaderClockInvalidError("created");
     }
   }
   if (parsed.expires) {
     const expiresSec = parseInt(parsed.expires);
     if (isNaN(expiresSec))
-      throw new SignatureHeaderClockInvalidError("expires");
+      throw new DraftSignatureHeaderClockInvalidError("expires");
     const nowTime = (options?.clockSkew?.now || /* @__PURE__ */ new Date()).getTime();
     if (expiresSec * 1e3 < nowTime - (options?.clockSkew?.forward ?? 100)) {
-      throw new SignatureHeaderClockInvalidError("expires");
+      throw new DraftSignatureHeaderClockInvalidError("expires");
     }
   }
   return {
@@ -349,29 +341,49 @@ function parseDraftRequest(request, options) {
 }
 
 // src/parse.ts
-var SignatureHeaderNotFoundError = class extends Error {
-  constructor() {
-    super("Signature header not found");
-  }
-};
-var InvalidRequestError = class extends Error {
+var HTTPMessageSignaturesParseError = class extends Error {
   constructor(message) {
     super(message);
   }
 };
-var RequestHasMultipleSignatureHeadersError = class extends Error {
+var SignatureHeaderNotFoundError = class extends HTTPMessageSignaturesParseError {
+  constructor() {
+    super("Signature header not found");
+  }
+};
+var InvalidRequestError = class extends HTTPMessageSignaturesParseError {
+  constructor(message) {
+    super(message);
+  }
+};
+var RequestHasMultipleSignatureHeadersError = class extends HTTPMessageSignaturesParseError {
   constructor() {
     super("Request has multiple signature headers");
   }
 };
-var RequestHasMultipleDateHeadersError = class extends Error {
+var RequestHasMultipleDateHeadersError = class extends HTTPMessageSignaturesParseError {
   constructor() {
     super("Request has multiple date headers");
   }
 };
-var ClockSkewInvalidError = class extends Error {
+var ClockSkewInvalidError = class extends HTTPMessageSignaturesParseError {
   constructor(reqDate, nowDate) {
     super(`Clock skew is invalid: request="${reqDate.toJSON()}",now="${nowDate.toJSON()}",diff="${nowDate.getTime() - reqDate.getTime()}"`);
+  }
+};
+var UnknownSignatureHeaderFormatError = class extends HTTPMessageSignaturesParseError {
+  constructor() {
+    super("Unknown signature header format");
+  }
+};
+var DraftSignatureHeaderContentLackedError = class extends HTTPMessageSignaturesParseError {
+  constructor(lackedContent) {
+    super(`Signature header content lacked: ${lackedContent}`);
+  }
+};
+var DraftSignatureHeaderClockInvalidError = class extends HTTPMessageSignaturesParseError {
+  constructor(prop) {
+    super(`Clock skew is invalid (${prop})`);
   }
 };
 function signatureHeaderIsDraft(signatureHeader) {
@@ -419,7 +431,7 @@ function parseRequestSignature(request, options) {
   } else if (signatureHeaderIsDraft(signatureHeader)) {
     return parseDraftRequest(request, options);
   }
-  return null;
+  throw new UnknownSignatureHeaderFormatError();
 }
 
 // src/keypair.ts
@@ -644,13 +656,15 @@ function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   ClockSkewInvalidError,
+  DraftSignatureHeaderClockInvalidError,
+  DraftSignatureHeaderContentLackedError,
   DraftSignatureHeaderKeys,
+  HTTPMessageSignaturesParseError,
   InvalidRequestError,
   RequestHasMultipleDateHeadersError,
   RequestHasMultipleSignatureHeadersError,
-  SignatureHeaderClockInvalidError,
-  SignatureHeaderContentLackedError,
   SignatureHeaderNotFoundError,
+  UnknownSignatureHeaderFormatError,
   checkClockSkew,
   detectAndVerifyAlgorithm,
   digestHeaderRegEx,

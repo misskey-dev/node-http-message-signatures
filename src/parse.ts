@@ -13,6 +13,7 @@ export type RequestParseOptions = {
 	clockSkew?: ClockSkewSettings;
 };
 
+//#region parse errors
 export class HTTPMessageSignaturesParseError extends Error {
 	constructor(message: string) { super(message); }
 }
@@ -41,6 +42,18 @@ export class UnknownSignatureHeaderFormatError extends HTTPMessageSignaturesPars
 	constructor() { super('Unknown signature header format'); }
 }
 
+//#region draft parse errors
+// ここに書かないと循環参照でCannot access 'HTTPMessageSignaturesParseError' before initializationになる
+export class DraftSignatureHeaderContentLackedError extends HTTPMessageSignaturesParseError {
+	constructor(lackedContent: string) { super(`Signature header content lacked: ${lackedContent}`); }
+}
+
+export class DraftSignatureHeaderClockInvalidError extends HTTPMessageSignaturesParseError {
+	constructor(prop: 'created' | 'expires') { super(`Clock skew is invalid (${prop})`); }
+}
+//#endregion
+//#endregion
+
 /**
  * Check if request signature is based on draft
  * from the expression of the Signature header
@@ -62,8 +75,8 @@ export function requestIsRFC9421(request: IncomingRequest) {
  * Check the clock skew of the request
  * @param reqDate Request date
  * @param nowDate Now date
- * @param delay Tolerance of Request's delay (ms)
- * @param forward Tolerance of request's forward (ms)
+ * @param delay Tolerance of request's clock delay (ms)
+ * @param forward Tolerance of request's clock forwarding (ms)
  */
 export function checkClockSkew(reqDate: Date, nowDate: Date, delay: number = 300 * 1e3, forward: number = 100) {
 	const reqTime = reqDate.getTime();

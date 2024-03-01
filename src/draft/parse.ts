@@ -1,14 +1,6 @@
-import { HTTPMessageSignaturesParseError, RequestParseOptions, validateRequestAndGetSignatureHeader } from "../parse.js";
+import { DraftSignatureHeaderClockInvalidError, DraftSignatureHeaderContentLackedError, RequestParseOptions, validateRequestAndGetSignatureHeader } from "../parse.js";
 import type { ParsedDraftSignature, IncomingRequest, RequestLike } from '../types.js';
-import { genDraftSigningString } from "../draft/sign.js";
-
-export class DraftSignatureHeaderContentLackedError extends HTTPMessageSignaturesParseError {
-	constructor(lackedContent: string) { super(`Signature header content lacked: ${lackedContent}`); }
-}
-
-export class DraftSignatureHeaderClockInvalidError extends HTTPMessageSignaturesParseError {
-	constructor(prop: 'created' | 'expires') { super(`Clock skew is invalid (${prop})`); }
-}
+import { genDraftSigningString } from './sign.js';
 
 export const DraftSignatureHeaderKeys = ['keyId', 'algorithm', 'created', 'expires', 'opaque', 'headers', 'signature'] as const;
 export type DraftSignatureHeaderParsedRaw = {
