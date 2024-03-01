@@ -1,5 +1,5 @@
 import { parseDraftRequest } from './draft/parse.js';
-import type { ClockSkewSettings, IncomingRequest } from './types.js';
+import type { ClockSkewSettings, IncomingRequest, ParsedSignature } from './types.js';
 import { lcObjectKey, objectLcKeys } from './utils.js';
 
 export type RequestParseOptions = {
@@ -114,7 +114,7 @@ export function validateRequestAndGetSignatureHeader(
  * @param request http.IncomingMessage | http2.Http2ServerRequest
  * @param options
  */
-export function parseRequestSignature(request: IncomingRequest, options?: RequestParseOptions) {
+export function parseRequestSignature(request: IncomingRequest, options?: RequestParseOptions): ParsedSignature {
 	const signatureHeader = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
 
 	if (requestIsRFC9421(request)) {
