@@ -13,24 +13,32 @@ export type RequestParseOptions = {
 	clockSkew?: ClockSkewSettings;
 };
 
-export class SignatureHeaderNotFoundError extends Error {
-	constructor() { super('Signature header not found'); }
-}
-
-export class InvalidRequestError extends Error {
+export class HTTPMessageSignaturesParseError extends Error {
 	constructor(message: string) { super(message); }
 }
 
-export class RequestHasMultipleSignatureHeadersError extends Error {
+export class SignatureHeaderNotFoundError extends HTTPMessageSignaturesParseError {
+	constructor() { super('Signature header not found'); }
+}
+
+export class InvalidRequestError extends HTTPMessageSignaturesParseError {
+	constructor(message: string) { super(message); }
+}
+
+export class RequestHasMultipleSignatureHeadersError extends HTTPMessageSignaturesParseError {
 	constructor() { super('Request has multiple signature headers'); }
 }
 
-export class RequestHasMultipleDateHeadersError extends Error {
+export class RequestHasMultipleDateHeadersError extends HTTPMessageSignaturesParseError {
 	constructor() { super('Request has multiple date headers'); }
 }
 
-export class ClockSkewInvalidError extends Error {
+export class ClockSkewInvalidError extends HTTPMessageSignaturesParseError {
 	constructor(reqDate: Date, nowDate: Date) { super(`Clock skew is invalid: request="${reqDate.toJSON()}",now="${nowDate.toJSON()}",diff="${nowDate.getTime() - reqDate.getTime()}"`); }
+}
+
+export class UnknownSignatureHeaderFormatError extends HTTPMessageSignaturesParseError {
+	constructor() { super('Unknown signature header format'); }
 }
 
 /**
@@ -102,5 +110,5 @@ export function parseRequestSignature(request: IncomingRequest, options?: Reques
 	} else if (signatureHeaderIsDraft(signatureHeader)) {
 		return parseDraftRequest(request, options);
 	}
-	return null;
+	throw new UnknownSignatureHeaderFormatError();
 }

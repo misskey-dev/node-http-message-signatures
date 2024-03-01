@@ -1,12 +1,12 @@
-import { RequestParseOptions, validateRequestAndGetSignatureHeader } from "../parse.js";
+import { HTTPMessageSignaturesParseError, RequestParseOptions, validateRequestAndGetSignatureHeader } from "../parse.js";
 import type { ParsedDraftSignature, IncomingRequest, RequestLike } from '../types.js';
 import { genDraftSigningString } from "../draft/sign.js";
 
-export class SignatureHeaderContentLackedError extends Error {
+export class DraftSignatureHeaderContentLackedError extends HTTPMessageSignaturesParseError {
 	constructor(lackedContent: string) { super(`Signature header content lacked: ${lackedContent}`); }
 }
 
-export class SignatureHeaderClockInvalidError extends Error {
+export class DraftSignatureHeaderClockInvalidError extends HTTPMessageSignaturesParseError {
 	constructor(prop: 'created' | 'expires') { super(`Clock skew is invalid (${prop})`); }
 }
 
@@ -88,10 +88,10 @@ export function parseDraftRequestSignatureHeader(signatureHeader: string): Draft
 }
 
 export function validateAndProcessParsedDraftSignatureHeader(parsed: DraftSignatureHeaderParsedRaw, options?: RequestParseOptions) {
-	if (!parsed.keyId) throw new SignatureHeaderContentLackedError('keyId');
-	if (!parsed.algorithm) throw new SignatureHeaderContentLackedError('algorithm');
-	if (!parsed.signature) throw new SignatureHeaderContentLackedError('signature');
-	if (!parsed.headers) throw new SignatureHeaderContentLackedError('headers');
+	if (!parsed.keyId) throw new DraftSignatureHeaderContentLackedError('keyId');
+	if (!parsed.algorithm) throw new DraftSignatureHeaderContentLackedError('algorithm');
+	if (!parsed.signature) throw new DraftSignatureHeaderContentLackedError('signature');
+	if (!parsed.headers) throw new DraftSignatureHeaderContentLackedError('headers');
 	const headersArray = parsed.headers.split(' ');
 	if (options?.requiredInputs?.draft) {
 		for (const requiredInput of options.requiredInputs.draft) {
@@ -99,26 +99,26 @@ export function validateAndProcessParsedDraftSignatureHeader(parsed: DraftSignat
 				// dateとx-dateは相互に読み替える
 				if (headersArray.includes('date')) continue;
 				if (headersArray.includes('x-date')) continue;
-				throw new SignatureHeaderContentLackedError(`headers.${requiredInput}`);
+				throw new DraftSignatureHeaderContentLackedError(`headers.${requiredInput}`);
 			}
-			if (!headersArray.includes(requiredInput)) throw new SignatureHeaderContentLackedError(`headers.${requiredInput}`);
+			if (!headersArray.includes(requiredInput)) throw new DraftSignatureHeaderContentLackedError(`headers.${requiredInput}`);
 		}
 	}
 
 	if (parsed.created) {
 		const createdSec = parseInt(parsed.created);
-		if (isNaN(createdSec)) throw new SignatureHeaderClockInvalidError('created');
+		if (isNaN(createdSec)) throw new DraftSignatureHeaderClockInvalidError('created');
 		const nowTime = (options?.clockSkew?.now || new Date()).getTime();
 		if (createdSec * 1000 > nowTime + (options?.clockSkew?.forward ?? 100)) {
-			throw new SignatureHeaderClockInvalidError('created');
+			throw new DraftSignatureHeaderClockInvalidError('created');
 		}
 	}
 	if (parsed.expires) {
 		const expiresSec = parseInt(parsed.expires);
-		if (isNaN(expiresSec)) throw new SignatureHeaderClockInvalidError('expires');
+		if (isNaN(expiresSec)) throw new DraftSignatureHeaderClockInvalidError('expires');
 		const nowTime = (options?.clockSkew?.now || new Date()).getTime();
 		if (expiresSec * 1000 < nowTime - (options?.clockSkew?.forward ?? 100)) {
-			throw new SignatureHeaderClockInvalidError('expires');
+			throw new DraftSignatureHeaderClockInvalidError('expires');
 		}
 	}
 
