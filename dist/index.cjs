@@ -38,7 +38,6 @@ __export(src_exports, {
   SignatureHeaderClockInvalidError: () => SignatureHeaderClockInvalidError,
   SignatureHeaderContentLackedError: () => SignatureHeaderContentLackedError,
   SignatureHeaderNotFoundError: () => SignatureHeaderNotFoundError,
-  SignatureMissmatchWithProvidedAlgorithmError: () => SignatureMissmatchWithProvidedAlgorithmError,
   checkClockSkew: () => checkClockSkew,
   detectAndVerifyAlgorithm: () => detectAndVerifyAlgorithm,
   digestHeaderRegEx: () => digestHeaderRegEx,
@@ -578,18 +577,18 @@ function verifyDigestHeader(request, rawBody, failOnNoDigest = true, errorLogger
 }
 
 // src/shared/verify.ts
-var SignatureMissmatchWithProvidedAlgorithmError = class extends Error {
-  constructor(providedAlgorithm, detectedAlgorithm, realKeyType) {
-    super(`Provided algorithm does not match the public key type: provided=${detectedAlgorithm}(${providedAlgorithm}}, real=${realKeyType}`);
-  }
-};
-function detectAndVerifyAlgorithm(algorithm, publicKey) {
+function buildErrorMessage(providedAlgorithm, detectedAlgorithm, realKeyType) {
+  return `Provided algorithm does not match the public key type: provided=${detectedAlgorithm}(${providedAlgorithm}}, real=${realKeyType}`;
+}
+function detectAndVerifyAlgorithm(algorithm, publicKey, errorLogger) {
   algorithm = algorithm?.toLowerCase();
   const realKeyType = publicKey.asymmetricKeyType;
   if (algorithm && algorithm !== "hs2019" && realKeyType) {
     const providedKeyAlgorithm = algorithm.split("-")[0];
     if (providedKeyAlgorithm !== realKeyType.toLowerCase() && !(providedKeyAlgorithm === "ecdsa" && realKeyType === "ec")) {
-      throw new SignatureMissmatchWithProvidedAlgorithmError(algorithm, providedKeyAlgorithm, realKeyType);
+      if (errorLogger)
+        errorLogger(buildErrorMessage(providedKeyAlgorithm, realKeyType, realKeyType));
+      return null;
     }
   }
   if (algorithm === "ed25519" || algorithm === "ed25519-sha512" || realKeyType === "ed25519") {
@@ -622,7 +621,9 @@ function detectAndVerifyAlgorithm(algorithm, publicKey) {
       hashAlg: algoSplitted.length === 1 ? null : algoSplitted[algoSplitted.length - 1]
     };
   }
-  throw new Error("Algorithm not found");
+  if (errorLogger)
+    errorLogger("Algorithm is not detected");
+  return null;
 }
 
 // src/draft/verify.ts
@@ -631,6 +632,8 @@ function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   const publicKey = crypto4.createPublicKey(publicKeyPem);
   try {
     const detected = detectAndVerifyAlgorithm(parsed.params.algorithm, publicKey);
+    if (!detected)
+      return false;
     return crypto4.verify(detected.hashAlg, Buffer.from(parsed.signingString), publicKey, Buffer.from(parsed.params.signature, "base64"));
   } catch (e) {
     if (errorLogger)
@@ -648,7 +651,6 @@ function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   SignatureHeaderClockInvalidError,
   SignatureHeaderContentLackedError,
   SignatureHeaderNotFoundError,
-  SignatureMissmatchWithProvidedAlgorithmError,
   checkClockSkew,
   detectAndVerifyAlgorithm,
   digestHeaderRegEx,
