@@ -36,8 +36,9 @@
   "scripts": {
     "eslint": "eslint --quiet \"src/**/*.ts\"",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent=false --verbose false",
-    "build": "NODE_ENV=production node build.js && tsc --project tsconfig.build.json"
-  },
+    "build": "NODE_ENV=production node build.js && tsc --project tsconfig.build.json",
+		"performance": "node ./test/performance/draft.js"
+	},
   "packageManager": "pnpm@8.15.4",
   "files": [
     "dist",

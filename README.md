@@ -66,7 +66,7 @@ await fastify.register(fastifyRawBody, {
 	encoding: null,
 	runFirst: true,
 });
-fastify.post('/inbox', { confog: { rawBody: true } }, async (request, reply) => {
+fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => {
 	const verifyDigest = verifyDigestHeader(request.raw, request.rawBody, true);
 	if (!verifyDigest) {
 		reply.code(401);
