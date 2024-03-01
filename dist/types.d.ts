@@ -6,6 +6,7 @@ export type RequestLike = {
     url: string;
     method: string;
     headers: Record<string, string>;
+    body?: string;
 };
 export type IncomingRequest = RequestLike | IncomingMessage | Http2ServerRequest;
 export type ClockSkewSettings = {
@@ -46,8 +47,9 @@ export type PrivateKey = {
     keyId: string;
 };
 export type SignatureHashAlgorithm = 'sha1' | 'sha256' | 'sha384' | 'sha512' | null;
+export type DigestHashAlgorithm = 'sha1' | 'sha256' | 'sha384' | 'sha512' | 'md5';
 export type SignatureAlgorithm = 'rsa-sha1' | 'rsa-sha256' | 'rsa-sha384' | 'rsa-sha512' | 'ecdsa-sha1' | 'ecdsa-sha256' | 'ecdsa-sha384' | 'ecdsa-sha512' | 'ed25519-sha512' | 'ed25519' | 'ed448';
-export type DraftParsedSignature = {
+export type ParsedDraftSignature = {
     version: 'draft';
     /**
      * Compatible with @peertube/http-signature
@@ -58,6 +60,7 @@ export type DraftParsedSignature = {
         params: {
             keyId: string;
             /**
+             * lower-case
              * @example 'rsa-sha256'
              */
             algorithm?: string;
@@ -69,9 +72,11 @@ export type DraftParsedSignature = {
         };
         signingString: string;
         /**
+         * UPPER-CASE
          * @example 'RSA-SHA256'
          */
         algorithm?: string;
         keyId: string;
     };
 };
+export type ParsedSignature = ParsedDraftSignature;

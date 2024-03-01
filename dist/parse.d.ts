@@ -1,6 +1,12 @@
 import type { ClockSkewSettings, IncomingRequest } from './types.js';
 export type RequestParseOptions = {
-    headers?: string[];
+    /**
+     * Headers should be included in the signature string
+     */
+    requiredInputs?: {
+        draft?: string[];
+        rfc9421?: string[];
+    };
     clockSkew?: ClockSkewSettings;
 };
 export declare class SignatureHeaderNotFoundError extends Error {
@@ -26,6 +32,10 @@ export declare class ClockSkewInvalidError extends Error {
  */
 export declare function signatureHeaderIsDraft(signatureHeader: string): boolean;
 /**
+ * Check if request is based on RFC 9421
+ */
+export declare function requestIsRFC9421(request: IncomingRequest): boolean;
+/**
  * Check the clock skew of the request
  * @param reqDate Request date
  * @param nowDate Now date
@@ -35,9 +45,8 @@ export declare function signatureHeaderIsDraft(signatureHeader: string): boolean
 export declare function checkClockSkew(reqDate: Date, nowDate: Date, delay?: number, forward?: number): void;
 export declare function validateRequestAndGetSignatureHeader(request: IncomingRequest, clock?: ClockSkewSettings): string;
 /**
- * Parse the request headers
- * DraftとRFCをうまく区別してリクエストをパースする
+ * Parse request headers with Draft and RFC discrimination
  * @param request http.IncomingMessage | http2.Http2ServerRequest
  * @param options
  */
-export declare function parseRequest(request: IncomingRequest, options?: RequestParseOptions): import("./types.js").DraftParsedSignature;
+export declare function parseRequestSignature(request: IncomingRequest, options?: RequestParseOptions): import("./types.js").ParsedDraftSignature | null;

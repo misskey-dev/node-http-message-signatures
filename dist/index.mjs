@@ -1,26 +1,4 @@
-var __defProp = Object.defineProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-
-// src/draft/parse.ts
-var parse_exports = {};
-__export(parse_exports, {
-  SignatureHeaderContentLackedError: () => SignatureHeaderContentLackedError,
-  parseDraftRequest: () => parseDraftRequest,
-  parseDraftRequestSignatureHeader: () => parseDraftRequestSignatureHeader
-});
-
 // src/draft/sign.ts
-var sign_exports = {};
-__export(sign_exports, {
-  genDraftAuthorizationHeader: () => genDraftAuthorizationHeader,
-  genDraftSignature: () => genDraftSignature,
-  genDraftSignatureHeader: () => genDraftSignatureHeader,
-  genDraftSigningString: () => genDraftSigningString,
-  signAsDraftToRequest: () => signAsDraftToRequest
-});
 import * as crypto2 from "node:crypto";
 
 // src/utils.ts
@@ -78,19 +56,45 @@ function lcObjectKey(src) {
     return dst;
   }, {});
 }
+function lcObjectGet(src, key) {
+  key = key.toLowerCase();
+  for (const [k, v] of Object.entries(src)) {
+    if (k.toLowerCase() === key)
+      return v;
+  }
+  return void 0;
+}
+function objectLcKeys(src) {
+  return Object.keys(src).reduce((dst, key) => {
+    if (key === "__proto__")
+      return dst;
+    dst.add(key.toLowerCase());
+    return dst;
+  }, /* @__PURE__ */ new Set());
+}
 
 // src/draft/sign.ts
-function genDraftSigningString(request, includeHeaders) {
-  request.headers = lcObjectKey(request.headers);
+function genDraftSigningString(request, includeHeaders, additional) {
+  const headers = lcObjectKey(request.headers);
   const results = [];
   for (const key of includeHeaders.map((x) => x.toLowerCase())) {
     if (key === "(request-target)") {
       results.push(`(request-target): ${request.method.toLowerCase()} ${request.url.startsWith("/") ? request.url : new URL(request.url).pathname}`);
+    } else if (key === "(keyid)") {
+      results.push(`(keyid): ${additional?.keyId}`);
+    } else if (key === "(algorithm)") {
+      results.push(`(algorithm): ${additional?.algorithm}`);
+    } else if (key === "(created)") {
+      results.push(`(created): ${additional?.created}`);
+    } else if (key === "(expires)") {
+      results.push(`(expires): ${additional?.expires}`);
+    } else if (key === "(opaque)") {
+      results.push(`(opaque): ${additional?.opaque}`);
     } else {
-      if (key === "date" && !request.headers["date"] && request.headers["x-date"]) {
-        results.push(`date: ${request.headers["x-date"]}`);
+      if (key === "date" && !headers["date"] && headers["x-date"]) {
+        results.push(`date: ${headers["x-date"]}`);
       } else {
-        results.push(`${key}: ${request.headers[key]}`);
+        results.push(`${key}: ${headers[key]}`);
       }
     }
   }
@@ -109,9 +113,10 @@ function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
 function signAsDraftToRequest(request, key, includeHeaders, opts = {}) {
   const hashAlgorithm = opts?.hashAlgorithm || "sha256";
   const signInfo = prepareSignInfo(key.privateKeyPem, hashAlgorithm);
-  const signingString = genDraftSigningString(request, includeHeaders);
+  const algoString = getDraftAlgoString(signInfo);
+  const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
   const signature = genDraftSignature(signingString, key.privateKeyPem, signInfo.hashAlg);
-  const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, getDraftAlgoString(signInfo));
+  const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, algoString);
   Object.assign(request.headers, {
     Signature: signatureHeader
   });
@@ -128,6 +133,12 @@ var SignatureHeaderContentLackedError = class extends Error {
     super(`Signature header content lacked: ${lackedContent}`);
   }
 };
+var SignatureHeaderClockInvalidError = class extends Error {
+  constructor(prop) {
+    super(`Clock skew is invalid (${prop})`);
+  }
+};
+var DraftSignatureHeaderKeys = ["keyId", "algorithm", "created", "expires", "opaque", "headers", "signature"];
 function parseDraftRequestSignatureHeader(signatureHeader) {
   const result = {};
   let prevStatus = "none";
@@ -188,26 +199,71 @@ function parseDraftRequestSignatureHeader(signatureHeader) {
   }
   return result;
 }
-function validateAndProcessParsedDraftSignatureHeader(parsed, headers) {
+function validateAndProcessParsedDraftSignatureHeader(parsed, options) {
   if (!parsed.keyId)
     throw new SignatureHeaderContentLackedError("keyId");
   if (!parsed.algorithm)
     throw new SignatureHeaderContentLackedError("algorithm");
   if (!parsed.signature)
     throw new SignatureHeaderContentLackedError("signature");
-  if (!parsed.headers && !headers)
+  if (!parsed.headers)
     throw new SignatureHeaderContentLackedError("headers");
+  const headersArray = parsed.headers.split(" ");
+  if (options?.requiredInputs?.draft) {
+    for (const requiredInput of options.requiredInputs.draft) {
+      if (requiredInput === "x-date" || requiredInput === "date") {
+        if (headersArray.includes("date"))
+          continue;
+        if (headersArray.includes("x-date"))
+          continue;
+        throw new SignatureHeaderContentLackedError(`headers.${requiredInput}`);
+      }
+      if (!headersArray.includes(requiredInput))
+        throw new SignatureHeaderContentLackedError(`headers.${requiredInput}`);
+    }
+  }
+  if (parsed.created) {
+    const createdSec = parseInt(parsed.created);
+    if (isNaN(createdSec))
+      throw new SignatureHeaderClockInvalidError("created");
+    const nowTime = (options?.clockSkew?.now || /* @__PURE__ */ new Date()).getTime();
+    if (createdSec * 1e3 > nowTime + (options?.clockSkew?.forward ?? 100)) {
+      throw new SignatureHeaderClockInvalidError("created");
+    }
+  }
+  if (parsed.expires) {
+    const expiresSec = parseInt(parsed.expires);
+    if (isNaN(expiresSec))
+      throw new SignatureHeaderClockInvalidError("expires");
+    const nowTime = (options?.clockSkew?.now || /* @__PURE__ */ new Date()).getTime();
+    if (expiresSec * 1e3 < nowTime - (options?.clockSkew?.forward ?? 100)) {
+      throw new SignatureHeaderClockInvalidError("expires");
+    }
+  }
   return {
     keyId: parsed.keyId,
     algorithm: parsed.algorithm.toLowerCase(),
     signature: parsed.signature,
-    headers: parsed.headers ? parsed.headers.split(" ") : headers
+    headers: headersArray,
+    created: parsed.created,
+    expires: parsed.expires,
+    opaque: parsed.opaque
   };
 }
 function parseDraftRequest(request, options) {
   const signatureHeader = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
-  const parsedSignatureHeader = validateAndProcessParsedDraftSignatureHeader(parseDraftRequestSignatureHeader(signatureHeader), options?.headers);
-  const signingString = genDraftSigningString(request, parsedSignatureHeader.headers);
+  const parsedSignatureHeader = validateAndProcessParsedDraftSignatureHeader(parseDraftRequestSignatureHeader(signatureHeader), options);
+  const signingString = genDraftSigningString(
+    request,
+    parsedSignatureHeader.headers,
+    {
+      keyId: parsedSignatureHeader.keyId,
+      algorithm: parsedSignatureHeader.algorithm,
+      created: parsedSignatureHeader.created,
+      expires: parsedSignatureHeader.expires,
+      opaque: parsedSignatureHeader.opaque
+    }
+  );
   return {
     version: "draft",
     value: {
@@ -249,6 +305,9 @@ var ClockSkewInvalidError = class extends Error {
 function signatureHeaderIsDraft(signatureHeader) {
   return signatureHeader.includes('signature="');
 }
+function requestIsRFC9421(request) {
+  return objectLcKeys(request.headers).has("signature-input");
+}
 function checkClockSkew(reqDate, nowDate, delay = 300 * 1e3, forward = 100) {
   const reqTime = reqDate.getTime();
   const nowTime = nowDate.getTime();
@@ -260,19 +319,20 @@ function checkClockSkew(reqDate, nowDate, delay = 300 * 1e3, forward = 100) {
 function validateRequestAndGetSignatureHeader(request, clock) {
   if (!request.headers)
     throw new SignatureHeaderNotFoundError();
-  const signatureHeader = request.headers["signature"] || request.headers["Signature"];
+  const headers = lcObjectKey(request.headers);
+  const signatureHeader = headers["signature"];
   if (!signatureHeader)
     throw new SignatureHeaderNotFoundError();
   if (Array.isArray(signatureHeader))
     throw new RequestHasMultipleSignatureHeadersError();
-  if (request.headers["date"]) {
-    if (Array.isArray(request.headers["date"]))
+  if (headers["date"]) {
+    if (Array.isArray(headers["date"]))
       throw new RequestHasMultipleDateHeadersError();
-    checkClockSkew(new Date(request.headers["date"]), clock?.now || /* @__PURE__ */ new Date(), clock?.delay, clock?.forward);
-  } else if (request.headers["x-date"]) {
-    if (Array.isArray(request.headers["x-date"]))
+    checkClockSkew(new Date(headers["date"]), clock?.now || /* @__PURE__ */ new Date(), clock?.delay, clock?.forward);
+  } else if (headers["x-date"]) {
+    if (Array.isArray(headers["x-date"]))
       throw new RequestHasMultipleDateHeadersError();
-    checkClockSkew(new Date(request.headers["x-date"]), clock?.now || /* @__PURE__ */ new Date(), clock?.delay, clock?.forward);
+    checkClockSkew(new Date(headers["x-date"]), clock?.now || /* @__PURE__ */ new Date(), clock?.delay, clock?.forward);
   }
   if (!request.method)
     throw new InvalidRequestError("Request method not found");
@@ -280,13 +340,14 @@ function validateRequestAndGetSignatureHeader(request, clock) {
     throw new InvalidRequestError("Request URL not found");
   return signatureHeader;
 }
-function parseRequest(request, options) {
+function parseRequestSignature(request, options) {
   const signatureHeader = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
-  if (signatureHeaderIsDraft(signatureHeader)) {
-    return parseDraftRequest(request, options);
-  } else {
+  if (requestIsRFC9421(request)) {
     throw new Error("Not implemented");
+  } else if (signatureHeaderIsDraft(signatureHeader)) {
+    return parseDraftRequest(request, options);
   }
+  return null;
 }
 
 // src/keypair.ts
@@ -358,6 +419,91 @@ function toSpkiPublicKey(publicKey) {
   });
 }
 
+// src/digest/utils.ts
+import { createHash } from "node:crypto";
+function createBase64Digest(body, hash = "sha256") {
+  if (Array.isArray(hash)) {
+    return new Map(hash.map((h) => [h, createBase64Digest(body, h)]));
+  }
+  return createHash(hash).update(body).digest("base64");
+}
+
+// src/digest/digest-rfc3230.ts
+var digestHashAlgosForEncoding = {
+  "sha1": "SHA",
+  "sha256": "SHA-256",
+  "sha384": "SHA-384",
+  "sha512": "SHA-512",
+  "md5": "MD5"
+};
+var digestHashAlgosForDecoding = {
+  "SHA": "sha1",
+  "SHA-1": "sha1",
+  "SHA-256": "sha256",
+  "SHA-384": "sha384",
+  "SHA-512": "sha512",
+  "MD5": "md5"
+};
+function genRFC3230DigestHeader(body, hashAlgorithm = "sha256") {
+  return `${digestHashAlgosForEncoding[hashAlgorithm]}=${createBase64Digest(body, hashAlgorithm)}`;
+}
+var digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
+function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
+  let digestHeader = lcObjectGet(request.headers, "digest");
+  if (!digestHeader) {
+    if (failOnNoDigest) {
+      if (errorLogger)
+        errorLogger("Digest header not found");
+      return false;
+    }
+    return true;
+  }
+  if (Array.isArray(digestHeader)) {
+    digestHeader = digestHeader[0];
+  }
+  const match = digestHeader.match(digestHeaderRegEx);
+  if (!match) {
+    if (errorLogger)
+      errorLogger("Invalid Digest header format");
+    return false;
+  }
+  const value = match[2];
+  if (!value) {
+    if (errorLogger)
+      errorLogger("Invalid Digest header format");
+    return false;
+  }
+  const algo = digestHashAlgosForDecoding[match[1].toUpperCase()];
+  if (!algo) {
+    if (errorLogger)
+      errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
+    return false;
+  }
+  const hash = createBase64Digest(rawBody, algo);
+  if (hash !== value) {
+    if (errorLogger)
+      errorLogger(`Digest header hash mismatch`);
+    return false;
+  }
+  return true;
+}
+
+// src/digest/digest.ts
+function verifyDigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
+  const headerKeys = objectLcKeys(request.headers);
+  if (headerKeys.has("content-digest")) {
+    throw new Error("Not implemented yet");
+  } else if (headerKeys.has("digest")) {
+    return verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest, errorLogger);
+  }
+  if (failOnNoDigest) {
+    if (errorLogger)
+      errorLogger("Content-Digest or Digest header not found");
+    return false;
+  }
+  return true;
+}
+
 // src/shared/verify.ts
 var SignatureMissmatchWithProvidedAlgorithmError = class extends Error {
   constructor(providedAlgorithm, detectedAlgorithm, realKeyType) {
@@ -407,12 +553,8 @@ function detectAndVerifyAlgorithm(algorithm, publicKey) {
 }
 
 // src/draft/verify.ts
-var verify_exports = {};
-__export(verify_exports, {
-  verifySignature: () => verifySignature
-});
 import * as crypto4 from "node:crypto";
-function verifySignature(parsed, publicKeyPem, errorLogger) {
+function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   const publicKey = crypto4.createPublicKey(publicKeyPem);
   try {
     const detected = detectAndVerifyAlgorithm(parsed.params.algorithm, publicKey);
@@ -423,32 +565,43 @@ function verifySignature(parsed, publicKeyPem, errorLogger) {
     return false;
   }
 }
-
-// src/index.ts
-var HttpSignatureDraft = {
-  ...parse_exports,
-  ...sign_exports,
-  ...verify_exports
-};
 export {
   ClockSkewInvalidError,
-  HttpSignatureDraft,
+  DraftSignatureHeaderKeys,
   InvalidRequestError,
   RequestHasMultipleDateHeadersError,
   RequestHasMultipleSignatureHeadersError,
+  SignatureHeaderClockInvalidError,
+  SignatureHeaderContentLackedError,
   SignatureHeaderNotFoundError,
   SignatureMissmatchWithProvidedAlgorithmError,
   checkClockSkew,
   detectAndVerifyAlgorithm,
+  digestHeaderRegEx,
+  genDraftAuthorizationHeader,
+  genDraftSignature,
+  genDraftSignatureHeader,
+  genDraftSigningString,
   genEcKeyPair,
   genEd25519KeyPair,
   genEd448KeyPair,
+  genRFC3230DigestHeader,
   genRsaKeyPair,
   getDraftAlgoString,
+  lcObjectGet,
   lcObjectKey,
-  parseRequest,
+  objectLcKeys,
+  parseDraftRequest,
+  parseDraftRequestSignatureHeader,
+  parseRequestSignature,
   prepareSignInfo,
+  requestIsRFC9421,
+  signAsDraftToRequest,
   signatureHeaderIsDraft,
   toSpkiPublicKey,
-  validateRequestAndGetSignatureHeader
+  validateAndProcessParsedDraftSignatureHeader,
+  validateRequestAndGetSignatureHeader,
+  verifyDigestHeader,
+  verifyDraftSignature,
+  verifyRFC3230DigestHeader
 };
