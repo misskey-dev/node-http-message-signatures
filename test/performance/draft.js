@@ -39,7 +39,7 @@ function logPerf(name, start, end) {
 	{
 		const start = performance.now();
 		for (let i = 0; i < TRYES; i++) {
-			signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey}, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
+			signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
 		}
 		const end = performance.now();
 		logPerf('Sign RSA4096, SHA-256', start, end);
@@ -51,7 +51,7 @@ function logPerf(name, start, end) {
 	{
 		const start = performance.now();
 		for (let i = 0; i < TRYES; i++) {
-			signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey}, basicIncludeHeaders, { hashAlgorithm: null });
+			signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
 		}
 		const end = performance.now();
 		logPerf('Sign Ed25519', start, end);
@@ -64,7 +64,7 @@ function logPerf(name, start, end) {
 {
 	const request = getBasicOutgoingRequest();
 	request.headers['Digest'] = genRFC3230DigestHeader(request.body, 'sha256');
-	signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey}, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
+	signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
 	const parsed = parseRequestSignature(request);
 
 	{
@@ -94,7 +94,7 @@ function logPerf(name, start, end) {
 {
 	const request = getBasicOutgoingRequest();
 	request.headers['Digest'] = genRFC3230DigestHeader(request.body, 'sha256');
-	signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey}, basicIncludeHeaders, { hashAlgorithm: null });
+	signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
 	const parsed = parseRequestSignature(request);
 
 	{
