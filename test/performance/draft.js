@@ -95,8 +95,8 @@ console.log('Performance test, TRYES:', TRYES);
 		}
 		const end = performance.now();
 		logPerf(testCase, process.hrtime(start));
-
 	}
+
 	request.headers = lcObjectKey(request.headers);
 	const parsedJ = httpSignature.parseRequest(request);
 	{
@@ -144,7 +144,6 @@ console.log('Performance test, TRYES:', TRYES);
 		}
 		const end = performance.now();
 		logPerf(testCase, process.hrtime(start));
-
 	}
 
 	request.headers = lcObjectKey(request.headers);
