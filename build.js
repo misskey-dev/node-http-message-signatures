@@ -13,6 +13,9 @@ const buildOptionsBase = {
 	absWorkingDir: __dirname,
 	outbase: `${__dirname}/src`,
 	outdir: `${__dirname}/dist`,
+	external: [
+		'@lapo/asn1js'
+	],
 	loader: {
 		'.ts': 'ts'
 	},

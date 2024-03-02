@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+dependencies:
+  '@lapo/asn1js':
+    specifier: ^1.2.4
+    version: 1.2.4
+
 devDependencies:
   '@jest/globals':
     specifier: ^29.7.0
@@ -23,6 +28,9 @@ devDependencies:
   '@types/jest':
     specifier: ^29.5.12
     version: 29.5.12
+  '@types/lapo__asn1js':
+    specifier: ^1.2.5
+    version: 1.2.5
   '@types/node':
     specifier: ^20.11.20
     version: 20.11.20
@@ -923,6 +931,10 @@ packages:
       '@jridgewell/sourcemap-codec': 1.4.15
     dev: true
 
+  /@lapo/asn1js@1.2.4:
+    resolution: {integrity: sha512-mdInpQZaYUWu5QbKIB2+Vd+j6Y7cc6xQYNwYBPC9jri2rwy3tbxom0IhhT4G5WOKWO7Iht10SxYpKq+AfuH6dw==}
+    dev: false
+
   /@misskey-dev/eslint-plugin@1.0.0(@typescript-eslint/eslint-plugin@7.1.0)(@typescript-eslint/parser@7.1.0)(eslint-plugin-import@2.29.1)(eslint@8.57.0):
     resolution: {integrity: sha512-dh6UbcrNDVg5DD8k8Qh4ab30OPpuEYIlJCqaBV/lkIV8wNN/AfCJ2V7iTP8V8KjryM4t+sf5IqzQLQnT0mWI4A==}
     peerDependencies:
@@ -1182,6 +1194,10 @@ packages:
 
   /@types/json5@0.0.29:
     resolution: {integrity: sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==}
+    dev: true
+
+  /@types/lapo__asn1js@1.2.5:
+    resolution: {integrity: sha512-iNL5QTHNC4i/ULPGoZbAaXFNOa312WtRnwz9FKtQGBiCiiwQ6DtA4vfzjY0XKpHSv+z3NI5KT1rz6CBkuiPDVw==}
     dev: true
 
   /@types/node@20.11.20:

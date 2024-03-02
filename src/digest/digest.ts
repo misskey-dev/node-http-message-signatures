@@ -1,7 +1,7 @@
 import { IncomingRequest } from "src/types";
 import { objectLcKeys } from "src/utils";
 import { verifyRFC3230DigestHeader } from "./digest-rfc3230";
-import { BinaryLike } from "node:crypto";
+import { BinaryLike } from "crypto";
 
 export function verifyDigestHeader(
 	request: IncomingRequest,

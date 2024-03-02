@@ -1,4 +1,4 @@
-import { signAsDraftToRequest, parseRequestSignature, genRFC3230DigestHeader, verifyDraftSignature, lcObjectKey } from '../../dist/index.mjs';
+import { signAsDraftToRequest, parseRequestSignature, genRFC3230DigestHeader, verifyDraftSignature, lcObjectKey, webVerifyDraftSignature } from '../../dist/index.mjs';
 import { rsa4096, ed25519 } from '../keys.js';
 import httpSignature from '@peertube/http-signature';
 
@@ -73,21 +73,42 @@ console.log('Performance test, TRYES:', TRYES);
 	const parsed = parseRequestSignature(request);
 
 	{
+		const testCase = 'node:crypto Verify RSA4096, SHA-256';
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = verifyDraftSignature(parsed.value, rsa4096.publicKey);
+			if (!verifyResult) {
+				throw new Error(`failed: ${testCase}`);
+			}
 		}
-		logPerf('node:crypto Verify RSA4096, SHA-256', process.hrtime(start));
+		logPerf(testCase, process.hrtime(start));
 	}
 
+	{
+		const testCase = 'web Verify RSA4096, SHA-256';
+		const start = process.hrtime();
+		for (let i = 0; i < TRYES; i++) {
+			const verifyResult = webVerifyDraftSignature(parsed.value, rsa4096.publicKey);
+			if (!verifyResult) {
+				throw new Error(`failed: ${testCase}`);
+			}
+		}
+		const end = performance.now();
+		logPerf(testCase, process.hrtime(start));
+
+	}
 	request.headers = lcObjectKey(request.headers);
 	const parsedJ = httpSignature.parseRequest(request);
 	{
+		const testCase = 'Joyent Verify RSA4096, SHA-256';
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = httpSignature.verifySignature(parsedJ, rsa4096.publicKey);
+			if (!verifyResult) {
+				throw new Error(`failed: ${testCase}`);
+			}
 		}
-		logPerf('Joyent Verify RSA4096, SHA-256', process.hrtime(start));
+		logPerf(testCase, process.hrtime(start));
 	}
 }
 
@@ -101,21 +122,43 @@ console.log('Performance test, TRYES:', TRYES);
 	const parsed = parseRequestSignature(request);
 
 	{
+		const testCase = 'node:crypto Verify Ed25519';
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = verifyDraftSignature(parsed.value, ed25519.publicKey);
+			if (!verifyResult) {
+				throw new Error(`failed: ${testCase}`);
+			}
 		}
-		logPerf('node:crypto Verify Ed25519', process.hrtime(start));
+		logPerf(testCase, process.hrtime(start));
+	}
+
+	{
+		const testCase = 'web Verify Ed25519';
+		const start = process.hrtime();
+		for (let i = 0; i < TRYES; i++) {
+			const verifyResult = webVerifyDraftSignature(parsed.value, ed25519.publicKey);
+			if (!verifyResult) {
+				throw new Error(`failed: ${testCase}`);
+			}
+		}
+		const end = performance.now();
+		logPerf(testCase, process.hrtime(start));
+
 	}
 
 	request.headers = lcObjectKey(request.headers);
 	const parsedJ = httpSignature.parseRequest(request);
 	{
+		const testCase = 'Joyent Verify Ed25519';
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = httpSignature.verifySignature(parsedJ, ed25519.publicKey);
+			if (!verifyResult) {
+				throw new Error(`failed: ${testCase}`);
+			}
 		}
 		const end = performance.now();
-		logPerf('Joyent Verify Ed25519', process.hrtime(start));
+		logPerf(testCase, process.hrtime(start));
 	}
 }

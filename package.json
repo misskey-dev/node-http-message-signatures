@@ -1,12 +1,12 @@
 {
   "name": "@misskey-dev/node-http-message-signatures",
-  "version": "0.0.0-alpha.11",
+  "version": "0.0.0-alpha.12",
   "description": "",
   "type": "module",
   "keywords": [
     "rfc9421",
-		"rfc3230",
-		"rfc9530",
+    "rfc3230",
+    "rfc9530",
     "http",
     "signature",
     "signing",
@@ -28,22 +28,25 @@
   "bugs": "https://github.com/misskey-dev/node-http-message-signatures/issues",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
-	"exports": {
-		"import": "./dist/index.mjs",
-		"require": "./dist/index.cjs",
-		"types": "./dist/index.d.ts"
-	},
+  "exports": {
+    "import": "./dist/index.mjs",
+    "require": "./dist/index.cjs",
+    "types": "./dist/index.d.ts"
+  },
   "scripts": {
     "eslint": "eslint --quiet \"src/**/*.ts\"",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent=false --verbose false",
     "build": "NODE_ENV=production node build.js && tsc --project tsconfig.build.json",
-		"performance": "node ./test/performance/draft.js"
-	},
+    "performance": "node ./test/performance/draft.js"
+  },
   "packageManager": "pnpm@8.15.4",
   "files": [
     "dist",
     "LICENSE"
   ],
+	"dependencies": {
+    "@lapo/asn1js": "^1.2.4"
+	},
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@misskey-dev/eslint-plugin": "^1.0.0",
@@ -51,6 +54,7 @@
     "@swc/core": "^1.4.2",
     "@swc/jest": "^0.2.36",
     "@types/jest": "^29.5.12",
+    "@types/lapo__asn1js": "^1.2.5",
     "@types/node": "^20.11.20",
     "@typescript-eslint/eslint-plugin": "^7.1.0",
     "@typescript-eslint/parser": "^7.1.0",

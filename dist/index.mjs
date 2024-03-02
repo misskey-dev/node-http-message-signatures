@@ -1,10 +1,10 @@
 // src/draft/sign.ts
-import * as crypto2 from "node:crypto";
+import * as crypto3 from "node:crypto";
 
 // src/utils.ts
-import * as crypto from "node:crypto";
+import * as crypto2 from "node:crypto";
 function prepareSignInfo(privateKeyPem, hash = null) {
-  const keyObject = crypto.createPrivateKey(privateKeyPem);
+  const keyObject = crypto2.createPrivateKey(privateKeyPem);
   if (keyObject.asymmetricKeyType === "rsa") {
     const hashAlgo = hash || "sha256";
     return {
@@ -101,7 +101,7 @@ function genDraftSigningString(request, includeHeaders, additional) {
   return results.join("\n");
 }
 function genDraftSignature(signingString, privateKey, hashAlgorithm) {
-  const r = crypto2.sign(hashAlgorithm, Buffer.from(signingString), privateKey);
+  const r = crypto3.sign(hashAlgorithm, Buffer.from(signingString), privateKey);
   return r.toString("base64");
 }
 function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
@@ -364,9 +364,9 @@ function parseRequestSignature(request, options) {
 }
 
 // src/keypair.ts
-import * as crypto3 from "node:crypto";
+import * as crypto4 from "node:crypto";
 import * as util from "node:util";
-var generateKeyPair2 = util.promisify(crypto3.generateKeyPair);
+var generateKeyPair2 = util.promisify(crypto4.generateKeyPair);
 async function genRsaKeyPair(modulusLength = 4096) {
   return await generateKeyPair2("rsa", {
     modulusLength,
@@ -426,7 +426,7 @@ async function genEd448KeyPair() {
   });
 }
 function toSpkiPublicKey(publicKey) {
-  return crypto3.createPublicKey(publicKey).export({
+  return crypto4.createPublicKey(publicKey).export({
     type: "spki",
     format: "pem"
   });
@@ -568,14 +568,163 @@ function detectAndVerifyAlgorithm(algorithm, publicKey, errorLogger) {
 }
 
 // src/draft/verify.ts
-import * as crypto4 from "node:crypto";
+import * as ncrypto from "node:crypto";
+
+// src/shared/spki-algo.ts
+import ASN1 from "@lapo/asn1js";
+import Hex from "@lapo/asn1js/hex.js";
+import Base64 from "@lapo/asn1js/base64.js";
+var SpkiParseError = class extends Error {
+  constructor(message) {
+    super(message);
+  }
+};
+function getPublicKeyAlgorithmNameFromOid(oidStr) {
+  const oid = oidStr.split("\n")[0].trim();
+  if (oid === "1.2.840.113549.1.1.1")
+    return "RSASSA-PKCS1-v1_5";
+  if (oid === "1.2.840.10040.4.1")
+    return "DSA";
+  if (oid === "1.2.840.10046.2.1")
+    return "DH";
+  if (oid === "2.16.840.1.101.2.1.1.22")
+    return "KEA";
+  if (oid === "1.2.840.10045.2.1")
+    return "EC";
+  if (oid === "1.3.101.112")
+    return "Ed25519";
+  if (oid === "1.3.101.113")
+    return "Ed448";
+  throw new SpkiParseError("Unknown Public Key Algorithm OID");
+}
+function getNistCurveFromOid(oidStr) {
+  const oid = oidStr.split("\n")[0].trim();
+  if (oid === "1.2.840.10045.3.1.1")
+    return "P-192";
+  if (oid === "1.3.132.0.33")
+    return "P-224";
+  if (oid === "1.2.840.10045.3.1.7")
+    return "P-256";
+  if (oid === "1.3.132.0.34")
+    return "P-384";
+  if (oid === "1.3.132.0.35")
+    return "P-521";
+  throw new SpkiParseError("Unknown Named Curve OID");
+}
+function asn1BinaryToArrayBuffer(enc) {
+  if (typeof enc === "string") {
+    return Uint8Array.from(enc, (s) => s.charCodeAt(0)).buffer;
+  }
+  if (enc instanceof ArrayBuffer) {
+    return enc;
+  } else if (enc instanceof Uint8Array) {
+    return enc.buffer;
+  } else if (Array.isArray(enc)) {
+    return new Uint8Array(enc).buffer;
+  }
+  throw new SpkiParseError("Invalid SPKI (invalid ASN1 Stream data)");
+}
+var reHex = /^\s*(?:[0-9A-Fa-f][0-9A-Fa-f]\s*)+$/;
+function parseSpki(input) {
+  const der = typeof input === "string" ? reHex.test(input) ? Hex.decode(input) : Base64.unarmor(input) : input;
+  const parsed = ASN1.decode(der);
+  if (!parsed.sub || parsed.sub.length === 0 || parsed.sub.length > 2)
+    throw new SpkiParseError("Invalid SPKI (invalid sub)");
+  const algorithmIdentifierSub = parsed.sub && parsed.sub[0] && parsed.sub[0].sub;
+  if (!algorithmIdentifierSub)
+    throw new SpkiParseError("Invalid SPKI (no AlgorithmIdentifier)");
+  if (algorithmIdentifierSub.length === 0)
+    throw new SpkiParseError("Invalid SPKI (invalid AlgorithmIdentifier sub length, zero)");
+  if (algorithmIdentifierSub.length > 2)
+    throw new SpkiParseError("Invalid SPKI (invalid AlgorithmIdentifier sub length, too many)");
+  if (algorithmIdentifierSub[0].tag.tagNumber !== 6)
+    throw new SpkiParseError("Invalid SPKI (invalid AlgorithmIdentifier.sub[0] type)");
+  const algorithm = algorithmIdentifierSub[0]?.content() ?? null;
+  if (typeof algorithm !== "string")
+    throw new SpkiParseError("Invalid SPKI (invalid algorithm content)");
+  const parameter = algorithmIdentifierSub[1]?.content() ?? null;
+  return {
+    der: asn1BinaryToArrayBuffer(parsed.stream.enc),
+    algorithm,
+    parameter
+  };
+}
+function genKeyImportParams(parsed, defaults = {
+  hash: "SHA-256",
+  ec: "DSA"
+}) {
+  const algorithm = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
+  if (!algorithm)
+    throw new SpkiParseError("Unknown algorithm");
+  if (algorithm === "RSASSA-PKCS1-v1_5") {
+    return { name: "RSASSA-PKCS1-v1_5", hash: defaults.hash };
+  }
+  if (algorithm === "EC") {
+    if (typeof parsed.parameter !== "string")
+      throw new SpkiParseError("Invalid EC parameter");
+    return {
+      name: `EC${defaults.ec}`,
+      namedCurve: getNistCurveFromOid(parsed.parameter)
+    };
+  }
+  if (algorithm === "Ed25519") {
+    return { name: "Ed25519" };
+  }
+  if (algorithm === "Ed448") {
+    return { name: "Ed448" };
+  }
+  throw new SpkiParseError("Unknown algorithm");
+}
+function genVerifyAlgorithm(parsed, defaults = {
+  hash: "SHA-256",
+  ec: "DSA"
+}) {
+  const algorithm = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
+  if (!algorithm)
+    throw new SpkiParseError("Unknown algorithm");
+  if (algorithm === "RSASSA-PKCS1-v1_5") {
+    return { name: "RSASSA-PKCS1-v1_5" };
+  }
+  if (algorithm === "EC") {
+    return {
+      name: `EC${defaults.ec}`,
+      hash: defaults.hash
+    };
+  }
+  if (algorithm === "Ed25519") {
+    return { name: "Ed25519" };
+  }
+  if (algorithm === "Ed448") {
+    return {
+      name: "Ed448",
+      context: void 0
+      // TODO?
+    };
+  }
+  throw new SpkiParseError("Unknown algorithm");
+}
+
+// src/draft/verify.ts
 function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
-  const publicKey = crypto4.createPublicKey(publicKeyPem);
+  const publicKey = ncrypto.createPublicKey(publicKeyPem);
   try {
     const detected = detectAndVerifyAlgorithm(parsed.params.algorithm, publicKey);
     if (!detected)
       return false;
-    return crypto4.verify(detected.hashAlg, Buffer.from(parsed.signingString), publicKey, Buffer.from(parsed.params.signature, "base64"));
+    return ncrypto.verify(detected.hashAlg, Buffer.from(parsed.signingString), publicKey, Buffer.from(parsed.params.signature, "base64"));
+  } catch (e) {
+    if (errorLogger)
+      errorLogger(e);
+    return false;
+  }
+}
+var encoder = new TextEncoder();
+async function webVerifyDraftSignature(parsed, publicKeyPem, errorLogger) {
+  try {
+    const parsedSpki = parseSpki(publicKeyPem);
+    const publicKey = await crypto.subtle.importKey("spki", parsedSpki.der, genKeyImportParams(parsedSpki), false, ["verify"]);
+    const verify2 = await crypto.subtle.verify(genVerifyAlgorithm(parsedSpki), publicKey, encoder.encode(parsed.params.signature), encoder.encode(parsed.signingString));
+    return verify2;
   } catch (e) {
     if (errorLogger)
       errorLogger(e);
@@ -620,5 +769,6 @@ export {
   validateRequestAndGetSignatureHeader,
   verifyDigestHeader,
   verifyDraftSignature,
-  verifyRFC3230DigestHeader
+  verifyRFC3230DigestHeader,
+  webVerifyDraftSignature
 };
