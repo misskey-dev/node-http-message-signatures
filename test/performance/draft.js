@@ -48,7 +48,7 @@ console.log('Performance test, TRYES:', TRYES);
 		for (let i = 0; i < TRYES; i++) {
 			signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
 		}
-		logPerf('Sign RSA4096, SHA-256', process.hrtime(start));
+		logPerf('node:crypto Sign RSA4096, SHA-256', process.hrtime(start));
 	}
 
 	/**
@@ -59,7 +59,7 @@ console.log('Performance test, TRYES:', TRYES);
 		for (let i = 0; i < TRYES; i++) {
 			signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
 		}
-		logPerf('Sign Ed25519', process.hrtime(start));
+		logPerf('node:crypto Sign Ed25519', process.hrtime(start));
 	}
 }
 
@@ -77,7 +77,7 @@ console.log('Performance test, TRYES:', TRYES);
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = verifyDraftSignature(parsed.value, rsa4096.publicKey);
 		}
-		logPerf('misskey-dev Verify RSA4096, SHA-256', process.hrtime(start));
+		logPerf('node:crypto Verify RSA4096, SHA-256', process.hrtime(start));
 	}
 
 	request.headers = lcObjectKey(request.headers);
@@ -105,7 +105,7 @@ console.log('Performance test, TRYES:', TRYES);
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = verifyDraftSignature(parsed.value, ed25519.publicKey);
 		}
-		logPerf('misskey-dev Verify Ed25519', process.hrtime(start));
+		logPerf('node:crypto Verify Ed25519', process.hrtime(start));
 	}
 
 	request.headers = lcObjectKey(request.headers);
