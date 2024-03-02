@@ -2,7 +2,7 @@ import { signAsDraftToRequest, parseRequestSignature, genRFC3230DigestHeader, ve
 import { rsa4096, ed25519 } from '../keys.js';
 import httpSignature from '@peertube/http-signature';
 
-const TRYES = 2048;
+const TRYES = 1600;
 
 const getBasicOutgoingRequest = () => ({
 	headers: {
@@ -22,9 +22,16 @@ function round3(value) {
 	return Math.round(value * pow) / pow;
 }
 
-function logPerf(name, start, end) {
-	console.log(name, '\n', round3(end - start), 'ms', round3(TRYES / ((end - start) / 1e3)), 'ops/s');
+/**
+ * @param {string} name
+ * @param {[number, number]} diff
+ */
+function logPerf(name, diff) {
+	const ms = diff[0] * 1e3 + diff[1] / 1e6;
+	console.log(name, '\n', round3(ms), 'ms', round3(TRYES / (ms / 1e3)), 'ops/s');
 }
+
+console.log('Performance test, TRYES:', TRYES);
 
 /**
  * Sign
@@ -37,24 +44,22 @@ function logPerf(name, start, end) {
 	 * RSA4096, SHA-256
 	 */
 	{
-		const start = performance.now();
+		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
 		}
-		const end = performance.now();
-		logPerf('Sign RSA4096, SHA-256', start, end);
+		logPerf('Sign RSA4096, SHA-256', process.hrtime(start));
 	}
 
 	/**
 	 * Ed25519
 	 */
 	{
-		const start = performance.now();
+		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
 		}
-		const end = performance.now();
-		logPerf('Sign Ed25519', start, end);
+		logPerf('Sign Ed25519', process.hrtime(start));
 	}
 }
 
@@ -68,23 +73,21 @@ function logPerf(name, start, end) {
 	const parsed = parseRequestSignature(request);
 
 	{
-		const start = performance.now();
+		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = verifyDraftSignature(parsed.value, rsa4096.publicKey);
 		}
-		const end = performance.now();
-		logPerf('misskey-dev Verify RSA4096, SHA-256', start, end);
+		logPerf('misskey-dev Verify RSA4096, SHA-256', process.hrtime(start));
 	}
 
 	request.headers = lcObjectKey(request.headers);
 	const parsedJ = httpSignature.parseRequest(request);
 	{
-		const start = performance.now();
+		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = httpSignature.verifySignature(parsedJ, rsa4096.publicKey);
 		}
-		const end = performance.now();
-		logPerf('Joyent Verify RSA4096, SHA-256', start, end);
+		logPerf('Joyent Verify RSA4096, SHA-256', process.hrtime(start));
 	}
 }
 
@@ -98,22 +101,21 @@ function logPerf(name, start, end) {
 	const parsed = parseRequestSignature(request);
 
 	{
-		const start = performance.now();
+		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = verifyDraftSignature(parsed.value, ed25519.publicKey);
 		}
-		const end = performance.now();
-		logPerf('misskey-dev Verify Ed25519', start, end);
+		logPerf('misskey-dev Verify Ed25519', process.hrtime(start));
 	}
 
 	request.headers = lcObjectKey(request.headers);
 	const parsedJ = httpSignature.parseRequest(request);
 	{
-		const start = performance.now();
+		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = httpSignature.verifySignature(parsedJ, ed25519.publicKey);
 		}
 		const end = performance.now();
-		logPerf('Joyent Verify Ed25519', start, end);
+		logPerf('Joyent Verify Ed25519', process.hrtime(start));
 	}
 }
