@@ -8,7 +8,7 @@ import * as util from 'node:util';
 
 const test_buffer = Buffer.from('test');
 
-describe('Parse SPKI for Web', () => {
+describe('spki', () => {
 	test('rsa4096', async () => {
 		const parsed = parseSpki(rsa4096.publicKey);
 		expect(parsed.algorithm).toBe('1.2.840.113549.1.1.1\nrsaEncryption\nPKCS #1');
