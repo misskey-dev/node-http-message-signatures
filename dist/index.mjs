@@ -709,27 +709,32 @@ function decodePem(input) {
   const der = typeof input === "string" ? reHex.test(input) ? Hex.decode(input) : Base64.unarmor(input) : input;
   return der;
 }
+function parseAlgorithmIdentifier(input) {
+  const algorithmIdentifierSub = input.sub;
+  if (!algorithmIdentifierSub)
+    throw new SpkiParseError("Invalid AlgorithmIdentifier");
+  if (algorithmIdentifierSub.length === 0)
+    throw new SpkiParseError("Invalid AlgorithmIdentifier (sub length, zero)");
+  if (algorithmIdentifierSub.length > 2)
+    throw new SpkiParseError("Invalid AlgorithmIdentifier (sub length, too many)");
+  if (algorithmIdentifierSub[0].tag.tagNumber !== 6)
+    throw new SpkiParseError("Invalid AlgorithmIdentifier (.sub[0] type)");
+  const algorithm = algorithmIdentifierSub[0]?.content() ?? null;
+  if (typeof algorithm !== "string")
+    throw new SpkiParseError("Invalid AlgorithmIdentifier (invalid content)");
+  const parameter = algorithmIdentifierSub[1]?.content() ?? null;
+  return {
+    algorithm,
+    parameter
+  };
+}
 function parseSpki(input) {
   const parsed = ASN12.decode(decodePem(input));
   if (!parsed.sub || parsed.sub.length === 0 || parsed.sub.length > 2)
     throw new SpkiParseError("Invalid SPKI (invalid sub)");
-  const algorithmIdentifierSub = parsed.sub && parsed.sub[0] && parsed.sub[0].sub;
-  if (!algorithmIdentifierSub)
-    throw new SpkiParseError("Invalid SPKI (no AlgorithmIdentifier)");
-  if (algorithmIdentifierSub.length === 0)
-    throw new SpkiParseError("Invalid SPKI (invalid AlgorithmIdentifier sub length, zero)");
-  if (algorithmIdentifierSub.length > 2)
-    throw new SpkiParseError("Invalid SPKI (invalid AlgorithmIdentifier sub length, too many)");
-  if (algorithmIdentifierSub[0].tag.tagNumber !== 6)
-    throw new SpkiParseError("Invalid SPKI (invalid AlgorithmIdentifier.sub[0] type)");
-  const algorithm = algorithmIdentifierSub[0]?.content() ?? null;
-  if (typeof algorithm !== "string")
-    throw new SpkiParseError("Invalid SPKI (invalid algorithm content)");
-  const parameter = algorithmIdentifierSub[1]?.content() ?? null;
   return {
     der: asn1ToArrayBuffer(parsed),
-    algorithm,
-    parameter
+    ...parseAlgorithmIdentifier(parsed.sub[0])
   };
 }
 function parsePublicKey(input) {
@@ -827,6 +832,36 @@ async function webVerifyDraftSignature(parsed, publicKeyPem, errorLogger) {
     return false;
   }
 }
+
+// src/pem/pkcs8.ts
+import ASN13 from "@lapo/asn1js";
+var Pkcs8ParseError = class extends Error {
+  constructor(message) {
+    super(message);
+  }
+};
+function parsePkcs8(input) {
+  const parsed = ASN13.decode(decodePem(input));
+  if (!parsed.sub || parsed.sub.length < 3 || parsed.sub.length > 4)
+    throw new Pkcs8ParseError("Invalid PKCS#8 (invalid sub length)");
+  const version = parsed.sub[0];
+  if (!version || !version.tag || version.tag.tagNumber !== 2)
+    throw new Pkcs8ParseError("Invalid PKCS#8 (invalid version)");
+  const privateKeyAlgorithm = parseAlgorithmIdentifier(parsed.sub[1]);
+  const privateKey = parsed.sub[2];
+  if (!privateKey || !privateKey.tag || privateKey.tag.tagNumber !== 4)
+    throw new Pkcs8ParseError("Invalid PKCS#8 (invalid privateKey)");
+  const attributes = parsed.sub[3];
+  if (attributes) {
+    if (attributes.tag.tagNumber !== 49)
+      throw new Pkcs8ParseError("Invalid PKCS#8 (invalid attributes)");
+  }
+  return {
+    privateKey: asn1ToArrayBuffer(privateKey),
+    ...privateKeyAlgorithm,
+    attributesRaw: attributes ? asn1ToArrayBuffer(attributes) : null
+  };
+}
 export {
   ClockSkewInvalidError,
   DraftSignatureHeaderClockInvalidError,
@@ -835,6 +870,7 @@ export {
   HTTPMessageSignaturesParseError,
   InvalidRequestError,
   Pkcs1ParseError,
+  Pkcs8ParseError,
   RequestHasMultipleDateHeadersError,
   RequestHasMultipleSignatureHeadersError,
   SignatureHeaderNotFoundError,
@@ -864,9 +900,11 @@ export {
   lcObjectKey,
   numberToUint8Array,
   objectLcKeys,
+  parseAlgorithmIdentifier,
   parseDraftRequest,
   parseDraftRequestSignatureHeader,
   parsePkcs1,
+  parsePkcs8,
   parsePublicKey,
   parseRequestSignature,
   parseSpki,

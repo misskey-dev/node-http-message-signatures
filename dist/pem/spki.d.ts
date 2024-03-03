@@ -17,13 +17,15 @@ export declare function getPublicKeyAlgorithmNameFromOid(oidStr: string): "RSASS
  * (Most environments may implement only P-256, P-384 and P-521)
  */
 export declare function getNistCurveFromOid(oidStr: string): "P-192" | "P-224" | "P-256" | "P-384" | "P-521";
-export type SpkiParsedAlgorithmIdentifierBase = {
-    /**
-     * DER
-     *
-     * (Somehow crypto.createPublicKey will cause `error:1E08010C:DECODER routines::unsupported`)
-     */
-    der: ArrayBuffer;
+/**
+ * Convert ASN1(@lapo/asn1js).Binary to ArrayBuffer
+ *
+ * @param asn1 ASN1 object
+ * @param contentOnly If true, return content only, excluding tag and length
+ * @examples `asn1BinaryToArrayBuffer(ASN1.decode(der).stream.enc);`
+ */
+export declare function asn1ToArrayBuffer(asn1: ASN1, contentOnly?: boolean): ArrayBufferLike;
+export type ParsedAlgorithmIdentifierBase = {
     /**
      * Parsed algorithm, 3 lines string
      * Data from https://github.com/lapo-luchini/asn1js/blob/trunk/oids.js
@@ -42,31 +44,31 @@ export type SpkiParsedAlgorithmIdentifierBase = {
      */
     parameter: any;
 };
-/**
- * Convert ASN1(@lapo/asn1js).Binary to ArrayBuffer
- *
- * @param asn1 ASN1 object
- * @param contentOnly If true, return content only, excluding tag and length
- * @examples `asn1BinaryToArrayBuffer(ASN1.decode(der).stream.enc);`
- */
-export declare function asn1ToArrayBuffer(asn1: ASN1, contentOnly?: boolean): ArrayBufferLike;
-export type SpkiParsedRSAIdentifier = {
-    der: ArrayBuffer;
+export type ParsedRSAIdentifier = {
     algorithm: '1.2.840.113549.1.1.1\nrsaEncryption\nPKCS #1';
     parameter: null;
 };
-export type SpkiParsedEd25519Identifier = {
+export type ParsedEd25519Identifier = {
     der: ArrayBuffer;
     algorithm: '1.3.101.112\ncurveEd25519\nEdDSA 25519 signature algorithm';
     parameter: null;
 };
-export type SpkiParsedNPrime256v1Identifier = {
+export type ParsedNPrime256v1Identifier = {
     der: ArrayBuffer;
     algorithm: '1.2.840.10045.2.1\necPublicKey\nANSI X9.62 public key type';
     parameter: '1.2.840.10045.3.1.7\nprime256v1\nANSI X9.62 named elliptic curve';
 };
-export type SpkiParsedAlgorithmIdentifier = SpkiParsedRSAIdentifier | SpkiParsedEd25519Identifier | SpkiParsedNPrime256v1Identifier | SpkiParsedAlgorithmIdentifierBase;
+export type ParsedAlgorithmIdentifier = ParsedRSAIdentifier | ParsedEd25519Identifier | ParsedNPrime256v1Identifier | ParsedAlgorithmIdentifierBase;
+export type SpkiParsedAlgorithmIdentifier = ParsedAlgorithmIdentifierBase & {
+    /**
+     * DER
+     *
+     * (Somehow crypto.createPublicKey will cause `error:1E08010C:DECODER routines::unsupported`)
+     */
+    der: ArrayBuffer;
+};
 export declare function decodePem(input: ASN1.StreamOrBinary): Exclude<ASN1.StreamOrBinary, string>;
+export declare function parseAlgorithmIdentifier(input: ASN1): ParsedAlgorithmIdentifier;
 /**
  * Parse X.509 SubjectPublicKeyInfo (SPKI) public key
  * @param input SPKI public key PEM or DER

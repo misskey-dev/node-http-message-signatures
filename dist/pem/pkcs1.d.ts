@@ -2,6 +2,9 @@ import ASN1 from '@lapo/asn1js';
 export declare class Pkcs1ParseError extends Error {
     constructor(message: string);
 }
+/**
+ * Parse PKCS#1 public key
+ */
 export declare function parsePkcs1(input: ASN1.StreamOrBinary): {
     pkcs1: ArrayBufferLike;
     modulus: number;
