@@ -32,3 +32,4 @@ export declare function genSignInfo(parsed: ParsedAlgorithmIdentifier, defaults?
     hash: SignatureHashAlgorithmUpperSnake;
     ec: 'DSA' | 'DH';
 }): SignInfo;
+export declare function splitPer64Chars(str: string): string[];

@@ -1,4 +1,5 @@
-import { genASN1Length } from "./utils";
+import { genASN1Length, splitPer64Chars } from "./utils";
+import { rsa4096 } from "../test/keys";
 
 describe(genASN1Length, () => {
 	test('10', () => {
@@ -12,5 +13,15 @@ describe(genASN1Length, () => {
 	});
 	test('1145141919810', () => {
 		expect(genASN1Length(1145141919810)).toEqual(Uint8Array.from([0x86, 1, 10, 159, 199, 0, 66]));
+	});
+});
+
+describe(splitPer64Chars, () => {
+	test('short', () => {
+		expect(splitPer64Chars('a').length).toBe(1);
+		expect(splitPer64Chars('a')[0]).toBe('a');
+	});
+	test('normal', () => {
+		expect(splitPer64Chars(rsa4096.privateKey).length).toBe(Math.ceil(rsa4096.privateKey.length / 64));
 	});
 });

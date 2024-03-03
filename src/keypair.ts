@@ -4,20 +4,20 @@
  */
 
 import type { webcrypto as crypto } from 'node:crypto';
-import { encodeArrayBufferToBase64 } from './utils';
+import { encodeArrayBufferToBase64, splitPer64Chars } from './utils';
 import { ECNamedCurve } from './types';
 
 export async function exportPublicKeyPem(key: crypto.CryptoKey) {
 	const ab = await globalThis.crypto.subtle.exportKey('spki', key);
 	return '-----BEGIN PUBLIC KEY-----\n' +
-		encodeArrayBufferToBase64(ab) +
+		splitPer64Chars(encodeArrayBufferToBase64(ab)).join('\n') +
 		'\n-----END PUBLIC KEY-----\n';
 }
 
 export async function exportPrivateKeyPem(key: crypto.CryptoKey) {
 	const ab = await globalThis.crypto.subtle.exportKey('pkcs8', key);
 	return '-----BEGIN PRIVATE KEY-----\n' +
-		encodeArrayBufferToBase64(ab) +
+	splitPer64Chars(encodeArrayBufferToBase64(ab)).join('\n') +
 		'\n-----END PRIVATE KEY-----\n';
 }
 

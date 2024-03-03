@@ -113,3 +113,11 @@ export function genSignInfo(
 	}
 	throw new KeyValidationError('Unknown algorithm');
 }
+
+export function splitPer64Chars(str: string): string[] {
+	const result = [] as string[];
+	for (let i = 0; i < str.length; i += 64) {
+		result.push(str.slice(i, i + 64));
+	}
+	return result;
+}

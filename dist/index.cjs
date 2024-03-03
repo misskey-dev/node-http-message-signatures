@@ -87,6 +87,7 @@ __export(src_exports, {
   rsaASN1AlgorithmIdentifier: () => rsaASN1AlgorithmIdentifier,
   signAsDraftToRequest: () => signAsDraftToRequest,
   signatureHeaderIsDraft: () => signatureHeaderIsDraft,
+  splitPer64Chars: () => splitPer64Chars,
   validateAndProcessParsedDraftSignatureHeader: () => validateAndProcessParsedDraftSignatureHeader,
   validateRequestAndGetSignatureHeader: () => validateRequestAndGetSignatureHeader,
   verifyDigestHeader: () => verifyDigestHeader,
@@ -348,6 +349,13 @@ function genSignInfo(parsed, defaults = {
     return { name: "Ed448" };
   }
   throw new KeyValidationError("Unknown algorithm");
+}
+function splitPer64Chars(str) {
+  const result = [];
+  for (let i = 0; i < str.length; i += 64) {
+    result.push(str.slice(i, i + 64));
+  }
+  return result;
 }
 
 // src/pem/pkcs8.ts
@@ -719,11 +727,11 @@ function parseRequestSignature(request, options) {
 // src/keypair.ts
 async function exportPublicKeyPem(key) {
   const ab = await globalThis.crypto.subtle.exportKey("spki", key);
-  return "-----BEGIN PUBLIC KEY-----\n" + encodeArrayBufferToBase64(ab) + "\n-----END PUBLIC KEY-----\n";
+  return "-----BEGIN PUBLIC KEY-----\n" + splitPer64Chars(encodeArrayBufferToBase64(ab)).join("\n") + "\n-----END PUBLIC KEY-----\n";
 }
 async function exportPrivateKeyPem(key) {
   const ab = await globalThis.crypto.subtle.exportKey("pkcs8", key);
-  return "-----BEGIN PRIVATE KEY-----\n" + encodeArrayBufferToBase64(ab) + "\n-----END PRIVATE KEY-----\n";
+  return "-----BEGIN PRIVATE KEY-----\n" + splitPer64Chars(encodeArrayBufferToBase64(ab)).join("\n") + "\n-----END PRIVATE KEY-----\n";
 }
 async function genRsaKeyPair(modulusLength = 4096, keyUsage = ["sign", "verify"]) {
   const keyPair = await globalThis.crypto.subtle.generateKey(
@@ -1007,6 +1015,7 @@ async function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   rsaASN1AlgorithmIdentifier,
   signAsDraftToRequest,
   signatureHeaderIsDraft,
+  splitPer64Chars,
   validateAndProcessParsedDraftSignatureHeader,
   validateRequestAndGetSignatureHeader,
   verifyDigestHeader,
