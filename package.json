@@ -1,6 +1,6 @@
 {
   "name": "@misskey-dev/node-http-message-signatures",
-  "version": "0.0.0-alpha.12",
+  "version": "0.0.0-alpha.13",
   "description": "",
   "type": "module",
   "keywords": [
@@ -10,7 +10,13 @@
     "http",
     "signature",
     "signing",
-    "activitypub"
+    "activitypub",
+		"webcrypto",
+		"pkcs1",
+		"rfc8017",
+    "spki",
+    "publickey",
+    "rfc5280"
   ],
   "author": "mei23 <m@m544.net>",
   "contributors": [

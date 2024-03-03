@@ -1,7 +1,7 @@
 import { detectAndVerifyAlgorithm } from '../shared/verify.js';
 import * as ncrypto from 'node:crypto';
 import type { ParsedDraftSignature } from '../types.js';
-import { genKeyImportParams, genVerifyAlgorithm, parseSpki } from '../shared/spki-algo.js';
+import { genKeyImportParams, genVerifyAlgorithm, parsePublicKey } from '../pem/spki.js';
 
 export function verifyDraftSignature(parsed: ParsedDraftSignature['value'], publicKeyPem: string, errorLogger?: ((message: any) => any)) {
 	const publicKey = ncrypto.createPublicKey(publicKeyPem);
@@ -23,7 +23,7 @@ const encoder = new TextEncoder();
  */
 export async function webVerifyDraftSignature(parsed: ParsedDraftSignature['value'], publicKeyPem: string, errorLogger?: ((message: any) => any)) {
 	try {
-		const parsedSpki = parseSpki(publicKeyPem);
+		const parsedSpki = parsePublicKey(publicKeyPem);
 		const publicKey = await crypto.subtle.importKey('spki', parsedSpki.der, genKeyImportParams(parsedSpki), false, ['verify']);
 		const verify = await crypto.subtle.verify(genVerifyAlgorithm(parsedSpki), publicKey, encoder.encode(parsed.params.signature), encoder.encode(parsed.signingString));
 		return verify;

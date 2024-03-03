@@ -18,3 +18,8 @@ export declare function lcObjectGet<T extends Record<string, any>>(src: T, key: 
  *  Get the Set of keys of the object, lowercased
  */
 export declare function objectLcKeys<T extends Record<string, any>>(src: T): Set<string>;
+/**
+ * convert number to Uint8Array, for ASN.1 length field
+ */
+export declare function numberToUint8Array(num: number | bigint): Uint8Array;
+export declare function genASN1Length(length: number | bigint): Uint8Array;

@@ -1,6 +1,7 @@
 import ASN1 from '@lapo/asn1js';
 import Hex from '@lapo/asn1js/hex.js';
 import Base64 from '@lapo/asn1js/base64.js';
+import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1';
 
 export class SpkiParseError extends Error {
 	constructor(message: string) { super(message); }
@@ -71,18 +72,25 @@ export type SpkiParsedAlgorithmIdentifierBase = {
 
 /**
  * Convert ASN1(@lapo/asn1js).Binary to ArrayBuffer
+ *
+ * @param asn1 ASN1 object
+ * @param contentOnly If true, return content only, excluding tag and length
  * @examples `asn1BinaryToArrayBuffer(ASN1.decode(der).stream.enc);`
  */
-export function asn1BinaryToArrayBuffer(enc: ASN1.Binary) {
-	if (typeof enc === 'string') {
+export function asn1ToArrayBuffer(asn1: ASN1, contentOnly = false) {
+	const fullEnc = asn1.stream.enc;
+	const start = contentOnly ? asn1.posContent() : asn1.posStart();
+	const end = asn1.posEnd();
+
+	if (typeof fullEnc === 'string') {
 		// enc is binary string
-		return Uint8Array.from(enc, s => s.charCodeAt(0)).buffer;
-	} if (enc instanceof ArrayBuffer) {
-		return enc;
-	} else if (enc instanceof Uint8Array) {
-		return enc.buffer;
-	} else if (Array.isArray(enc)) {
-		return new Uint8Array(enc).buffer;
+		return Uint8Array.from(fullEnc.slice(start, end), s => s.charCodeAt(0)).buffer;
+	} else if (fullEnc instanceof Uint8Array) {
+		return fullEnc.buffer.slice(start, end);
+	} if (fullEnc instanceof ArrayBuffer) {
+		return new Uint8Array(fullEnc.slice(start, end)).buffer;
+	} else if (Array.isArray(fullEnc)) {
+		return new Uint8Array(fullEnc.slice(start, end)).buffer;
 	}
 	throw new SpkiParseError('Invalid SPKI (invalid ASN1 Stream data)');
 }
@@ -111,13 +119,22 @@ export type SpkiParsedAlgorithmIdentifier =
 
 const reHex = /^\s*(?:[0-9A-Fa-f][0-9A-Fa-f]\s*)+$/;
 
-export function parseSpki(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmIdentifier {
+export function decodePem(input: ASN1.StreamOrBinary): Exclude<ASN1.StreamOrBinary, string> {
 	const der = typeof input === 'string' ?
 		reHex.test(input) ?
 			Hex.decode(input) :
 			Base64.unarmor(input) :
 		input;
-	const parsed = ASN1.decode(der);
+	return der;
+}
+
+/**
+ * Parse X.509 SubjectPublicKeyInfo (SPKI) public key
+ * @param input SPKI public key PEM or DER
+ * @returns parsed object
+ */
+export function parseSpki(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmIdentifier {
+	const parsed = ASN1.decode(decodePem(input));
 	if (!parsed.sub || parsed.sub.length === 0 || parsed.sub.length > 2) throw new SpkiParseError('Invalid SPKI (invalid sub)');
 	const algorithmIdentifierSub = parsed.sub && parsed.sub[0] && parsed.sub[0].sub;
 	if (!algorithmIdentifierSub) throw new SpkiParseError('Invalid SPKI (no AlgorithmIdentifier)');
@@ -130,10 +147,31 @@ export function parseSpki(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmIdenti
 	const parameter = algorithmIdentifierSub[1]?.content() ?? null;
 
 	return {
-		der: asn1BinaryToArrayBuffer(parsed.stream.enc),
+		der: asn1ToArrayBuffer(parsed),
 		algorithm,
 		parameter,
 	};
+}
+
+/**
+ * Parse X.509 SubjectPublicKeyInfo (SPKI) public key
+ * @param input SPKI public key PEM or DER
+ * @returns parsed object
+ */
+export function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmIdentifier {
+	try {
+		// Try to parse as SPKI
+		return parseSpki(input);
+	} catch (e) {
+		try {
+			// Try to parse as PKCS#1
+			const { pkcs1 } = parsePkcs1(input);
+			const spki = genSpkiFromPkcs1(new Uint8Array(pkcs1));
+			return parseSpki(spki);
+		} catch (e2) {
+			throw new SpkiParseError('Invalid SPKI or PKCS#1');
+		}
+	}
 }
 
 export function genKeyImportParams(

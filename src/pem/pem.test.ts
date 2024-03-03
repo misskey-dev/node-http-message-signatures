@@ -1,7 +1,10 @@
-import { genKeyImportParams, genVerifyAlgorithm, parseSpki } from './spki-algo';
+import { genKeyImportParams, genVerifyAlgorithm, parsePublicKey, parseSpki } from './spki';
+import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1';
 import { rsa4096, ed25519 } from '../../test/keys';
 import { genEcKeyPair } from '../keypair';
-import { sign } from 'node:crypto';
+
+import { sign, generateKeyPair } from 'node:crypto';
+import * as util from 'node:util';
 
 const test_buffer = Buffer.from('test');
 
@@ -63,3 +66,50 @@ describe('Parse SPKI for Web', () => {
 	});
 });
 
+describe('pkcs1', () => {
+	test('pkcs1', async () => {
+		const modulusLength = 4096;
+		const kp = await util.promisify(generateKeyPair)('rsa', {
+			modulusLength,
+			publicKeyEncoding: {
+				type: 'pkcs1',
+				format: 'pem'
+			},
+			privateKeyEncoding: {
+				type: 'pkcs8',
+				format: 'pem',
+				cipher: undefined,
+				passphrase: undefined
+			}
+		});
+
+		const pkcs1 = parsePkcs1(kp.publicKey);
+		expect(pkcs1.modulus).toBe(modulusLength); // BigInt have 00 prefix
+		expect(pkcs1.publicExponent).toBe(65537);
+
+		const spki = genSpkiFromPkcs1(new Uint8Array(pkcs1.pkcs1));
+		const parsed = parseSpki(spki);
+		expect(parsed.algorithm).toBe('1.2.840.113549.1.1.1\nrsaEncryption\nPKCS #1');
+
+		const signed = sign('sha256', test_buffer, kp.privateKey);
+
+		const publicKey = await crypto.subtle.importKey('spki', spki, genKeyImportParams(parsed), true, ['verify']);
+		expect((publicKey?.algorithm as any).modulusLength).toBe(4096);
+
+		const verify = await crypto.subtle.verify(genVerifyAlgorithm(parsed), publicKey, signed, test_buffer);
+		expect(verify).toBe(true);
+	});
+});
+
+describe(parsePublicKey, () => {
+	test('SPKI', () => {
+		const parsed = parsePublicKey(rsa4096.publicKey);
+		expect(parsed.algorithm).toBe('1.2.840.113549.1.1.1\nrsaEncryption\nPKCS #1');
+		expect(parsed.parameter).toBeNull();
+	});
+	test('PKCS#1', () => {
+		const parsed = parsePublicKey(rsa4096.publicKey);
+		expect(parsed.algorithm).toBe('1.2.840.113549.1.1.1\nrsaEncryption\nPKCS #1');
+		expect(parsed.parameter).toBeNull();
+	});
+});

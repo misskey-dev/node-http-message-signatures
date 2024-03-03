@@ -86,3 +86,23 @@ export function objectLcKeys<T extends Record<string, any>>(src: T): Set<string>
 		return dst;
 	}, new Set<string>() as any);
 }
+
+/**
+ * convert number to Uint8Array, for ASN.1 length field
+ */
+export function numberToUint8Array(num: number | bigint): Uint8Array {
+	const buf = new ArrayBuffer(8);
+	const view = new DataView(buf);
+	view.setBigUint64(0, BigInt(num), false);
+	const viewUint8Array = new Uint8Array(buf);
+	const firstNonZero = viewUint8Array.findIndex((v) => v !== 0);
+	return viewUint8Array.slice(firstNonZero);
+}
+
+export function genASN1Length(length: number | bigint): Uint8Array {
+	if (length < 0x80n) {
+		return new Uint8Array([Number(length)]);
+	}
+	const lengthUint8Array = numberToUint8Array(length);
+	return new Uint8Array([0x80 + lengthUint8Array.length, ...lengthUint8Array]);
+}

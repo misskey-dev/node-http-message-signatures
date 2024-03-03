@@ -36,30 +36,45 @@ __export(src_exports, {
   DraftSignatureHeaderKeys: () => DraftSignatureHeaderKeys,
   HTTPMessageSignaturesParseError: () => HTTPMessageSignaturesParseError,
   InvalidRequestError: () => InvalidRequestError,
+  Pkcs1ParseError: () => Pkcs1ParseError,
   RequestHasMultipleDateHeadersError: () => RequestHasMultipleDateHeadersError,
   RequestHasMultipleSignatureHeadersError: () => RequestHasMultipleSignatureHeadersError,
   SignatureHeaderNotFoundError: () => SignatureHeaderNotFoundError,
+  SpkiParseError: () => SpkiParseError,
   UnknownSignatureHeaderFormatError: () => UnknownSignatureHeaderFormatError,
+  asn1ToArrayBuffer: () => asn1ToArrayBuffer,
   checkClockSkew: () => checkClockSkew,
+  decodePem: () => decodePem,
   detectAndVerifyAlgorithm: () => detectAndVerifyAlgorithm,
   digestHeaderRegEx: () => digestHeaderRegEx,
+  genASN1Length: () => genASN1Length,
   genDraftSignature: () => genDraftSignature,
   genDraftSignatureHeader: () => genDraftSignatureHeader,
   genDraftSigningString: () => genDraftSigningString,
   genEcKeyPair: () => genEcKeyPair,
   genEd25519KeyPair: () => genEd25519KeyPair,
   genEd448KeyPair: () => genEd448KeyPair,
+  genKeyImportParams: () => genKeyImportParams,
   genRFC3230DigestHeader: () => genRFC3230DigestHeader,
   genRsaKeyPair: () => genRsaKeyPair,
+  genSpkiFromPkcs1: () => genSpkiFromPkcs1,
+  genVerifyAlgorithm: () => genVerifyAlgorithm,
   getDraftAlgoString: () => getDraftAlgoString,
+  getNistCurveFromOid: () => getNistCurveFromOid,
+  getPublicKeyAlgorithmNameFromOid: () => getPublicKeyAlgorithmNameFromOid,
   lcObjectGet: () => lcObjectGet,
   lcObjectKey: () => lcObjectKey,
+  numberToUint8Array: () => numberToUint8Array,
   objectLcKeys: () => objectLcKeys,
   parseDraftRequest: () => parseDraftRequest,
   parseDraftRequestSignatureHeader: () => parseDraftRequestSignatureHeader,
+  parsePkcs1: () => parsePkcs1,
+  parsePublicKey: () => parsePublicKey,
   parseRequestSignature: () => parseRequestSignature,
+  parseSpki: () => parseSpki,
   prepareSignInfo: () => prepareSignInfo,
   requestIsRFC9421: () => requestIsRFC9421,
+  rsaASN1AlgorithmIdentifier: () => rsaASN1AlgorithmIdentifier,
   signAsDraftToRequest: () => signAsDraftToRequest,
   signatureHeaderIsDraft: () => signatureHeaderIsDraft,
   toSpkiPublicKey: () => toSpkiPublicKey,
@@ -145,6 +160,21 @@ function objectLcKeys(src) {
     dst.add(key.toLowerCase());
     return dst;
   }, /* @__PURE__ */ new Set());
+}
+function numberToUint8Array(num) {
+  const buf = new ArrayBuffer(8);
+  const view = new DataView(buf);
+  view.setBigUint64(0, BigInt(num), false);
+  const viewUint8Array = new Uint8Array(buf);
+  const firstNonZero = viewUint8Array.findIndex((v) => v !== 0);
+  return viewUint8Array.slice(firstNonZero);
+}
+function genASN1Length(length) {
+  if (length < 0x80n) {
+    return new Uint8Array([Number(length)]);
+  }
+  const lengthUint8Array = numberToUint8Array(length);
+  return new Uint8Array([128 + lengthUint8Array.length, ...lengthUint8Array]);
 }
 
 // src/draft/sign.ts
@@ -644,10 +674,72 @@ function detectAndVerifyAlgorithm(algorithm, publicKey, errorLogger) {
 // src/draft/verify.ts
 var ncrypto = __toESM(require("node:crypto"), 1);
 
-// src/shared/spki-algo.ts
-var import_asn1js = __toESM(require("@lapo/asn1js"), 1);
+// src/pem/spki.ts
+var import_asn1js2 = __toESM(require("@lapo/asn1js"), 1);
 var import_hex = __toESM(require("@lapo/asn1js/hex.js"), 1);
 var import_base64 = __toESM(require("@lapo/asn1js/base64.js"), 1);
+
+// src/pem/pkcs1.ts
+var import_asn1js = __toESM(require("@lapo/asn1js"), 1);
+var Pkcs1ParseError = class extends Error {
+  constructor(message) {
+    super(message);
+  }
+};
+function parsePkcs1(input) {
+  const parsed = import_asn1js.default.decode(decodePem(input));
+  if (!parsed.sub || parsed.sub.length !== 2)
+    throw new Pkcs1ParseError("Invalid SPKI (invalid sub length)");
+  const modulus = parsed.sub[0];
+  const publicExponent = parsed.sub[1];
+  if (!modulus || modulus.tag.tagNumber !== 2)
+    throw new Pkcs1ParseError("Invalid SPKI (invalid modulus)");
+  if (!publicExponent || publicExponent.tag.tagNumber !== 2)
+    throw new Pkcs1ParseError("Invalid SPKI (invalid publicExponent)");
+  return {
+    pkcs1: asn1ToArrayBuffer(parsed),
+    modulus: (asn1ToArrayBuffer(modulus, true).byteLength - 1) * 8,
+    publicExponent: parseInt(publicExponent.content() || "0")
+  };
+}
+var rsaASN1AlgorithmIdentifier = Uint8Array.from([
+  48,
+  13,
+  6,
+  9,
+  42,
+  134,
+  72,
+  134,
+  247,
+  13,
+  1,
+  1,
+  1,
+  // 1.2.840.113549.1.1.1
+  5,
+  0
+]);
+function genSpkiFromPkcs1(input) {
+  const { pkcs1 } = parsePkcs1(input);
+  const pkcsLength = genASN1Length(pkcs1.byteLength + 1);
+  const rootContent = Uint8Array.from([
+    ...rsaASN1AlgorithmIdentifier,
+    3,
+    ...pkcsLength,
+    // BIT STRING
+    0,
+    ...new Uint8Array(pkcs1)
+  ]);
+  return Uint8Array.from([
+    48,
+    ...genASN1Length(rootContent.length),
+    // SEQUENCE
+    ...rootContent
+  ]);
+}
+
+// src/pem/spki.ts
 var SpkiParseError = class extends Error {
   constructor(message) {
     super(message);
@@ -685,23 +777,29 @@ function getNistCurveFromOid(oidStr) {
     return "P-521";
   throw new SpkiParseError("Unknown Named Curve OID");
 }
-function asn1BinaryToArrayBuffer(enc) {
-  if (typeof enc === "string") {
-    return Uint8Array.from(enc, (s) => s.charCodeAt(0)).buffer;
+function asn1ToArrayBuffer(asn1, contentOnly = false) {
+  const fullEnc = asn1.stream.enc;
+  const start = contentOnly ? asn1.posContent() : asn1.posStart();
+  const end = asn1.posEnd();
+  if (typeof fullEnc === "string") {
+    return Uint8Array.from(fullEnc.slice(start, end), (s) => s.charCodeAt(0)).buffer;
+  } else if (fullEnc instanceof Uint8Array) {
+    return fullEnc.buffer.slice(start, end);
   }
-  if (enc instanceof ArrayBuffer) {
-    return enc;
-  } else if (enc instanceof Uint8Array) {
-    return enc.buffer;
-  } else if (Array.isArray(enc)) {
-    return new Uint8Array(enc).buffer;
+  if (fullEnc instanceof ArrayBuffer) {
+    return new Uint8Array(fullEnc.slice(start, end)).buffer;
+  } else if (Array.isArray(fullEnc)) {
+    return new Uint8Array(fullEnc.slice(start, end)).buffer;
   }
   throw new SpkiParseError("Invalid SPKI (invalid ASN1 Stream data)");
 }
 var reHex = /^\s*(?:[0-9A-Fa-f][0-9A-Fa-f]\s*)+$/;
-function parseSpki(input) {
+function decodePem(input) {
   const der = typeof input === "string" ? reHex.test(input) ? import_hex.default.decode(input) : import_base64.default.unarmor(input) : input;
-  const parsed = import_asn1js.default.decode(der);
+  return der;
+}
+function parseSpki(input) {
+  const parsed = import_asn1js2.default.decode(decodePem(input));
   if (!parsed.sub || parsed.sub.length === 0 || parsed.sub.length > 2)
     throw new SpkiParseError("Invalid SPKI (invalid sub)");
   const algorithmIdentifierSub = parsed.sub && parsed.sub[0] && parsed.sub[0].sub;
@@ -718,10 +816,23 @@ function parseSpki(input) {
     throw new SpkiParseError("Invalid SPKI (invalid algorithm content)");
   const parameter = algorithmIdentifierSub[1]?.content() ?? null;
   return {
-    der: asn1BinaryToArrayBuffer(parsed.stream.enc),
+    der: asn1ToArrayBuffer(parsed),
     algorithm,
     parameter
   };
+}
+function parsePublicKey(input) {
+  try {
+    return parseSpki(input);
+  } catch (e) {
+    try {
+      const { pkcs1 } = parsePkcs1(input);
+      const spki = genSpkiFromPkcs1(new Uint8Array(pkcs1));
+      return parseSpki(spki);
+    } catch (e2) {
+      throw new SpkiParseError("Invalid SPKI or PKCS#1");
+    }
+  }
 }
 function genKeyImportParams(parsed, defaults = {
   hash: "SHA-256",
@@ -795,7 +906,7 @@ function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
 var encoder = new TextEncoder();
 async function webVerifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   try {
-    const parsedSpki = parseSpki(publicKeyPem);
+    const parsedSpki = parsePublicKey(publicKeyPem);
     const publicKey = await crypto.subtle.importKey("spki", parsedSpki.der, genKeyImportParams(parsedSpki), false, ["verify"]);
     const verify2 = await crypto.subtle.verify(genVerifyAlgorithm(parsedSpki), publicKey, encoder.encode(parsed.params.signature), encoder.encode(parsed.signingString));
     return verify2;
@@ -813,30 +924,45 @@ async function webVerifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   DraftSignatureHeaderKeys,
   HTTPMessageSignaturesParseError,
   InvalidRequestError,
+  Pkcs1ParseError,
   RequestHasMultipleDateHeadersError,
   RequestHasMultipleSignatureHeadersError,
   SignatureHeaderNotFoundError,
+  SpkiParseError,
   UnknownSignatureHeaderFormatError,
+  asn1ToArrayBuffer,
   checkClockSkew,
+  decodePem,
   detectAndVerifyAlgorithm,
   digestHeaderRegEx,
+  genASN1Length,
   genDraftSignature,
   genDraftSignatureHeader,
   genDraftSigningString,
   genEcKeyPair,
   genEd25519KeyPair,
   genEd448KeyPair,
+  genKeyImportParams,
   genRFC3230DigestHeader,
   genRsaKeyPair,
+  genSpkiFromPkcs1,
+  genVerifyAlgorithm,
   getDraftAlgoString,
+  getNistCurveFromOid,
+  getPublicKeyAlgorithmNameFromOid,
   lcObjectGet,
   lcObjectKey,
+  numberToUint8Array,
   objectLcKeys,
   parseDraftRequest,
   parseDraftRequestSignatureHeader,
+  parsePkcs1,
+  parsePublicKey,
   parseRequestSignature,
+  parseSpki,
   prepareSignInfo,
   requestIsRFC9421,
+  rsaASN1AlgorithmIdentifier,
   signAsDraftToRequest,
   signatureHeaderIsDraft,
   toSpkiPublicKey,
