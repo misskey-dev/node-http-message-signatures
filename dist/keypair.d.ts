@@ -1,22 +1,21 @@
 /// <reference types="node" />
-export declare function genRsaKeyPair(modulusLength?: number): Promise<{
+import type { webcrypto as crypto } from 'node:crypto';
+import { ECNamedCurve } from './types';
+export declare function exportPublicKeyPem(key: crypto.CryptoKey): Promise<string>;
+export declare function exportPrivateKeyPem(key: crypto.CryptoKey): Promise<string>;
+export declare function genRsaKeyPair(modulusLength?: number, keyUsage?: crypto.KeyUsage[]): Promise<{
     publicKey: string;
     privateKey: string;
 }>;
-export type EcCurves = 'prime256v1' | 'secp384r1' | 'secp521r1' | 'secp256k1';
-export declare function genEcKeyPair(namedCurve?: EcCurves): Promise<{
+export declare function genEcKeyPair(namedCurve?: ECNamedCurve, keyUsage?: crypto.KeyUsage[]): Promise<{
     publicKey: string;
     privateKey: string;
 }>;
-export declare function genEd25519KeyPair(): Promise<{
+export declare function genEd25519KeyPair(keyUsage?: crypto.KeyUsage[]): Promise<{
     publicKey: string;
     privateKey: string;
 }>;
-export declare function genEd448KeyPair(): Promise<{
+export declare function genEd448KeyPair(keyUsage: any): Promise<{
     publicKey: string;
     privateKey: string;
 }>;
-/**
- * PKCS1形式かもしれない公開キーをSPKI形式に統一して出力する
- */
-export declare function toSpkiPublicKey(publicKey: string): string | Buffer;

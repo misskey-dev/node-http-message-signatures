@@ -46,7 +46,7 @@ describe('spki', () => {
 		expect(verify).toBe(true);
 	});
 	test('ec', async () => {
-		const keyPair = await genEcKeyPair('prime256v1');
+		const keyPair = await genEcKeyPair('P-256');
 		const parsed = parseSpki(keyPair.publicKey);
 		expect(parsed.algorithm).toBe('1.2.840.10045.2.1\necPublicKey\nANSI X9.62 public key type');
 		expect(parsed.parameter).toBe('1.2.840.10045.3.1.7\nprime256v1\nANSI X9.62 named elliptic curve');

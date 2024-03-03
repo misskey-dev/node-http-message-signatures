@@ -3,85 +3,80 @@
  * SPDX-License-Identifier: MIT
  */
 
-import * as crypto from 'node:crypto';
-import * as util from 'node:util';
+import type { webcrypto as crypto } from 'node:crypto';
+import { encodeArrayBufferToBase64 } from './utils';
+import { ECNamedCurve } from './types';
 
-const generateKeyPair = util.promisify(crypto.generateKeyPair);
-
-export async function genRsaKeyPair(modulusLength = 4096) {
-	return await generateKeyPair('rsa', {
-		modulusLength,
-		publicKeyEncoding: {
-			type: 'spki',
-			format: 'pem'
-		},
-		privateKeyEncoding: {
-			type: 'pkcs8',
-			format: 'pem',
-			cipher: undefined,
-			passphrase: undefined
-		}
-	});
+export async function exportPublicKeyPem(key: crypto.CryptoKey) {
+	const ab = await globalThis.crypto.subtle.exportKey('spki', key);
+	return '-----BEGIN PUBLIC KEY-----\n' +
+		encodeArrayBufferToBase64(ab) +
+		'\n-----END PUBLIC KEY-----\n';
 }
 
-export type EcCurves
-	= 'prime256v1'	// NIST P-256, secp256r1
-	| 'secp384r1'	// NIST P-384
-	| 'secp521r1'	// NIST P-521
-	| 'secp256k1';
-
-export async function genEcKeyPair(namedCurve: EcCurves = 'prime256v1') {
-	return await generateKeyPair('ec', {
-		namedCurve,
-		publicKeyEncoding: {
-			type: 'spki',
-			format: 'pem'
-		},
-		privateKeyEncoding: {
-			type: 'pkcs8',
-			format: 'pem',
-			cipher: undefined,
-			passphrase: undefined
-		}
-	});
+export async function exportPrivateKeyPem(key: crypto.CryptoKey) {
+	const ab = await globalThis.crypto.subtle.exportKey('pkcs8', key);
+	return '-----BEGIN PRIVATE KEY-----\n' +
+		encodeArrayBufferToBase64(ab) +
+		'\n-----END PRIVATE KEY-----\n';
 }
 
-export async function genEd25519KeyPair() {
-	return await generateKeyPair('ed25519', {
-		publicKeyEncoding: {
-			type: 'spki',
-			format: 'pem'
+export async function genRsaKeyPair(modulusLength = 4096, keyUsage: crypto.KeyUsage[] = ['sign', 'verify']) {
+	const keyPair = await globalThis.crypto.subtle.generateKey(
+		{
+			name: 'RSASSA-PKCS1-v1_5',
+			modulusLength,
+			publicExponent: new Uint8Array([1, 0, 1]),
+			hash: 'SHA-256'
 		},
-		privateKeyEncoding: {
-			type: 'pkcs8',
-			format: 'pem',
-			cipher: undefined,
-			passphrase: undefined
-		}
-	});
+		true,
+		keyUsage,
+	);
+	return {
+		publicKey: await exportPublicKeyPem(keyPair.publicKey),
+		privateKey: await exportPrivateKeyPem(keyPair.privateKey)
+	};
 }
 
-export async function genEd448KeyPair() {
-	return await generateKeyPair('ed448', {
-		publicKeyEncoding: {
-			type: 'spki',
-			format: 'pem'
+export async function genEcKeyPair(namedCurve: ECNamedCurve = 'P-256', keyUsage: crypto.KeyUsage[] = ['sign', 'verify']) {
+	const keyPair = await globalThis.crypto.subtle.generateKey(
+		{
+			name: 'ECDSA',
+			namedCurve
 		},
-		privateKeyEncoding: {
-			type: 'pkcs8',
-			format: 'pem',
-			cipher: undefined,
-			passphrase: undefined
-		}
-	});
+		true,
+		keyUsage,
+	);
+	return {
+		publicKey: await exportPublicKeyPem(keyPair.publicKey),
+		privateKey: await exportPrivateKeyPem(keyPair.privateKey)
+	};
 }
 
-/**
- * PKCS1形式かもしれない公開キーをSPKI形式に統一して出力する
- */
-export function toSpkiPublicKey(publicKey: string) {
-	return crypto.createPublicKey(publicKey).export({
-		type: 'spki',
-		format: 'pem'
-	});
+export async function genEd25519KeyPair(keyUsage: crypto.KeyUsage[] = ['sign', 'verify']) {
+	const keyPair = await globalThis.crypto.subtle.generateKey(
+		{
+			name: 'Ed25519',
+		},
+		true,
+		keyUsage,
+	) as crypto.CryptoKeyPair;
+	return {
+		publicKey: await exportPublicKeyPem(keyPair.publicKey),
+		privateKey: await exportPrivateKeyPem(keyPair.privateKey)
+	};
+}
+
+export async function genEd448KeyPair(keyUsage) {
+	const keyPair = await globalThis.crypto.subtle.generateKey(
+		{
+			name: 'Ed448',
+		},
+		true,
+		keyUsage,
+	) as crypto.CryptoKeyPair;
+	return {
+		publicKey: await exportPublicKeyPem(keyPair.publicKey),
+		privateKey: await exportPrivateKeyPem(keyPair.privateKey)
+	};
 }

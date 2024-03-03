@@ -620,72 +620,69 @@ function parseRequestSignature(request, options) {
 }
 
 // src/keypair.ts
-import * as crypto from "node:crypto";
-import * as util from "node:util";
-var generateKeyPair2 = util.promisify(crypto.generateKeyPair);
-async function genRsaKeyPair(modulusLength = 4096) {
-  return await generateKeyPair2("rsa", {
-    modulusLength,
-    publicKeyEncoding: {
-      type: "spki",
-      format: "pem"
-    },
-    privateKeyEncoding: {
-      type: "pkcs8",
-      format: "pem",
-      cipher: void 0,
-      passphrase: void 0
-    }
-  });
+async function exportPublicKeyPem(key) {
+  const ab = await globalThis.crypto.subtle.exportKey("spki", key);
+  return "-----BEGIN PUBLIC KEY-----\n" + encodeArrayBufferToBase64(ab) + "\n-----END PUBLIC KEY-----\n";
 }
-async function genEcKeyPair(namedCurve = "prime256v1") {
-  return await generateKeyPair2("ec", {
-    namedCurve,
-    publicKeyEncoding: {
-      type: "spki",
-      format: "pem"
-    },
-    privateKeyEncoding: {
-      type: "pkcs8",
-      format: "pem",
-      cipher: void 0,
-      passphrase: void 0
-    }
-  });
+async function exportPrivateKeyPem(key) {
+  const ab = await globalThis.crypto.subtle.exportKey("pkcs8", key);
+  return "-----BEGIN PRIVATE KEY-----\n" + encodeArrayBufferToBase64(ab) + "\n-----END PRIVATE KEY-----\n";
 }
-async function genEd25519KeyPair() {
-  return await generateKeyPair2("ed25519", {
-    publicKeyEncoding: {
-      type: "spki",
-      format: "pem"
+async function genRsaKeyPair(modulusLength = 4096, keyUsage = ["sign", "verify"]) {
+  const keyPair = await globalThis.crypto.subtle.generateKey(
+    {
+      name: "RSASSA-PKCS1-v1_5",
+      modulusLength,
+      publicExponent: new Uint8Array([1, 0, 1]),
+      hash: "SHA-256"
     },
-    privateKeyEncoding: {
-      type: "pkcs8",
-      format: "pem",
-      cipher: void 0,
-      passphrase: void 0
-    }
-  });
+    true,
+    keyUsage
+  );
+  return {
+    publicKey: await exportPublicKeyPem(keyPair.publicKey),
+    privateKey: await exportPrivateKeyPem(keyPair.privateKey)
+  };
 }
-async function genEd448KeyPair() {
-  return await generateKeyPair2("ed448", {
-    publicKeyEncoding: {
-      type: "spki",
-      format: "pem"
+async function genEcKeyPair(namedCurve = "P-256", keyUsage = ["sign", "verify"]) {
+  const keyPair = await globalThis.crypto.subtle.generateKey(
+    {
+      name: "ECDSA",
+      namedCurve
     },
-    privateKeyEncoding: {
-      type: "pkcs8",
-      format: "pem",
-      cipher: void 0,
-      passphrase: void 0
-    }
-  });
+    true,
+    keyUsage
+  );
+  return {
+    publicKey: await exportPublicKeyPem(keyPair.publicKey),
+    privateKey: await exportPrivateKeyPem(keyPair.privateKey)
+  };
 }
-function toSpkiPublicKey(publicKey) {
-  return crypto.createPublicKey(publicKey).export({
-    type: "spki",
-    format: "pem"
-  });
+async function genEd25519KeyPair(keyUsage = ["sign", "verify"]) {
+  const keyPair = await globalThis.crypto.subtle.generateKey(
+    {
+      name: "Ed25519"
+    },
+    true,
+    keyUsage
+  );
+  return {
+    publicKey: await exportPublicKeyPem(keyPair.publicKey),
+    privateKey: await exportPrivateKeyPem(keyPair.privateKey)
+  };
+}
+async function genEd448KeyPair(keyUsage) {
+  const keyPair = await globalThis.crypto.subtle.generateKey(
+    {
+      name: "Ed448"
+    },
+    true,
+    keyUsage
+  );
+  return {
+    publicKey: await exportPublicKeyPem(keyPair.publicKey),
+    privateKey: await exportPrivateKeyPem(keyPair.privateKey)
+  };
 }
 
 // src/digest/utils.ts
@@ -877,6 +874,8 @@ export {
   digestHashAlgosForDecoding,
   digestHeaderRegEx,
   encodeArrayBufferToBase64,
+  exportPrivateKeyPem,
+  exportPublicKeyPem,
   genASN1Length,
   genDraftSignature,
   genDraftSignatureHeader,
@@ -910,7 +909,6 @@ export {
   rsaASN1AlgorithmIdentifier,
   signAsDraftToRequest,
   signatureHeaderIsDraft,
-  toSpkiPublicKey,
   validateAndProcessParsedDraftSignatureHeader,
   validateRequestAndGetSignatureHeader,
   verifyDigestHeader,
