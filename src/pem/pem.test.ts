@@ -1,5 +1,6 @@
 import { genKeyImportParams, genVerifyAlgorithm, parsePublicKey, parseSpki } from './spki';
 import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1';
+import { parsePkcs8 } from './pkcs8';
 import { rsa4096, ed25519 } from '../../test/keys';
 import { genEcKeyPair } from '../keypair';
 
@@ -111,5 +112,19 @@ describe(parsePublicKey, () => {
 		const parsed = parsePublicKey(rsa4096.publicKey);
 		expect(parsed.algorithm).toBe('1.2.840.113549.1.1.1\nrsaEncryption\nPKCS #1');
 		expect(parsed.parameter).toBeNull();
+	});
+});
+
+describe('pkcs8', () => {
+	test('rsa4096', async () => {
+		const parsed = parsePkcs8(rsa4096.privateKey);
+		expect(parsed.algorithm).toBe('1.2.840.113549.1.1.1\nrsaEncryption\nPKCS #1');
+	});
+	test('ed25519', async () => {
+		const parsed = parsePkcs8(ed25519.privateKey);
+		expect(parsed.algorithm).toBe('1.3.101.112\ncurveEd25519\nEdDSA 25519 signature algorithm');
+	});
+	test('fail', () => {
+		expect(() => parsePkcs8(rsa4096.publicKey)).toThrow();
 	});
 });

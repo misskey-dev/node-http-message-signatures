@@ -42,34 +42,6 @@ export function getNistCurveFromOid(oidStr: string) {
 	throw new SpkiParseError('Unknown Named Curve OID');
 }
 
-export type SpkiParsedAlgorithmIdentifierBase = {
-	/**
-	 * DER
-	 *
-	 * (Somehow crypto.createPublicKey will cause `error:1E08010C:DECODER routines::unsupported`)
-	 */
-	der: ArrayBuffer;
-
-	/**
-	 * Parsed algorithm, 3 lines string
-	 * Data from https://github.com/lapo-luchini/asn1js/blob/trunk/oids.js
-	 *
-	 * e.g.
-	 * ```
-	 * 1.3.101.112
-	 * curveEd25519
-	 * EdDSA 25519 signature algorithm
-	 * ```
-	 */
-	algorithm: string;
-
-	/**
-	 * Parsed parameter
-	 * https://github.com/lapo-luchini/asn1js/blob/408efbc4a18c786b843995746d86165c61680e80/asn1.js#L424-L487
-	 */
-	parameter: any;
-};
-
 /**
  * Convert ASN1(@lapo/asn1js).Binary to ArrayBuffer
  *
@@ -95,27 +67,55 @@ export function asn1ToArrayBuffer(asn1: ASN1, contentOnly = false) {
 	throw new SpkiParseError('Invalid SPKI (invalid ASN1 Stream data)');
 }
 
-export type SpkiParsedRSAIdentifier = {
-	der: ArrayBuffer;
+export type ParsedAlgorithmIdentifierBase = {
+	/**
+	 * Parsed algorithm, 3 lines string
+	 * Data from https://github.com/lapo-luchini/asn1js/blob/trunk/oids.js
+	 *
+	 * e.g.
+	 * ```
+	 * 1.3.101.112
+	 * curveEd25519
+	 * EdDSA 25519 signature algorithm
+	 * ```
+	 */
+	algorithm: string;
+
+	/**
+	 * Parsed parameter
+	 * https://github.com/lapo-luchini/asn1js/blob/408efbc4a18c786b843995746d86165c61680e80/asn1.js#L424-L487
+	 */
+	parameter: any;
+};
+export type ParsedRSAIdentifier = {
 	algorithm: '1.2.840.113549.1.1.1\nrsaEncryption\nPKCS #1';
 	parameter: null;
 };
-export type SpkiParsedEd25519Identifier = {
+export type ParsedEd25519Identifier = {
 	der: ArrayBuffer;
 	algorithm: '1.3.101.112\ncurveEd25519\nEdDSA 25519 signature algorithm',
 	parameter: null;
 }
-export type SpkiParsedNPrime256v1Identifier = {
+export type ParsedNPrime256v1Identifier = {
 	der: ArrayBuffer;
 	algorithm: '1.2.840.10045.2.1\necPublicKey\nANSI X9.62 public key type',
   parameter: '1.2.840.10045.3.1.7\nprime256v1\nANSI X9.62 named elliptic curve'
 }
 
-export type SpkiParsedAlgorithmIdentifier =
-	| SpkiParsedRSAIdentifier
-	| SpkiParsedEd25519Identifier
-	| SpkiParsedNPrime256v1Identifier
-	| SpkiParsedAlgorithmIdentifierBase;
+export type ParsedAlgorithmIdentifier =
+	| ParsedRSAIdentifier
+	| ParsedEd25519Identifier
+	| ParsedNPrime256v1Identifier
+	| ParsedAlgorithmIdentifierBase;
+
+export type SpkiParsedAlgorithmIdentifier = ParsedAlgorithmIdentifierBase & {
+	/**
+	 * DER
+	 *
+	 * (Somehow crypto.createPublicKey will cause `error:1E08010C:DECODER routines::unsupported`)
+	 */
+	der: ArrayBuffer;
+};
 
 const reHex = /^\s*(?:[0-9A-Fa-f][0-9A-Fa-f]\s*)+$/;
 
@@ -128,6 +128,22 @@ export function decodePem(input: ASN1.StreamOrBinary): Exclude<ASN1.StreamOrBina
 	return der;
 }
 
+export function parseAlgorithmIdentifier(input: ASN1): ParsedAlgorithmIdentifier {
+	const algorithmIdentifierSub = input.sub;
+	if (!algorithmIdentifierSub) throw new SpkiParseError('Invalid AlgorithmIdentifier');
+	if (algorithmIdentifierSub.length === 0) throw new SpkiParseError('Invalid AlgorithmIdentifier (sub length, zero)');
+	if (algorithmIdentifierSub.length > 2) throw new SpkiParseError('Invalid AlgorithmIdentifier (sub length, too many)');
+	if (algorithmIdentifierSub[0].tag.tagNumber !== 0x06) throw new SpkiParseError('Invalid AlgorithmIdentifier (.sub[0] type)');
+
+	const algorithm = algorithmIdentifierSub[0]?.content() ?? null;
+	if (typeof algorithm !== 'string') throw new SpkiParseError('Invalid AlgorithmIdentifier (invalid content)');
+	const parameter = algorithmIdentifierSub[1]?.content() ?? null;
+
+	return {
+		algorithm,
+		parameter,
+	};
+}
 /**
  * Parse X.509 SubjectPublicKeyInfo (SPKI) public key
  * @param input SPKI public key PEM or DER
@@ -136,20 +152,10 @@ export function decodePem(input: ASN1.StreamOrBinary): Exclude<ASN1.StreamOrBina
 export function parseSpki(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmIdentifier {
 	const parsed = ASN1.decode(decodePem(input));
 	if (!parsed.sub || parsed.sub.length === 0 || parsed.sub.length > 2) throw new SpkiParseError('Invalid SPKI (invalid sub)');
-	const algorithmIdentifierSub = parsed.sub && parsed.sub[0] && parsed.sub[0].sub;
-	if (!algorithmIdentifierSub) throw new SpkiParseError('Invalid SPKI (no AlgorithmIdentifier)');
-	if (algorithmIdentifierSub.length === 0) throw new SpkiParseError('Invalid SPKI (invalid AlgorithmIdentifier sub length, zero)');
-	if (algorithmIdentifierSub.length > 2) throw new SpkiParseError('Invalid SPKI (invalid AlgorithmIdentifier sub length, too many)');
-	if (algorithmIdentifierSub[0].tag.tagNumber !== 0x06) throw new SpkiParseError('Invalid SPKI (invalid AlgorithmIdentifier.sub[0] type)');
-
-	const algorithm = algorithmIdentifierSub[0]?.content() ?? null;
-	if (typeof algorithm !== 'string') throw new SpkiParseError('Invalid SPKI (invalid algorithm content)');
-	const parameter = algorithmIdentifierSub[1]?.content() ?? null;
 
 	return {
 		der: asn1ToArrayBuffer(parsed),
-		algorithm,
-		parameter,
+		...parseAlgorithmIdentifier(parsed.sub[0]),
 	};
 }
 
