@@ -46,6 +46,11 @@ export function numberToUint8Array(num: number | bigint): Uint8Array {
 	return viewUint8Array.slice(firstNonZero);
 }
 
+/**
+ * Generate ASN.1 length field
+ * @param length Length of the content
+ * @returns ASN.1 length field
+ */
 export function genASN1Length(length: number | bigint): Uint8Array {
 	if (length < 0x80n) {
 		return new Uint8Array([Number(length)]);
@@ -55,7 +60,7 @@ export function genASN1Length(length: number | bigint): Uint8Array {
 }
 
 /**
- * For web
+ * ArrayBuffer to base64
  */
 export function encodeArrayBufferToBase64(buffer: ArrayBuffer): string {
 	const uint8Array = new Uint8Array(buffer);
@@ -64,15 +69,10 @@ export function encodeArrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 /**
- * for Web
+ * base64 to Uint8Array
  */
 export function decodeBase64ToUint8Array(base64: string): Uint8Array {
-	const binary = atob(base64);
-	const uint8Array = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i++) {
-		uint8Array[i] = binary.charCodeAt(i);
-	}
-	return uint8Array;
+	return Uint8Array.from(atob(base64), s => s.charCodeAt(0));
 }
 
 export class KeyValidationError extends Error {

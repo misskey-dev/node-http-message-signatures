@@ -82,7 +82,11 @@ Parse and verify in fastify web server, implements ActivityPub inbox
 ```ts
 import Fastify from 'fastify';
 import fastifyRawBody from 'fastify-raw-body';
-import { parseRequestSignature, verifyDraftSignature, verifyDigestHeader } from '@misskey-dev/node-http-message-signatures';
+import {
+	verifyDigestHeader,
+	parseRequestSignature,
+	verifyDraftSignature,
+} from '@misskey-dev/node-http-message-signatures';
 
 /**
  * Prepare keyId-publicKeyPem Map
@@ -101,7 +105,7 @@ await fastify.register(fastifyRawBody, {
 	runFirst: true,
 });
 fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => {
-	const verifyDigest = verifyDigestHeader(request.raw, request.rawBody, true);
+	const verifyDigest = await verifyDigestHeader(request.raw, request.rawBody, true);
 	if (!verifyDigest) {
 		reply.code(401);
 		return;
@@ -133,7 +137,11 @@ fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => 
 
 ### Sign and Post
 ```ts
-import { signAsDraftToRequest, genRFC3230DigestHeader, RequestLike } from '@misskey-dev/node-http-message-signatures';
+import {
+	genRFC3230DigestHeader,
+	signAsDraftToRequest,
+	RequestLike,
+} from '@misskey-dev/node-http-message-signatures';
 
 /**
  * Prepare keyId-privateKeyPem Map
@@ -168,7 +176,7 @@ export async function send(url: string, body: string, keyId: string) {
 		// TODO
 	} else {
 		// Draft
-		request.headers['Digest'] = genRFC3230DigestHeader(body);
+		request.headers['Digest'] = await genRFC3230DigestHeader(body);
 
 		await signAsDraftToRequest(request, { keyId, privateKeyPem }, includeHeaders);
 

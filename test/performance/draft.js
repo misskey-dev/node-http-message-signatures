@@ -38,7 +38,7 @@ console.log('Performance test, TRYES:', TRYES);
  */
 {
 	const request = getBasicOutgoingRequest();
-	request.headers['Digest'] = genRFC3230DigestHeader(request.body, 'sha256');
+	request.headers['Digest'] = await genRFC3230DigestHeader(request.body, 'SHA-256');
 
 	/**
 	 * RSA4096, SHA-256
@@ -78,7 +78,7 @@ console.log('Performance test, TRYES:', TRYES);
  */
 {
 	const request = getBasicOutgoingRequest();
-	request.headers['Digest'] = genRFC3230DigestHeader(request.body, 'sha256');
+	request.headers['Digest'] = await genRFC3230DigestHeader(request.body, 'SHA-256');
 	await signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'SHA-256' });
 	const parsed = parseRequestSignature(request);
 
@@ -122,7 +122,7 @@ console.log('Performance test, TRYES:', TRYES);
  */
 {
 	const request = getBasicOutgoingRequest();
-	request.headers['Digest'] = genRFC3230DigestHeader(request.body, 'sha256');
+	request.headers['Digest'] = await genRFC3230DigestHeader(request.body, 'SHA-256');
 	await signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
 	const parsed = parseRequestSignature(request);
 

@@ -1,15 +1,28 @@
-import { createHash, BinaryLike } from 'node:crypto';
+import { webcrypto as crypto } from 'node:crypto';
 import { DigestHashAlgorithm } from '../types';
+import { encodeArrayBufferToBase64 } from '../utils';
 
-export function createBase64Digest(body: BinaryLike, hash: DigestHashAlgorithm): string;
-export function createBase64Digest<Ks extends DigestHashAlgorithm[]>(body: BinaryLike, hash: Ks): Map<Ks[number], string>;
-export function createBase64Digest(body: BinaryLike): string
-export function createBase64Digest(
-	body: BinaryLike,
-	hash: DigestHashAlgorithm | DigestHashAlgorithm[] = 'sha256',
-): Map<DigestHashAlgorithm, string> | string {
+export type DigestSource = crypto.BufferSource | string;
+
+export async function createBase64Digest(body: DigestSource, hash: DigestHashAlgorithm): Promise<string>;
+export async function createBase64Digest<Ks extends DigestHashAlgorithm[]>(body: DigestSource, hash: Ks): Promise<Map<Ks[number], string>>;
+export async function createBase64Digest(body: DigestSource): Promise<string>
+export async function createBase64Digest(
+	body: DigestSource,
+	hash: DigestHashAlgorithm | DigestHashAlgorithm[] = 'SHA-256',
+): Promise<Map<DigestHashAlgorithm, string> | string> {
 	if (Array.isArray(hash)) {
-		return new Map(hash.map((h) => [h, createBase64Digest(body, h)]));
+		return new Map(await Promise.all(hash.map((h) => {
+			return (async () => [h, await createBase64Digest(body, h)] as const)();
+		})));
 	}
-	return createHash(hash).update(body).digest('base64');
+
+	if (hash === 'SHA') {
+		hash = 'SHA-1';
+	}
+	if (typeof body === 'string') {
+		body = (new TextEncoder()).encode(body);
+	}
+	const hashAb = await crypto.subtle.digest(hash, body);
+	return encodeArrayBufferToBase64(hashAb);
 }

@@ -49,7 +49,6 @@ __export(src_exports, {
   checkClockSkew: () => checkClockSkew,
   decodeBase64ToUint8Array: () => decodeBase64ToUint8Array,
   decodePem: () => decodePem,
-  digestHashAlgosForDecoding: () => digestHashAlgosForDecoding,
   digestHeaderRegEx: () => digestHeaderRegEx,
   encodeArrayBufferToBase64: () => encodeArrayBufferToBase64,
   exportPrivateKeyPem: () => exportPrivateKeyPem,
@@ -308,12 +307,7 @@ function encodeArrayBufferToBase64(buffer) {
   return btoa(binary);
 }
 function decodeBase64ToUint8Array(base64) {
-  const binary = atob(base64);
-  const uint8Array = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    uint8Array[i] = binary.charCodeAt(i);
-  }
-  return uint8Array;
+  return Uint8Array.from(atob(base64), (s) => s.charCodeAt(0));
 }
 var KeyValidationError = class extends Error {
   constructor(message) {
@@ -792,34 +786,28 @@ async function genEd448KeyPair(keyUsage) {
 
 // src/digest/utils.ts
 var import_node_crypto = require("node:crypto");
-function createBase64Digest(body, hash = "sha256") {
+async function createBase64Digest(body, hash = "SHA-256") {
   if (Array.isArray(hash)) {
-    return new Map(hash.map((h) => [h, createBase64Digest(body, h)]));
+    return new Map(await Promise.all(hash.map((h) => {
+      return (async () => [h, await createBase64Digest(body, h)])();
+    })));
   }
-  return (0, import_node_crypto.createHash)(hash).update(body).digest("base64");
+  if (hash === "SHA") {
+    hash = "SHA-1";
+  }
+  if (typeof body === "string") {
+    body = new TextEncoder().encode(body);
+  }
+  const hashAb = await import_node_crypto.webcrypto.subtle.digest(hash, body);
+  return encodeArrayBufferToBase64(hashAb);
 }
 
 // src/digest/digest-rfc3230.ts
-var digestHashAlgosForEncoding = {
-  "sha1": "SHA",
-  "sha256": "SHA-256",
-  "sha384": "SHA-384",
-  "sha512": "SHA-512",
-  "md5": "MD5"
-};
-var digestHashAlgosForDecoding = {
-  "SHA": "sha1",
-  "SHA-1": "sha1",
-  "SHA-256": "sha256",
-  "SHA-384": "sha384",
-  "SHA-512": "sha512",
-  "MD5": "md5"
-};
-function genRFC3230DigestHeader(body, hashAlgorithm = "sha256") {
-  return `${digestHashAlgosForEncoding[hashAlgorithm]}=${createBase64Digest(body, hashAlgorithm)}`;
+async function genRFC3230DigestHeader(body, hashAlgorithm) {
+  return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm)}`;
 }
 var digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
-function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
+async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
   let digestHeader = lcObjectGet(request.headers, "digest");
   if (!digestHeader) {
     if (failOnNoDigest) {
@@ -844,13 +832,13 @@ function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true, erro
       errorLogger("Invalid Digest header format");
     return false;
   }
-  const algo = digestHashAlgosForDecoding[match[1].toUpperCase()];
+  const algo = match[1];
   if (!algo) {
     if (errorLogger)
       errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
     return false;
   }
-  const hash = createBase64Digest(rawBody, algo);
+  const hash = await createBase64Digest(rawBody, algo);
   if (hash !== value) {
     if (errorLogger)
       errorLogger(`Digest header hash mismatch`);
@@ -860,12 +848,12 @@ function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true, erro
 }
 
 // src/digest/digest.ts
-function verifyDigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
+async function verifyDigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
   const headerKeys = objectLcKeys(request.headers);
   if (headerKeys.has("content-digest")) {
     throw new Error("Not implemented yet");
   } else if (headerKeys.has("digest")) {
-    return verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest, errorLogger);
+    return await verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest, errorLogger);
   }
   if (failOnNoDigest) {
     if (errorLogger)
@@ -977,7 +965,6 @@ async function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   checkClockSkew,
   decodeBase64ToUint8Array,
   decodePem,
-  digestHashAlgosForDecoding,
   digestHeaderRegEx,
   encodeArrayBufferToBase64,
   exportPrivateKeyPem,

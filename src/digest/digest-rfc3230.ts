@@ -1,34 +1,16 @@
 import { lcObjectGet } from '../utils';
-import { createBase64Digest } from './utils';
+import { DigestSource, createBase64Digest } from './utils';
 import { DigestHashAlgorithm, IncomingRequest } from '../types';
-import { BinaryLike } from 'node:crypto';
 
-const digestHashAlgosForEncoding = {
-	'sha1': 'SHA',
-	'sha256': 'SHA-256',
-	'sha384': 'SHA-384',
-	'sha512': 'SHA-512',
-	'md5': 'MD5',
-} as const satisfies Record<DigestHashAlgorithm, string>;
-
-export const digestHashAlgosForDecoding = {
-	'SHA': 'sha1',
-	'SHA-1': 'sha1',
-	'SHA-256': 'sha256',
-	'SHA-384': 'sha384',
-	'SHA-512': 'sha512',
-	'MD5': 'md5',
-} as const satisfies Record<string, DigestHashAlgorithm>;
-
-export function genRFC3230DigestHeader(body: string, hashAlgorithm: DigestHashAlgorithm = 'sha256') {
-	return `${digestHashAlgosForEncoding[hashAlgorithm]}=${createBase64Digest(body, hashAlgorithm)}`;
+export async function genRFC3230DigestHeader(body: string, hashAlgorithm: DigestHashAlgorithm) {
+	return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm)}`;
 }
 
 export const digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
 
-export function verifyRFC3230DigestHeader(
+export async function verifyRFC3230DigestHeader(
 	request: IncomingRequest,
-	rawBody: BinaryLike,
+	rawBody: DigestSource,
 	failOnNoDigest = true,
 	errorLogger?: ((message: any) => any)
 ) {
@@ -56,13 +38,13 @@ export function verifyRFC3230DigestHeader(
 		return false;
 	}
 
-	const algo = digestHashAlgosForDecoding[match[1].toUpperCase()] as DigestHashAlgorithm | undefined;
+	const algo = match[1] as DigestHashAlgorithm;
 	if (!algo) {
 		if (errorLogger) errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
 		return false;
 	}
 
-	const hash = createBase64Digest(rawBody, algo);
+	const hash = await createBase64Digest(rawBody, algo);
 	if (hash !== value) {
 		if (errorLogger) errorLogger(`Digest header hash mismatch`);
 		return false;

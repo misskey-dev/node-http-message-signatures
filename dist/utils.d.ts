@@ -16,13 +16,18 @@ export declare function objectLcKeys<T extends Record<string, any>>(src: T): Set
  * convert number to Uint8Array, for ASN.1 length field
  */
 export declare function numberToUint8Array(num: number | bigint): Uint8Array;
+/**
+ * Generate ASN.1 length field
+ * @param length Length of the content
+ * @returns ASN.1 length field
+ */
 export declare function genASN1Length(length: number | bigint): Uint8Array;
 /**
- * For web
+ * ArrayBuffer to base64
  */
 export declare function encodeArrayBufferToBase64(buffer: ArrayBuffer): string;
 /**
- * for Web
+ * base64 to Uint8Array
  */
 export declare function decodeBase64ToUint8Array(base64: string): Uint8Array;
 export declare class KeyValidationError extends Error {
