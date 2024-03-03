@@ -6,6 +6,8 @@ export class Pkcs8ParseError extends Error {
 }
 
 /**
+ * Parse PKCS#8 private key
+ *
  * PrivateKeyInfo ::= SEQUENCE {
  *	version Version,
  *	privateKeyAlgorithm AlgorithmIdentifier {{PrivateKeyAlgorithms}},
@@ -20,7 +22,7 @@ export class Pkcs8ParseError extends Error {
  */
 export function parsePkcs8(input: ASN1.StreamOrBinary) {
 	const parsed = ASN1.decode(decodePem(input));
-	if (!parsed.sub || parsed.sub.length < 3) throw new Pkcs8ParseError('Invalid PKCS#8 (invalid sub length)');
+	if (!parsed.sub || parsed.sub.length < 3 || parsed.sub.length > 4) throw new Pkcs8ParseError('Invalid PKCS#8 (invalid sub length)');
 	const version = parsed.sub[0];
 	if (!version || !version.tag || version.tag.tagNumber !== 0x02) throw new Pkcs8ParseError('Invalid PKCS#8 (invalid version)');
 	const privateKeyAlgorithm = parseAlgorithmIdentifier(parsed.sub[1]);

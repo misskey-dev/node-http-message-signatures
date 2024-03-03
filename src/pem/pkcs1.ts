@@ -6,6 +6,9 @@ export class Pkcs1ParseError extends Error {
 	constructor(message: string) { super(message); }
 }
 
+/**
+ * Parse PKCS#1 public key
+ */
 export function parsePkcs1(input: ASN1.StreamOrBinary) {
 	const parsed = ASN1.decode(decodePem(input));
 	if (!parsed.sub || parsed.sub.length !== 2) throw new Pkcs1ParseError('Invalid SPKI (invalid sub length)');
