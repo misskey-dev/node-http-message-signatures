@@ -85,7 +85,7 @@ export declare function genKeyImportParams(parsed: SpkiParsedAlgorithmIdentifier
     hash: 'SHA-256' | 'SHA-384' | 'SHA-512';
     ec: 'DSA' | 'DH';
 }): Parameters<typeof crypto.subtle.importKey>[2];
-export declare function genVerifyAlgorithm(parsed: SpkiParsedAlgorithmIdentifier, defaults?: {
+export declare function genSignOrVerifyAlgorithm(parsed: ParsedAlgorithmIdentifier, defaults?: {
     hash: 'SHA-256' | 'SHA-384' | 'SHA-512';
     ec: 'DSA' | 'DH';
-}): Parameters<typeof crypto.subtle.verify>[0];
+}): Parameters<typeof crypto.subtle.verify>[0] | Parameters<typeof crypto.subtle.sign>[0];

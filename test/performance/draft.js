@@ -1,4 +1,4 @@
-import { signAsDraftToRequest, parseRequestSignature, genRFC3230DigestHeader, verifyDraftSignature, lcObjectKey, webVerifyDraftSignature } from '../../dist/index.mjs';
+import { signAsDraftToRequest, signAsDraftToRequestWeb, parseRequestSignature, genRFC3230DigestHeader, verifyDraftSignature, lcObjectKey, webVerifyDraftSignature } from '../../dist/index.mjs';
 import { rsa4096, ed25519 } from '../keys.js';
 import httpSignature from '@peertube/http-signature';
 
@@ -50,6 +50,13 @@ console.log('Performance test, TRYES:', TRYES);
 		}
 		logPerf('node:crypto Sign RSA4096, SHA-256', process.hrtime(start));
 	}
+	{
+		const start = process.hrtime();
+		for (let i = 0; i < TRYES; i++) {
+			await signAsDraftToRequestWeb(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
+		}
+		logPerf('web Sign RSA4096, SHA-256', process.hrtime(start));
+	}
 
 	/**
 	 * Ed25519
@@ -60,6 +67,13 @@ console.log('Performance test, TRYES:', TRYES);
 			signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
 		}
 		logPerf('node:crypto Sign Ed25519', process.hrtime(start));
+	}
+	{
+		const start = process.hrtime();
+		for (let i = 0; i < TRYES; i++) {
+			await signAsDraftToRequestWeb(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
+		}
+		logPerf('web Sign Ed25519', process.hrtime(start));
 	}
 }
 
@@ -88,12 +102,11 @@ console.log('Performance test, TRYES:', TRYES);
 		const testCase = 'web Verify RSA4096, SHA-256';
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
-			const verifyResult = webVerifyDraftSignature(parsed.value, rsa4096.publicKey);
+			const verifyResult = await webVerifyDraftSignature(parsed.value, rsa4096.publicKey);
 			if (!verifyResult) {
 				throw new Error(`failed: ${testCase}`);
 			}
 		}
-		const end = performance.now();
 		logPerf(testCase, process.hrtime(start));
 	}
 
@@ -137,7 +150,7 @@ console.log('Performance test, TRYES:', TRYES);
 		const testCase = 'web Verify Ed25519';
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
-			const verifyResult = webVerifyDraftSignature(parsed.value, ed25519.publicKey);
+			const verifyResult = await webVerifyDraftSignature(parsed.value, ed25519.publicKey);
 			if (!verifyResult) {
 				throw new Error(`failed: ${testCase}`);
 			}

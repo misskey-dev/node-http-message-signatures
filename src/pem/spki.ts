@@ -211,8 +211,8 @@ export function genKeyImportParams(
 	throw new SpkiParseError('Unknown algorithm');
 }
 
-export function genVerifyAlgorithm(
-	parsed: SpkiParsedAlgorithmIdentifier,
+export function genSignOrVerifyAlgorithm(
+	parsed: ParsedAlgorithmIdentifier,
 	defaults: {
 		hash: 'SHA-256' | 'SHA-384' | 'SHA-512'; // HashAlgorithmIdentifier
 		ec: 'DSA' | 'DH',
@@ -220,7 +220,7 @@ export function genVerifyAlgorithm(
 		hash: 'SHA-256',
 		ec: 'DSA',
 	},
-): Parameters<typeof crypto.subtle.verify>[0] {
+): Parameters<typeof crypto.subtle.verify>[0] | Parameters<typeof crypto.subtle.sign>[0] {
 	const algorithm = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
 	if (!algorithm) throw new SpkiParseError('Unknown algorithm');
 

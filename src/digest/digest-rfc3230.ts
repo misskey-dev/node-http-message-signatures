@@ -11,7 +11,7 @@ const digestHashAlgosForEncoding = {
 	'md5': 'MD5',
 } as const satisfies Record<DigestHashAlgorithm, string>;
 
-const digestHashAlgosForDecoding = {
+export const digestHashAlgosForDecoding = {
 	'SHA': 'sha1',
 	'SHA-1': 'sha1',
 	'SHA-256': 'sha256',

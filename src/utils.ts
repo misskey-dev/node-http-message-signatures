@@ -1,5 +1,6 @@
 import * as crypto from 'node:crypto';
 import type { SignInfo, SignatureHashAlgorithm } from './types.js';
+import { digestHashAlgosForDecoding } from './digest/digest-rfc3230.js';
 
 /**
  * privateKeyPemからhashAlgorithmを推測する
@@ -54,6 +55,16 @@ export function getDraftAlgoString(signInfo: SignInfo) {
 	throw new Error(`unsupported keyAlgorithm`);
 }
 
+export function webGetDraftAlgoString(parsed: any /*CryptoKey*/) {
+	if (parsed.algorithm.name === 'RSASSA-PKCS1-v1_5') {
+		return `rsa-${digestHashAlgosForDecoding[parsed.algorithm.hash]}`;
+	}
+	if (parsed.algorithm.name === 'ECDSA') {
+		return `ecdsa-${digestHashAlgosForDecoding[parsed.algorithm.hash]}`;
+	}
+	return parsed.algorithm.name.toLowerCase();
+}
+
 /**
  * Convert object keys to lowercase
  */
@@ -105,4 +116,13 @@ export function genASN1Length(length: number | bigint): Uint8Array {
 	}
 	const lengthUint8Array = numberToUint8Array(length);
 	return new Uint8Array([0x80 + lengthUint8Array.length, ...lengthUint8Array]);
+}
+
+/**
+ * For web
+ */
+export function encodeArrayBufferToBase64(buffer: ArrayBuffer): string {
+	const uint8Array = new Uint8Array(buffer);
+	const binary = String.fromCharCode(...uint8Array);
+	return btoa(binary);
 }

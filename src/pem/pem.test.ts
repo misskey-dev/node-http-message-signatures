@@ -1,4 +1,4 @@
-import { genKeyImportParams, genVerifyAlgorithm, parsePublicKey, parseSpki } from './spki';
+import { genKeyImportParams, genSignOrVerifyAlgorithm, parsePublicKey, parseSpki } from './spki';
 import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1';
 import { parsePkcs8 } from './pkcs8';
 import { rsa4096, ed25519 } from '../../test/keys';
@@ -23,7 +23,7 @@ describe('spki', () => {
 
 		const signed = sign('sha256', test_buffer, rsa4096.privateKey);
 
-		const verifyAlgorithm = genVerifyAlgorithm(parsed);
+		const verifyAlgorithm = genSignOrVerifyAlgorithm(parsed);
 		const verify = await crypto.subtle.verify(verifyAlgorithm, publicKey, signed, test_buffer);
 		expect(verify).toBe(true);
 	});
@@ -40,7 +40,7 @@ describe('spki', () => {
 
 		const signed = sign(null, test_buffer, ed25519.privateKey);
 
-		const verifyAlgorithm = genVerifyAlgorithm(parsed);
+		const verifyAlgorithm = genSignOrVerifyAlgorithm(parsed);
 		const verify = await crypto.subtle.verify(verifyAlgorithm, publicKey, signed, test_buffer);
 		expect(verify).toBe(true);
 	});
@@ -58,7 +58,7 @@ describe('spki', () => {
 
 		const signed = sign('sha256', test_buffer, { key: keyPair.privateKey, dsaEncoding: 'ieee-p1363' });
 
-		const verifyAlgorithm = genVerifyAlgorithm(parsed, { hash: 'SHA-256', ec: 'DSA' });
+		const verifyAlgorithm = genSignOrVerifyAlgorithm(parsed, { hash: 'SHA-256', ec: 'DSA' });
 		const verify = await crypto.subtle.verify(verifyAlgorithm, publicKey, signed, test_buffer);
 		expect(verify).toBe(true);
 	});
@@ -97,7 +97,7 @@ describe('pkcs1', () => {
 		const publicKey = await crypto.subtle.importKey('spki', spki, genKeyImportParams(parsed), true, ['verify']);
 		expect((publicKey?.algorithm as any).modulusLength).toBe(4096);
 
-		const verify = await crypto.subtle.verify(genVerifyAlgorithm(parsed), publicKey, signed, test_buffer);
+		const verify = await crypto.subtle.verify(genSignOrVerifyAlgorithm(parsed), publicKey, signed, test_buffer);
 		expect(verify).toBe(true);
 	});
 });

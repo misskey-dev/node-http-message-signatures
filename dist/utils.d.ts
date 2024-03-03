@@ -6,6 +6,7 @@ import type { SignInfo, SignatureHashAlgorithm } from './types.js';
  */
 export declare function prepareSignInfo(privateKeyPem: string, hash?: SignatureHashAlgorithm): SignInfo;
 export declare function getDraftAlgoString(signInfo: SignInfo): string;
+export declare function webGetDraftAlgoString(parsed: any): any;
 /**
  * Convert object keys to lowercase
  */
@@ -23,3 +24,7 @@ export declare function objectLcKeys<T extends Record<string, any>>(src: T): Set
  */
 export declare function numberToUint8Array(num: number | bigint): Uint8Array;
 export declare function genASN1Length(length: number | bigint): Uint8Array;
+/**
+ * For web
+ */
+export declare function encodeArrayBufferToBase64(buffer: ArrayBuffer): string;
