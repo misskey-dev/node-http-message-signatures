@@ -1,9 +1,11 @@
 @misskey-dev/node-http-message-signatures
 ----
 
-(WIP) Implementation of [HTTP Signatures "Draft", RFC 9421](https://datatracker.ietf.org/doc/rfc9421/), [RFC 3230](https://datatracker.ietf.org/doc/rfc3230/) and [RFC 9530](https://datatracker.ietf.org/doc/rfc9530/) for Node.js.
+(WIP) Implementation of [HTTP Signatures "Draft", RFC 9421](https://datatracker.ietf.org/doc/rfc9421/), [RFC 3230](https://datatracker.ietf.org/doc/rfc3230/) and [RFC 9530](https://datatracker.ietf.org/doc/rfc9530/) for JavaScript.
 
 It is created for Misskey's ActivityPub implementation.
+
+We initially started working on it with the intention of using it in Node.js, but since we rewrote it to Web Crypto API, it may also work in browsers and edge workers.
 
 ## Context
 ### HTTP Signatures "Draft" and RFC 9421
@@ -117,8 +119,8 @@ fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => 
 			return;
 		}
 
-		// Verify
-		const verifyResult = verifyDraftSignature(parsed!.value, keys.rsa4096.publicKey, errorLogger);
+		// Verify Signature
+		const verifyResult =  await verifyDraftSignature(parsed!.value, keys.rsa4096.publicKey, errorLogger);
 		if (!verifyResult) {
 			reply.code(401);
 			return;
@@ -147,7 +149,7 @@ function targetSupportsRFC9421(url) {
 
 const includeHeaders = ['(request-target)', 'date', 'host', 'digest'];
 
-export function send(url: string, body: string, keyId: string) {
+export async function send(url: string, body: string, keyId: string) {
 	const privateKeyPem = privateKeyMap.get(keyId);
 	const u = new URL(url);
 
@@ -168,7 +170,7 @@ export function send(url: string, body: string, keyId: string) {
 		// Draft
 		request.headers['Digest'] = genRFC3230DigestHeader(body);
 
-		signAsDraftToRequest(request, { keyId, privateKeyPem }, includeHeaders);
+		await signAsDraftToRequest(request, { keyId, privateKeyPem }, includeHeaders);
 
 		fetch(u, {
 			method: request.method,

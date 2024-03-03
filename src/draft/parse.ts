@@ -1,3 +1,7 @@
+/**
+ * Parse Request
+ */
+
 import { DraftSignatureHeaderClockInvalidError, DraftSignatureHeaderContentLackedError, RequestParseOptions, validateRequestAndGetSignatureHeader } from "../parse.js";
 import type { ParsedDraftSignature, IncomingRequest, RequestLike } from '../types.js';
 import { genDraftSigningString } from './sign.js';

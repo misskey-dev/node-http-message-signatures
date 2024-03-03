@@ -1,3 +1,6 @@
+/**
+ * Parse Request
+ */
 import { RequestParseOptions } from "../parse.js";
 import type { ParsedDraftSignature, IncomingRequest } from '../types.js';
 export declare const DraftSignatureHeaderKeys: readonly ["keyId", "algorithm", "created", "expires", "opaque", "headers", "signature"];

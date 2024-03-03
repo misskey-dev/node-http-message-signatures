@@ -1,8 +1,36 @@
-import * as ncrypto from 'node:crypto';
-import type { PrivateKey, RequestLike, SignatureHashAlgorithm } from '../types.js';
-import { encodeArrayBufferToBase64, getDraftAlgoString, lcObjectKey, prepareSignInfo, webGetDraftAlgoString } from '../utils.js';
+import type { webcrypto as crypto } from 'node:crypto';
+import type { PrivateKey, RequestLike, SignInfo, SignatureHashAlgorithmUpperSnake } from '../types.js';
+import { encodeArrayBufferToBase64, genSignInfo, lcObjectKey } from '../utils.js';
 import { parsePkcs8 } from '../pem/pkcs8.js';
-import { genKeyImportParams } from '../pem/spki.js';
+import { keyHashAlgosForDraftEncofing } from './const.js';
+
+export function getDraftAlgoString(algorithm: SignInfo) {
+	const verifyHash = () => {
+		// @ts-expect-error hash is required
+		if (!algorithm.hash) throw new Error(`hash is required`);
+		// @ts-expect-error hash is required
+		if (!(algorithm.hash in keyHashAlgosForDraftEncofing)) throw new Error(`unsupported hash: ${algorithm.hash}`);
+	};
+	if (algorithm.name === 'RSASSA-PKCS1-v1_5') {
+		verifyHash();
+		return `rsa-${keyHashAlgosForDraftEncofing[algorithm.hash]}`;
+	}
+	if (algorithm.name === 'ECDSA') {
+		verifyHash();
+		return `ecdsa-${keyHashAlgosForDraftEncofing[algorithm.hash]}`;
+	}
+	if (algorithm.name === 'ECDH') {
+		verifyHash();
+		return `ecdh-${keyHashAlgosForDraftEncofing[algorithm.hash]}`;
+	}
+	if (algorithm.name === 'Ed25519') {
+		return `ed25519-sha512`; // Joyent/@peertube/http-signatureではこう指定する必要がある
+	}
+	if (algorithm.name === 'Ed448') {
+		return `ed448`;
+	}
+	throw new Error(`unsupported keyAlgorithm`);
+}
 
 export function genDraftSigningString(
 	request: RequestLike,
@@ -44,48 +72,26 @@ export function genDraftSigningString(
 	return results.join('\n');
 }
 
-export function genDraftSignature(signingString: string, privateKey: string, hashAlgorithm: SignatureHashAlgorithm | null) {
-	const r = ncrypto.sign(hashAlgorithm, Buffer.from(signingString), privateKey);
-	return r.toString('base64');
+export async function genDraftSignature(privateKey: crypto.CryptoKey, signingString: string) {
+	const signatureAB = await globalThis.crypto.subtle.sign(privateKey.algorithm, privateKey, new TextEncoder().encode(signingString));
+	return encodeArrayBufferToBase64(signatureAB);
 }
 
 export function genDraftSignatureHeader(includeHeaders: string[], keyId: string, signature: string, algorithm: string) {
 	return `keyId="${keyId}",algorithm="${algorithm}",headers="${includeHeaders.join(' ')}",signature="${signature}"`;
 }
 
-export function signAsDraftToRequest(request: RequestLike, key: PrivateKey, includeHeaders: string[], opts: { hashAlgorithm?: SignatureHashAlgorithm; web?: boolean } = {}) {
-	const hashAlgorithm = opts?.hashAlgorithm || 'sha256';
-	const signInfo = prepareSignInfo(key.privateKeyPem, hashAlgorithm);
-	const algoString = getDraftAlgoString(signInfo);
-
-	const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
-	const signature = genDraftSignature(signingString, key.privateKeyPem, signInfo.hashAlg);
-
-	const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, algoString);
-
-	Object.assign(request.headers, {
-		Signature: signatureHeader,
-	});
-
-	return {
-		signingString,
-		signature,
-		signatureHeader,
-	};
-}
-
-export async function signAsDraftToRequestWeb(request: RequestLike, key: PrivateKey, includeHeaders: string[], opts: { hashAlgorithm?: SignatureHashAlgorithm } = {}) {
-	const hash = /**opts?.hashAlgorithm || **/'SHA-256';
+export async function signAsDraftToRequest(request: RequestLike, key: PrivateKey, includeHeaders: string[], opts: { hashAlgorithm?: SignatureHashAlgorithmUpperSnake } = {}) {
+	const hash = opts?.hashAlgorithm || 'SHA-256';
 
 	const parsedPrivateKey = parsePkcs8(key.privateKeyPem);
-	const importParams = genKeyImportParams(parsedPrivateKey, { hash, ec: 'DSA' });
-	const privateKey = await crypto.subtle.importKey('pkcs8', parsedPrivateKey.der, importParams, false, ['sign']);
-	const algoString = webGetDraftAlgoString(privateKey);
+	const importParams = genSignInfo(parsedPrivateKey, { hash, ec: 'DSA' });
+	const privateKey = await globalThis.crypto.subtle.importKey('pkcs8', parsedPrivateKey.der, importParams, false, ['sign']);
+	const algoString = getDraftAlgoString(importParams);
 
 	const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
-	const signatureAB = await crypto.subtle.sign(importParams, privateKey, new TextEncoder().encode(signingString));
-	const signature = encodeArrayBufferToBase64(signatureAB);
 
+	const signature = await genDraftSignature(privateKey, signingString);
 	const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, algoString);
 
 	Object.assign(request.headers, {

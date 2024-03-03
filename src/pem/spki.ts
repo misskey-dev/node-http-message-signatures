@@ -2,6 +2,7 @@ import ASN1 from '@lapo/asn1js';
 import Hex from '@lapo/asn1js/hex.js';
 import Base64 from '@lapo/asn1js/base64.js';
 import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1';
+import { ECNamedCurve, KeyAlgorithmName } from '../types';
 
 export class SpkiParseError extends Error {
 	constructor(message: string) { super(message); }
@@ -14,7 +15,7 @@ export class SpkiParseError extends Error {
  * @param oidStr e.g. '1.2.840.113549.1.1.1' or SpkiParsedAlgorithmIdentifier.algorithm
  * @returns e.g. 'RSASSA-PKCS1-v1_5'
  */
-export function getPublicKeyAlgorithmNameFromOid(oidStr: string) {
+export function getPublicKeyAlgorithmNameFromOid(oidStr: string): KeyAlgorithmName {
 	const oid = oidStr.split('\n')[0].trim();
 	if (oid === '1.2.840.113549.1.1.1') return 'RSASSA-PKCS1-v1_5';
 	if (oid === '1.2.840.10040.4.1') return 'DSA';
@@ -32,7 +33,7 @@ export function getPublicKeyAlgorithmNameFromOid(oidStr: string) {
  *
  * (Most environments may implement only P-256, P-384 and P-521)
  */
-export function getNistCurveFromOid(oidStr: string) {
+export function getNistCurveFromOid(oidStr: string): ECNamedCurve {
 	const oid = oidStr.split('\n')[0].trim();
 	if (oid === '1.2.840.10045.3.1.1') return 'P-192';
 	if (oid === '1.3.132.0.33') return 'P-224';
@@ -178,69 +179,4 @@ export function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmI
 			throw new SpkiParseError('Invalid SPKI or PKCS#1');
 		}
 	}
-}
-
-export function genKeyImportParams(
-	parsed: SpkiParsedAlgorithmIdentifier,
-	defaults: {
-		hash: 'SHA-256' | 'SHA-384' | 'SHA-512'; // HashAlgorithmIdentifier
-		ec: 'DSA' | 'DH',
-	} = {
-		hash: 'SHA-256',
-		ec: 'DSA',
-	}
-): Parameters<typeof crypto.subtle.importKey>[2] {
-	const algorithm = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
-	if (!algorithm) throw new SpkiParseError('Unknown algorithm');
-	if (algorithm === 'RSASSA-PKCS1-v1_5') {
-		return { name: 'RSASSA-PKCS1-v1_5', hash: defaults.hash };
-	}
-	if (algorithm === 'EC') {
-		if (typeof parsed.parameter !== 'string') throw new SpkiParseError('Invalid EC parameter');
-		return {
-			name: `EC${defaults.ec}` as 'ECDSA' | 'ECDH',
-			namedCurve: getNistCurveFromOid(parsed.parameter),
-		};
-	}
-	if (algorithm === 'Ed25519') {
-		return { name: 'Ed25519' };
-	}
-	if (algorithm === 'Ed448') {
-		return { name: 'Ed448' };
-	}
-	throw new SpkiParseError('Unknown algorithm');
-}
-
-export function genSignOrVerifyAlgorithm(
-	parsed: ParsedAlgorithmIdentifier,
-	defaults: {
-		hash: 'SHA-256' | 'SHA-384' | 'SHA-512'; // HashAlgorithmIdentifier
-		ec: 'DSA' | 'DH',
-	} = {
-		hash: 'SHA-256',
-		ec: 'DSA',
-	},
-): Parameters<typeof crypto.subtle.verify>[0] | Parameters<typeof crypto.subtle.sign>[0] {
-	const algorithm = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
-	if (!algorithm) throw new SpkiParseError('Unknown algorithm');
-
-	if (algorithm === 'RSASSA-PKCS1-v1_5') {
-		return 'RSASSA-PKCS1-v1_5';
-	}
-	if (algorithm === 'EC') {
-		return {
-			name: `EC${defaults.ec}` as 'ECDSA' | 'ECDH',
-			hash: defaults.hash,
-		};
-	}
-	if (algorithm === 'Ed25519') {
-		return { name: 'Ed25519' };
-	}
-	if (algorithm === 'Ed448') {
-		return {
-			name: 'Ed448',
-			context: undefined, // TODO?
-		};
-	}
-	throw new SpkiParseError('Unknown algorithm');
 }

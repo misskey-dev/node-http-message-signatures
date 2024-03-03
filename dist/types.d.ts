@@ -26,29 +26,31 @@ export type ClockSkewSettings = {
     delay?: number;
 };
 export type SignInfoRSA = {
-    keyAlg: 'rsa';
-    hashAlg: NonNullable<SignatureHashAlgorithm>;
+    name: 'RSASSA-PKCS1-v1_5';
+    hash: NonNullable<SignatureHashAlgorithmUpperSnake>;
 };
 export type SignInfoEC = {
-    keyAlg: 'ec';
-    hashAlg: NonNullable<SignatureHashAlgorithm>;
+    name: 'ECDSA' | 'ECDH';
+    hash: NonNullable<SignatureHashAlgorithmUpperSnake>;
+    namedCurve: ECNamedCurve;
 };
 export type SignInfoEd25519 = {
-    keyAlg: 'ed25519';
-    hashAlg: null;
+    name: 'Ed25519';
 };
 export type SignInfoEd448 = {
-    keyAlg: 'ed448';
-    hashAlg: null;
+    name: 'Ed448';
+    context?: string;
 };
 export type SignInfo = SignInfoRSA | SignInfoEC | SignInfoEd25519 | SignInfoEd448;
 export type PrivateKey = {
     privateKeyPem: string;
     keyId: string;
 };
-export type SignatureHashAlgorithm = 'sha1' | 'sha256' | 'sha384' | 'sha512' | null;
+export type KeyAlgorithmName = 'RSASSA-PKCS1-v1_5' | 'DSA' | 'DH' | 'KEA' | 'EC' | 'Ed25519' | 'Ed448';
+export type ECNamedCurve = 'P-192' | 'P-224' | 'P-256' | 'P-384' | 'P-521';
+export type SignatureHashAlgorithmUpperSnake = 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512' | null;
 export type DigestHashAlgorithm = 'sha1' | 'sha256' | 'sha384' | 'sha512' | 'md5';
-export type SignatureAlgorithm = 'rsa-sha1' | 'rsa-sha256' | 'rsa-sha384' | 'rsa-sha512' | 'ecdsa-sha1' | 'ecdsa-sha256' | 'ecdsa-sha384' | 'ecdsa-sha512' | 'ed25519-sha512' | 'ed25519' | 'ed448';
+export type DraftSignatureAlgorithm = 'rsa-sha1' | 'rsa-sha256' | 'rsa-sha384' | 'rsa-sha512' | 'ecdsa-sha1' | 'ecdsa-sha256' | 'ecdsa-sha384' | 'ecdsa-sha512' | 'ed25519-sha512' | 'ed25519' | 'ed448';
 export type ParsedDraftSignature = {
     version: 'draft';
     /**

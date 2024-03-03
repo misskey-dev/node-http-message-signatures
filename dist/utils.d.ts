@@ -1,12 +1,5 @@
-import type { SignInfo, SignatureHashAlgorithm } from './types.js';
-/**
- * privateKeyPemからhashAlgorithmを推測する
- *   hashが指定されていない場合、RSAかECの場合はsha256を補完する
- *   ed25519, ed448の場合はhashAlgorithmは常にnull
- */
-export declare function prepareSignInfo(privateKeyPem: string, hash?: SignatureHashAlgorithm): SignInfo;
-export declare function getDraftAlgoString(signInfo: SignInfo): string;
-export declare function webGetDraftAlgoString(parsed: any): any;
+import type { SignInfo, SignatureHashAlgorithmUpperSnake } from './types.js';
+import { ParsedAlgorithmIdentifier } from './pem/spki.js';
 /**
  * Convert object keys to lowercase
  */
@@ -32,3 +25,10 @@ export declare function encodeArrayBufferToBase64(buffer: ArrayBuffer): string;
  * for Web
  */
 export declare function decodeBase64ToUint8Array(base64: string): Uint8Array;
+export declare class KeyValidationError extends Error {
+    constructor(message: string);
+}
+export declare function genSignInfo(parsed: ParsedAlgorithmIdentifier, defaults?: {
+    hash: SignatureHashAlgorithmUpperSnake;
+    ec: 'DSA' | 'DH';
+}): SignInfo;

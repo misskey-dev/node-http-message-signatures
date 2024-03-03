@@ -1,69 +1,5 @@
-import * as crypto from 'node:crypto';
-import type { SignInfo, SignatureHashAlgorithm } from './types.js';
-import { digestHashAlgosForDecoding } from './digest/digest-rfc3230.js';
-
-/**
- * privateKeyPemからhashAlgorithmを推測する
- *   hashが指定されていない場合、RSAかECの場合はsha256を補完する
- *   ed25519, ed448の場合はhashAlgorithmは常にnull
- */
-export function prepareSignInfo(privateKeyPem: string, hash: SignatureHashAlgorithm = null): SignInfo {
-	const keyObject = crypto.createPrivateKey(privateKeyPem);
-
-	if (keyObject.asymmetricKeyType === 'rsa') {
-		const hashAlgo = hash || 'sha256';
-		return {
-			keyAlg: keyObject.asymmetricKeyType,
-			hashAlg: hashAlgo,
-		};
-	}
-	if (keyObject.asymmetricKeyType === 'ec') {
-		const hashAlgo = hash || 'sha256';
-		return {
-			keyAlg: keyObject.asymmetricKeyType,
-			hashAlg: hashAlgo,
-		};
-	}
-	if (keyObject.asymmetricKeyType === 'ed25519') {
-		return {
-			keyAlg: keyObject.asymmetricKeyType,
-			hashAlg: null,
-		};
-	}
-	if (keyObject.asymmetricKeyType === 'ed448') {
-		return {
-			keyAlg: keyObject.asymmetricKeyType,
-			hashAlg: null,
-		};
-	}
-	throw new Error(`unsupported keyAlgorithm: ${keyObject.asymmetricKeyType}`);
-}
-
-export function getDraftAlgoString(signInfo: SignInfo) {
-	if (signInfo.keyAlg === 'rsa') {
-		return `rsa-${signInfo.hashAlg}`;
-	}
-	if (signInfo.keyAlg === 'ec') {
-		return `ecdsa-${signInfo.hashAlg}`;
-	}
-	if (signInfo.keyAlg === 'ed25519') {
-		return 'ed25519-sha512'; // TODO: -sha512付けたくないがjoyent(別実装)が認識しない
-	}
-	if (signInfo.keyAlg === 'ed448') {
-		return 'ed448';
-	}
-	throw new Error(`unsupported keyAlgorithm`);
-}
-
-export function webGetDraftAlgoString(parsed: any /*CryptoKey*/) {
-	if (parsed.algorithm.name === 'RSASSA-PKCS1-v1_5') {
-		return `rsa-${digestHashAlgosForDecoding[parsed.algorithm.hash]}`;
-	}
-	if (parsed.algorithm.name === 'ECDSA') {
-		return `ecdsa-${digestHashAlgosForDecoding[parsed.algorithm.hash]}`;
-	}
-	return parsed.algorithm.name.toLowerCase();
-}
+import type { SignInfo, SignatureHashAlgorithmUpperSnake } from './types.js';
+import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from './pem/spki.js';
 
 /**
  * Convert object keys to lowercase
@@ -137,4 +73,43 @@ export function decodeBase64ToUint8Array(base64: string): Uint8Array {
 		uint8Array[i] = binary.charCodeAt(i);
 	}
 	return uint8Array;
+}
+
+export class KeyValidationError extends Error {
+	constructor(message: string) { super(message); }
+}
+
+export function genSignInfo(
+	parsed: ParsedAlgorithmIdentifier,
+	defaults: {
+		hash: SignatureHashAlgorithmUpperSnake,
+		ec: 'DSA' | 'DH',
+	} = {
+		hash: 'SHA-256',
+		ec: 'DSA',
+	}
+): SignInfo {
+	const algorithm = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
+	if (!algorithm) throw new KeyValidationError('Unknown algorithm');
+	if (algorithm === 'RSASSA-PKCS1-v1_5') {
+		return {
+			name: 'RSASSA-PKCS1-v1_5',
+			hash: defaults.hash ?? 'SHA-256'
+		};
+	}
+	if (algorithm === 'EC') {
+		if (typeof parsed.parameter !== 'string') throw new KeyValidationError('Invalid EC parameter');
+		return {
+			name: `EC${defaults.ec}` as 'ECDSA' | 'ECDH',
+			hash: defaults.hash ?? 'SHA-256',
+			namedCurve: getNistCurveFromOid(parsed.parameter),
+		};
+	}
+	if (algorithm === 'Ed25519') {
+		return { name: 'Ed25519' };
+	}
+	if (algorithm === 'Ed448') {
+		return { name: 'Ed448' };
+	}
+	throw new KeyValidationError('Unknown algorithm');
 }

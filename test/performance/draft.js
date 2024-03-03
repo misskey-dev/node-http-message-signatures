@@ -1,4 +1,4 @@
-import { signAsDraftToRequest, signAsDraftToRequestWeb, parseRequestSignature, genRFC3230DigestHeader, verifyDraftSignature, lcObjectKey, webVerifyDraftSignature } from '../../dist/index.mjs';
+import { signAsDraftToRequest, parseRequestSignature, genRFC3230DigestHeader, verifyDraftSignature, lcObjectKey } from '../../dist/index.mjs';
 import { rsa4096, ed25519 } from '../keys.js';
 import httpSignature from '@peertube/http-signature';
 
@@ -46,20 +46,13 @@ console.log('Performance test, TRYES:', TRYES);
 	{
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
-			signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
-		}
-		logPerf('node:crypto Sign RSA4096, SHA-256', process.hrtime(start));
-	}
-	{
-		const start = process.hrtime();
-		for (let i = 0; i < TRYES; i++) {
-			await signAsDraftToRequestWeb(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
+			await signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'SHA-256' });
 		}
 		logPerf('web Sign RSA4096, SHA-256', process.hrtime(start));
 	}
 	{
 		const start = process.hrtime();
-		await Promise.all(Array(TRYES).fill().map(() => signAsDraftToRequestWeb(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'sha256' })));
+		await Promise.all(Array(TRYES).fill().map(() => signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'SHA-256' })));
 		logPerf('web(Promise.all) Sign RSA4096, SHA-256', process.hrtime(start));
 	}
 
@@ -69,20 +62,13 @@ console.log('Performance test, TRYES:', TRYES);
 	{
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
-			signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
-		}
-		logPerf('node:crypto Sign Ed25519', process.hrtime(start));
-	}
-	{
-		const start = process.hrtime();
-		for (let i = 0; i < TRYES; i++) {
-			await signAsDraftToRequestWeb(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
+			await signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
 		}
 		logPerf('web Sign Ed25519', process.hrtime(start));
 	}
 	{
 		const start = process.hrtime();
-		await Promise.all(Array(TRYES).fill().map(() => signAsDraftToRequestWeb(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null })));
+		await Promise.all(Array(TRYES).fill().map(() => signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null })));
 		logPerf('web(Promise.all) Sign Ed25519', process.hrtime(start));
 	}
 }
@@ -93,25 +79,14 @@ console.log('Performance test, TRYES:', TRYES);
 {
 	const request = getBasicOutgoingRequest();
 	request.headers['Digest'] = genRFC3230DigestHeader(request.body, 'sha256');
-	signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'sha256' });
+	await signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'SHA-256' });
 	const parsed = parseRequestSignature(request);
 
-	{
-		const testCase = 'node:crypto Verify RSA4096, SHA-256';
-		const start = process.hrtime();
-		for (let i = 0; i < TRYES; i++) {
-			const verifyResult = verifyDraftSignature(parsed.value, rsa4096.publicKey);
-			if (!verifyResult) {
-				throw new Error(`failed: ${testCase}`);
-			}
-		}
-		logPerf(testCase, process.hrtime(start));
-	}
 	{
 		const testCase = 'web Verify RSA4096, SHA-256';
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
-			const verifyResult = await webVerifyDraftSignature(parsed.value, rsa4096.publicKey);
+			const verifyResult = await verifyDraftSignature(parsed.value, rsa4096.publicKey);
 			if (!verifyResult) {
 				throw new Error(`failed: ${testCase}`);
 			}
@@ -122,7 +97,7 @@ console.log('Performance test, TRYES:', TRYES);
 		const testCase = 'web(Promise.all) Verify RSA4096, SHA-256';
 		const start = process.hrtime();
 		await Promise.all(Array(TRYES).fill().map(() =>
-			webVerifyDraftSignature(parsed.value, rsa4096.publicKey)
+			verifyDraftSignature(parsed.value, rsa4096.publicKey)
 				.then(r => r ? true : Promise.reject(new Error('failed')))));
 		logPerf(testCase, process.hrtime(start));
 	}
@@ -148,25 +123,14 @@ console.log('Performance test, TRYES:', TRYES);
 {
 	const request = getBasicOutgoingRequest();
 	request.headers['Digest'] = genRFC3230DigestHeader(request.body, 'sha256');
-	signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
+	await signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
 	const parsed = parseRequestSignature(request);
 
-	{
-		const testCase = 'node:crypto Verify Ed25519';
-		const start = process.hrtime();
-		for (let i = 0; i < TRYES; i++) {
-			const verifyResult = verifyDraftSignature(parsed.value, ed25519.publicKey);
-			if (!verifyResult) {
-				throw new Error(`failed: ${testCase}`);
-			}
-		}
-		logPerf(testCase, process.hrtime(start));
-	}
 	{
 		const testCase = 'web Verify Ed25519';
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
-			const verifyResult = await webVerifyDraftSignature(parsed.value, ed25519.publicKey);
+			const verifyResult = await verifyDraftSignature(parsed.value, ed25519.publicKey);
 			if (!verifyResult) {
 				throw new Error(`failed: ${testCase}`);
 			}
@@ -178,7 +142,7 @@ console.log('Performance test, TRYES:', TRYES);
 		const testCase = 'web(Promise.all) Verify Ed25519';
 		const start = process.hrtime();
 		await Promise.all(Array(TRYES).fill().map(() =>
-			webVerifyDraftSignature(parsed.value, ed25519.publicKey)
+			verifyDraftSignature(parsed.value, ed25519.publicKey)
 				.then(r => r ? true : Promise.reject(new Error('failed')))));
 		logPerf(testCase, process.hrtime(start));
 	}

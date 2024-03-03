@@ -31,11 +31,13 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var src_exports = {};
 __export(src_exports, {
   ClockSkewInvalidError: () => ClockSkewInvalidError,
+  DraftKeyHashValidationError: () => DraftKeyHashValidationError,
   DraftSignatureHeaderClockInvalidError: () => DraftSignatureHeaderClockInvalidError,
   DraftSignatureHeaderContentLackedError: () => DraftSignatureHeaderContentLackedError,
   DraftSignatureHeaderKeys: () => DraftSignatureHeaderKeys,
   HTTPMessageSignaturesParseError: () => HTTPMessageSignaturesParseError,
   InvalidRequestError: () => InvalidRequestError,
+  KeyValidationError: () => KeyValidationError,
   Pkcs1ParseError: () => Pkcs1ParseError,
   Pkcs8ParseError: () => Pkcs8ParseError,
   RequestHasMultipleDateHeadersError: () => RequestHasMultipleDateHeadersError,
@@ -47,7 +49,6 @@ __export(src_exports, {
   checkClockSkew: () => checkClockSkew,
   decodeBase64ToUint8Array: () => decodeBase64ToUint8Array,
   decodePem: () => decodePem,
-  detectAndVerifyAlgorithm: () => detectAndVerifyAlgorithm,
   digestHashAlgosForDecoding: () => digestHashAlgosForDecoding,
   digestHeaderRegEx: () => digestHeaderRegEx,
   encodeArrayBufferToBase64: () => encodeArrayBufferToBase64,
@@ -58,14 +59,16 @@ __export(src_exports, {
   genEcKeyPair: () => genEcKeyPair,
   genEd25519KeyPair: () => genEd25519KeyPair,
   genEd448KeyPair: () => genEd448KeyPair,
-  genKeyImportParams: () => genKeyImportParams,
   genRFC3230DigestHeader: () => genRFC3230DigestHeader,
   genRsaKeyPair: () => genRsaKeyPair,
-  genSignOrVerifyAlgorithm: () => genSignOrVerifyAlgorithm,
+  genSignInfo: () => genSignInfo,
+  genSignInfoDraft: () => genSignInfoDraft,
   genSpkiFromPkcs1: () => genSpkiFromPkcs1,
   getDraftAlgoString: () => getDraftAlgoString,
   getNistCurveFromOid: () => getNistCurveFromOid,
   getPublicKeyAlgorithmNameFromOid: () => getPublicKeyAlgorithmNameFromOid,
+  keyHashAlgosForDraftDecoding: () => keyHashAlgosForDraftDecoding,
+  keyHashAlgosForDraftEncofing: () => keyHashAlgosForDraftEncofing,
   lcObjectGet: () => lcObjectGet,
   lcObjectKey: () => lcObjectKey,
   numberToUint8Array: () => numberToUint8Array,
@@ -78,208 +81,18 @@ __export(src_exports, {
   parsePublicKey: () => parsePublicKey,
   parseRequestSignature: () => parseRequestSignature,
   parseSpki: () => parseSpki,
-  prepareSignInfo: () => prepareSignInfo,
   requestIsRFC9421: () => requestIsRFC9421,
   rsaASN1AlgorithmIdentifier: () => rsaASN1AlgorithmIdentifier,
   signAsDraftToRequest: () => signAsDraftToRequest,
-  signAsDraftToRequestWeb: () => signAsDraftToRequestWeb,
   signatureHeaderIsDraft: () => signatureHeaderIsDraft,
   toSpkiPublicKey: () => toSpkiPublicKey,
   validateAndProcessParsedDraftSignatureHeader: () => validateAndProcessParsedDraftSignatureHeader,
   validateRequestAndGetSignatureHeader: () => validateRequestAndGetSignatureHeader,
   verifyDigestHeader: () => verifyDigestHeader,
   verifyDraftSignature: () => verifyDraftSignature,
-  verifyRFC3230DigestHeader: () => verifyRFC3230DigestHeader,
-  webGetDraftAlgoString: () => webGetDraftAlgoString,
-  webVerifyDraftSignature: () => webVerifyDraftSignature
+  verifyRFC3230DigestHeader: () => verifyRFC3230DigestHeader
 });
 module.exports = __toCommonJS(src_exports);
-
-// src/draft/sign.ts
-var ncrypto = __toESM(require("node:crypto"), 1);
-
-// src/utils.ts
-var crypto2 = __toESM(require("node:crypto"), 1);
-
-// src/digest/utils.ts
-var import_node_crypto = require("node:crypto");
-function createBase64Digest(body, hash = "sha256") {
-  if (Array.isArray(hash)) {
-    return new Map(hash.map((h) => [h, createBase64Digest(body, h)]));
-  }
-  return (0, import_node_crypto.createHash)(hash).update(body).digest("base64");
-}
-
-// src/digest/digest-rfc3230.ts
-var digestHashAlgosForEncoding = {
-  "sha1": "SHA",
-  "sha256": "SHA-256",
-  "sha384": "SHA-384",
-  "sha512": "SHA-512",
-  "md5": "MD5"
-};
-var digestHashAlgosForDecoding = {
-  "SHA": "sha1",
-  "SHA-1": "sha1",
-  "SHA-256": "sha256",
-  "SHA-384": "sha384",
-  "SHA-512": "sha512",
-  "MD5": "md5"
-};
-function genRFC3230DigestHeader(body, hashAlgorithm = "sha256") {
-  return `${digestHashAlgosForEncoding[hashAlgorithm]}=${createBase64Digest(body, hashAlgorithm)}`;
-}
-var digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
-function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
-  let digestHeader = lcObjectGet(request.headers, "digest");
-  if (!digestHeader) {
-    if (failOnNoDigest) {
-      if (errorLogger)
-        errorLogger("Digest header not found");
-      return false;
-    }
-    return true;
-  }
-  if (Array.isArray(digestHeader)) {
-    digestHeader = digestHeader[0];
-  }
-  const match = digestHeader.match(digestHeaderRegEx);
-  if (!match) {
-    if (errorLogger)
-      errorLogger("Invalid Digest header format");
-    return false;
-  }
-  const value = match[2];
-  if (!value) {
-    if (errorLogger)
-      errorLogger("Invalid Digest header format");
-    return false;
-  }
-  const algo = digestHashAlgosForDecoding[match[1].toUpperCase()];
-  if (!algo) {
-    if (errorLogger)
-      errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
-    return false;
-  }
-  const hash = createBase64Digest(rawBody, algo);
-  if (hash !== value) {
-    if (errorLogger)
-      errorLogger(`Digest header hash mismatch`);
-    return false;
-  }
-  return true;
-}
-
-// src/utils.ts
-function prepareSignInfo(privateKeyPem, hash = null) {
-  const keyObject = crypto2.createPrivateKey(privateKeyPem);
-  if (keyObject.asymmetricKeyType === "rsa") {
-    const hashAlgo = hash || "sha256";
-    return {
-      keyAlg: keyObject.asymmetricKeyType,
-      hashAlg: hashAlgo
-    };
-  }
-  if (keyObject.asymmetricKeyType === "ec") {
-    const hashAlgo = hash || "sha256";
-    return {
-      keyAlg: keyObject.asymmetricKeyType,
-      hashAlg: hashAlgo
-    };
-  }
-  if (keyObject.asymmetricKeyType === "ed25519") {
-    return {
-      keyAlg: keyObject.asymmetricKeyType,
-      hashAlg: null
-    };
-  }
-  if (keyObject.asymmetricKeyType === "ed448") {
-    return {
-      keyAlg: keyObject.asymmetricKeyType,
-      hashAlg: null
-    };
-  }
-  throw new Error(`unsupported keyAlgorithm: ${keyObject.asymmetricKeyType}`);
-}
-function getDraftAlgoString(signInfo) {
-  if (signInfo.keyAlg === "rsa") {
-    return `rsa-${signInfo.hashAlg}`;
-  }
-  if (signInfo.keyAlg === "ec") {
-    return `ecdsa-${signInfo.hashAlg}`;
-  }
-  if (signInfo.keyAlg === "ed25519") {
-    return "ed25519-sha512";
-  }
-  if (signInfo.keyAlg === "ed448") {
-    return "ed448";
-  }
-  throw new Error(`unsupported keyAlgorithm`);
-}
-function webGetDraftAlgoString(parsed) {
-  if (parsed.algorithm.name === "RSASSA-PKCS1-v1_5") {
-    return `rsa-${digestHashAlgosForDecoding[parsed.algorithm.hash]}`;
-  }
-  if (parsed.algorithm.name === "ECDSA") {
-    return `ecdsa-${digestHashAlgosForDecoding[parsed.algorithm.hash]}`;
-  }
-  return parsed.algorithm.name.toLowerCase();
-}
-function lcObjectKey(src) {
-  return Object.entries(src).reduce((dst, [key, value]) => {
-    if (key === "__proto__")
-      return dst;
-    dst[key.toLowerCase()] = value;
-    return dst;
-  }, {});
-}
-function lcObjectGet(src, key) {
-  key = key.toLowerCase();
-  for (const [k, v] of Object.entries(src)) {
-    if (k.toLowerCase() === key)
-      return v;
-  }
-  return void 0;
-}
-function objectLcKeys(src) {
-  return Object.keys(src).reduce((dst, key) => {
-    if (key === "__proto__")
-      return dst;
-    dst.add(key.toLowerCase());
-    return dst;
-  }, /* @__PURE__ */ new Set());
-}
-function numberToUint8Array(num) {
-  const buf = new ArrayBuffer(8);
-  const view = new DataView(buf);
-  view.setBigUint64(0, BigInt(num), false);
-  const viewUint8Array = new Uint8Array(buf);
-  const firstNonZero = viewUint8Array.findIndex((v) => v !== 0);
-  return viewUint8Array.slice(firstNonZero);
-}
-function genASN1Length(length) {
-  if (length < 0x80n) {
-    return new Uint8Array([Number(length)]);
-  }
-  const lengthUint8Array = numberToUint8Array(length);
-  return new Uint8Array([128 + lengthUint8Array.length, ...lengthUint8Array]);
-}
-function encodeArrayBufferToBase64(buffer) {
-  const uint8Array = new Uint8Array(buffer);
-  const binary = String.fromCharCode(...uint8Array);
-  return btoa(binary);
-}
-function decodeBase64ToUint8Array(base64) {
-  const binary = atob(base64);
-  const uint8Array = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    uint8Array[i] = binary.charCodeAt(i);
-  }
-  return uint8Array;
-}
-
-// src/pem/pkcs8.ts
-var import_asn1js3 = __toESM(require("@lapo/asn1js"), 1);
 
 // src/pem/spki.ts
 var import_asn1js2 = __toESM(require("@lapo/asn1js"), 1);
@@ -446,21 +259,84 @@ function parsePublicKey(input) {
     }
   }
 }
-function genKeyImportParams(parsed, defaults = {
+
+// src/utils.ts
+function lcObjectKey(src) {
+  return Object.entries(src).reduce((dst, [key, value]) => {
+    if (key === "__proto__")
+      return dst;
+    dst[key.toLowerCase()] = value;
+    return dst;
+  }, {});
+}
+function lcObjectGet(src, key) {
+  key = key.toLowerCase();
+  for (const [k, v] of Object.entries(src)) {
+    if (k.toLowerCase() === key)
+      return v;
+  }
+  return void 0;
+}
+function objectLcKeys(src) {
+  return Object.keys(src).reduce((dst, key) => {
+    if (key === "__proto__")
+      return dst;
+    dst.add(key.toLowerCase());
+    return dst;
+  }, /* @__PURE__ */ new Set());
+}
+function numberToUint8Array(num) {
+  const buf = new ArrayBuffer(8);
+  const view = new DataView(buf);
+  view.setBigUint64(0, BigInt(num), false);
+  const viewUint8Array = new Uint8Array(buf);
+  const firstNonZero = viewUint8Array.findIndex((v) => v !== 0);
+  return viewUint8Array.slice(firstNonZero);
+}
+function genASN1Length(length) {
+  if (length < 0x80n) {
+    return new Uint8Array([Number(length)]);
+  }
+  const lengthUint8Array = numberToUint8Array(length);
+  return new Uint8Array([128 + lengthUint8Array.length, ...lengthUint8Array]);
+}
+function encodeArrayBufferToBase64(buffer) {
+  const uint8Array = new Uint8Array(buffer);
+  const binary = String.fromCharCode(...uint8Array);
+  return btoa(binary);
+}
+function decodeBase64ToUint8Array(base64) {
+  const binary = atob(base64);
+  const uint8Array = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    uint8Array[i] = binary.charCodeAt(i);
+  }
+  return uint8Array;
+}
+var KeyValidationError = class extends Error {
+  constructor(message) {
+    super(message);
+  }
+};
+function genSignInfo(parsed, defaults = {
   hash: "SHA-256",
   ec: "DSA"
 }) {
   const algorithm = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
   if (!algorithm)
-    throw new SpkiParseError("Unknown algorithm");
+    throw new KeyValidationError("Unknown algorithm");
   if (algorithm === "RSASSA-PKCS1-v1_5") {
-    return { name: "RSASSA-PKCS1-v1_5", hash: defaults.hash };
+    return {
+      name: "RSASSA-PKCS1-v1_5",
+      hash: defaults.hash ?? "SHA-256"
+    };
   }
   if (algorithm === "EC") {
     if (typeof parsed.parameter !== "string")
-      throw new SpkiParseError("Invalid EC parameter");
+      throw new KeyValidationError("Invalid EC parameter");
     return {
       name: `EC${defaults.ec}`,
+      hash: defaults.hash ?? "SHA-256",
       namedCurve: getNistCurveFromOid(parsed.parameter)
     };
   }
@@ -470,38 +346,11 @@ function genKeyImportParams(parsed, defaults = {
   if (algorithm === "Ed448") {
     return { name: "Ed448" };
   }
-  throw new SpkiParseError("Unknown algorithm");
-}
-function genSignOrVerifyAlgorithm(parsed, defaults = {
-  hash: "SHA-256",
-  ec: "DSA"
-}) {
-  const algorithm = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
-  if (!algorithm)
-    throw new SpkiParseError("Unknown algorithm");
-  if (algorithm === "RSASSA-PKCS1-v1_5") {
-    return "RSASSA-PKCS1-v1_5";
-  }
-  if (algorithm === "EC") {
-    return {
-      name: `EC${defaults.ec}`,
-      hash: defaults.hash
-    };
-  }
-  if (algorithm === "Ed25519") {
-    return { name: "Ed25519" };
-  }
-  if (algorithm === "Ed448") {
-    return {
-      name: "Ed448",
-      context: void 0
-      // TODO?
-    };
-  }
-  throw new SpkiParseError("Unknown algorithm");
+  throw new KeyValidationError("Unknown algorithm");
 }
 
 // src/pem/pkcs8.ts
+var import_asn1js3 = __toESM(require("@lapo/asn1js"), 1);
 var Pkcs8ParseError = class extends Error {
   constructor(message) {
     super(message);
@@ -530,7 +379,51 @@ function parsePkcs8(input) {
   };
 }
 
+// src/draft/const.ts
+var keyHashAlgosForDraftEncofing = {
+  "SHA": "sha1",
+  "SHA-1": "sha1",
+  "SHA-256": "sha256",
+  "SHA-384": "sha384",
+  "SHA-512": "sha512",
+  "MD5": "md5"
+};
+var keyHashAlgosForDraftDecoding = {
+  "sha1": "SHA",
+  "sha256": "SHA-256",
+  "sha384": "SHA-384",
+  "sha512": "SHA-512",
+  "md5": "MD5"
+};
+
 // src/draft/sign.ts
+function getDraftAlgoString(algorithm) {
+  const verifyHash = () => {
+    if (!algorithm.hash)
+      throw new Error(`hash is required`);
+    if (!(algorithm.hash in keyHashAlgosForDraftEncofing))
+      throw new Error(`unsupported hash: ${algorithm.hash}`);
+  };
+  if (algorithm.name === "RSASSA-PKCS1-v1_5") {
+    verifyHash();
+    return `rsa-${keyHashAlgosForDraftEncofing[algorithm.hash]}`;
+  }
+  if (algorithm.name === "ECDSA") {
+    verifyHash();
+    return `ecdsa-${keyHashAlgosForDraftEncofing[algorithm.hash]}`;
+  }
+  if (algorithm.name === "ECDH") {
+    verifyHash();
+    return `ecdh-${keyHashAlgosForDraftEncofing[algorithm.hash]}`;
+  }
+  if (algorithm.name === "Ed25519") {
+    return `ed25519-sha512`;
+  }
+  if (algorithm.name === "Ed448") {
+    return `ed448`;
+  }
+  throw new Error(`unsupported keyAlgorithm`);
+}
 function genDraftSigningString(request, includeHeaders, additional) {
   const headers = lcObjectKey(request.headers);
   const results = [];
@@ -557,41 +450,21 @@ function genDraftSigningString(request, includeHeaders, additional) {
   }
   return results.join("\n");
 }
-function genDraftSignature(signingString, privateKey, hashAlgorithm) {
-  const r = ncrypto.sign(hashAlgorithm, Buffer.from(signingString), privateKey);
-  return r.toString("base64");
+async function genDraftSignature(privateKey, signingString) {
+  const signatureAB = await globalThis.crypto.subtle.sign(privateKey.algorithm, privateKey, new TextEncoder().encode(signingString));
+  return encodeArrayBufferToBase64(signatureAB);
 }
 function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
   return `keyId="${keyId}",algorithm="${algorithm}",headers="${includeHeaders.join(" ")}",signature="${signature}"`;
 }
-function signAsDraftToRequest(request, key, includeHeaders, opts = {}) {
-  const hashAlgorithm = opts?.hashAlgorithm || "sha256";
-  const signInfo = prepareSignInfo(key.privateKeyPem, hashAlgorithm);
-  const algoString = getDraftAlgoString(signInfo);
-  const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
-  const signature = genDraftSignature(signingString, key.privateKeyPem, signInfo.hashAlg);
-  const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, algoString);
-  Object.assign(request.headers, {
-    Signature: signatureHeader
-  });
-  return {
-    signingString,
-    signature,
-    signatureHeader
-  };
-}
-async function signAsDraftToRequestWeb(request, key, includeHeaders, opts = {}) {
-  const hash = (
-    /**opts?.hashAlgorithm || **/
-    "SHA-256"
-  );
+async function signAsDraftToRequest(request, key, includeHeaders, opts = {}) {
+  const hash = opts?.hashAlgorithm || "SHA-256";
   const parsedPrivateKey = parsePkcs8(key.privateKeyPem);
-  const importParams = genKeyImportParams(parsedPrivateKey, { hash, ec: "DSA" });
-  const privateKey = await crypto.subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, false, ["sign"]);
-  const algoString = webGetDraftAlgoString(privateKey);
+  const importParams = genSignInfo(parsedPrivateKey, { hash, ec: "DSA" });
+  const privateKey = await globalThis.crypto.subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, false, ["sign"]);
+  const algoString = getDraftAlgoString(importParams);
   const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
-  const signatureAB = await crypto.subtle.sign(importParams, privateKey, new TextEncoder().encode(signingString));
-  const signature = encodeArrayBufferToBase64(signatureAB);
+  const signature = await genDraftSignature(privateKey, signingString);
   const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, algoString);
   Object.assign(request.headers, {
     Signature: signatureHeader
@@ -843,9 +716,9 @@ function parseRequestSignature(request, options) {
 }
 
 // src/keypair.ts
-var crypto3 = __toESM(require("node:crypto"), 1);
+var crypto = __toESM(require("node:crypto"), 1);
 var util = __toESM(require("node:util"), 1);
-var generateKeyPair2 = util.promisify(crypto3.generateKeyPair);
+var generateKeyPair2 = util.promisify(crypto.generateKeyPair);
 async function genRsaKeyPair(modulusLength = 4096) {
   return await generateKeyPair2("rsa", {
     modulusLength,
@@ -905,10 +778,79 @@ async function genEd448KeyPair() {
   });
 }
 function toSpkiPublicKey(publicKey) {
-  return crypto3.createPublicKey(publicKey).export({
+  return crypto.createPublicKey(publicKey).export({
     type: "spki",
     format: "pem"
   });
+}
+
+// src/digest/utils.ts
+var import_node_crypto = require("node:crypto");
+function createBase64Digest(body, hash = "sha256") {
+  if (Array.isArray(hash)) {
+    return new Map(hash.map((h) => [h, createBase64Digest(body, h)]));
+  }
+  return (0, import_node_crypto.createHash)(hash).update(body).digest("base64");
+}
+
+// src/digest/digest-rfc3230.ts
+var digestHashAlgosForEncoding = {
+  "sha1": "SHA",
+  "sha256": "SHA-256",
+  "sha384": "SHA-384",
+  "sha512": "SHA-512",
+  "md5": "MD5"
+};
+var digestHashAlgosForDecoding = {
+  "SHA": "sha1",
+  "SHA-1": "sha1",
+  "SHA-256": "sha256",
+  "SHA-384": "sha384",
+  "SHA-512": "sha512",
+  "MD5": "md5"
+};
+function genRFC3230DigestHeader(body, hashAlgorithm = "sha256") {
+  return `${digestHashAlgosForEncoding[hashAlgorithm]}=${createBase64Digest(body, hashAlgorithm)}`;
+}
+var digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
+function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
+  let digestHeader = lcObjectGet(request.headers, "digest");
+  if (!digestHeader) {
+    if (failOnNoDigest) {
+      if (errorLogger)
+        errorLogger("Digest header not found");
+      return false;
+    }
+    return true;
+  }
+  if (Array.isArray(digestHeader)) {
+    digestHeader = digestHeader[0];
+  }
+  const match = digestHeader.match(digestHeaderRegEx);
+  if (!match) {
+    if (errorLogger)
+      errorLogger("Invalid Digest header format");
+    return false;
+  }
+  const value = match[2];
+  if (!value) {
+    if (errorLogger)
+      errorLogger("Invalid Digest header format");
+    return false;
+  }
+  const algo = digestHashAlgosForDecoding[match[1].toUpperCase()];
+  if (!algo) {
+    if (errorLogger)
+      errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
+    return false;
+  }
+  const hash = createBase64Digest(rawBody, algo);
+  if (hash !== value) {
+    if (errorLogger)
+      errorLogger(`Digest header hash mismatch`);
+    return false;
+  }
+  return true;
 }
 
 // src/digest/digest.ts
@@ -927,77 +869,81 @@ function verifyDigestHeader(request, rawBody, failOnNoDigest = true, errorLogger
   return true;
 }
 
-// src/shared/verify.ts
-function buildErrorMessage(providedAlgorithm, detectedAlgorithm, realKeyType) {
-  return `Provided algorithm does not match the public key type: provided=${detectedAlgorithm}(${providedAlgorithm}}, real=${realKeyType}`;
-}
-function detectAndVerifyAlgorithm(algorithm, publicKey, errorLogger) {
-  algorithm = algorithm?.toLowerCase();
-  const realKeyType = publicKey.asymmetricKeyType;
-  if (algorithm && algorithm !== "hs2019" && realKeyType) {
-    const providedKeyAlgorithm = algorithm.split("-")[0];
-    if (providedKeyAlgorithm !== realKeyType.toLowerCase() && !(providedKeyAlgorithm === "ecdsa" && realKeyType === "ec")) {
-      if (errorLogger)
-        errorLogger(buildErrorMessage(providedKeyAlgorithm, realKeyType, realKeyType));
-      return null;
-    }
-  }
-  if (algorithm === "ed25519" || algorithm === "ed25519-sha512" || realKeyType === "ed25519") {
-    return { keyAlg: "ed25519", hashAlg: null };
-  }
-  if (algorithm === "ed448" || realKeyType === "ed448") {
-    return { keyAlg: "ed448", hashAlg: null };
-  }
-  if (algorithm === "rsa-v1_5-sha256")
-    return { keyAlg: "rsa", hashAlg: "sha256" };
-  if (algorithm === "ecdsa-p256-sha256")
-    return { keyAlg: "ec", hashAlg: "sha256" };
-  if (algorithm === "ecdsa-p384-sha384")
-    return { keyAlg: "ec", hashAlg: "sha384" };
-  const m = algorithm?.match(/^(rsa|ecdsa)-(sha(?:256|384|512))$/);
-  if (m) {
-    return {
-      keyAlg: m[1] === "ecdsa" ? "ec" : "rsa",
-      hashAlg: m[2]
-    };
-  }
-  if (realKeyType === "rsa" || realKeyType === "ec") {
-    return { keyAlg: realKeyType, hashAlg: "sha256" };
-  } else if (realKeyType) {
-    return { keyAlg: realKeyType, hashAlg: null };
-  } else if (algorithm && algorithm !== "hs2019") {
-    const algoSplitted = algorithm.split("-");
-    return {
-      keyAlg: algoSplitted[0],
-      hashAlg: algoSplitted.length === 1 ? null : algoSplitted[algoSplitted.length - 1]
-    };
-  }
-  if (errorLogger)
-    errorLogger("Algorithm is not detected");
-  return null;
-}
-
 // src/draft/verify.ts
-var ncrypto2 = __toESM(require("node:crypto"), 1);
-function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
-  const publicKey = ncrypto2.createPublicKey(publicKeyPem);
-  try {
-    const detected = detectAndVerifyAlgorithm(parsed.params.algorithm, publicKey);
-    if (!detected)
-      return false;
-    return ncrypto2.verify(detected.hashAlg, Buffer.from(parsed.signingString), publicKey, Buffer.from(parsed.params.signature, "base64"));
-  } catch (e) {
-    if (errorLogger)
-      errorLogger(e);
-    return false;
+var DraftKeyHashValidationError = class extends Error {
+  constructor(message) {
+    super(message);
   }
+};
+function buildErrorMessage(providedAlgorithm, real) {
+  return `Provided algorithm does not match the public key type: provided=${providedAlgorithm}, real=${real}`;
 }
-async function webVerifyDraftSignature(parsed, publicKeyPem, errorLogger) {
+function genSignInfoDraft(algorithm, parsed, errorLogger) {
+  algorithm = algorithm?.toLowerCase();
+  const realKeyType = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
+  if (realKeyType === "RSASSA-PKCS1-v1_5") {
+    if (!algorithm || algorithm === "hs2019" || algorithm === "rsa-sha256" || algorithm === "rsa-v1_5-sha256") {
+      return { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
+    }
+    const [parsedName, hash] = algorithm.split("-");
+    if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
+      throw new DraftKeyHashValidationError(`unsupported hash: ${hash}`);
+    }
+    if (parsedName === "rsa") {
+      return { name: "RSASSA-PKCS1-v1_5", hash: keyHashAlgosForDraftDecoding[hash] };
+    }
+    throw new DraftKeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
+  }
+  if (realKeyType === "EC") {
+    if (!algorithm || algorithm === "hs2019" || algorithm === "ecdsa-sha256" || algorithm === "ecdsa-p256-sha256") {
+      return { name: "ECDSA", hash: "SHA-256", namedCurve: getNistCurveFromOid(parsed.parameter) };
+    }
+    if (algorithm === "ecdsa-p256-sha256") {
+      const namedCurve = getNistCurveFromOid(parsed.parameter);
+      if (namedCurve !== "P-256") {
+        throw new DraftKeyHashValidationError(`curve is not P-256: ${namedCurve}`);
+      }
+      return { name: "ECDSA", hash: "SHA-256", namedCurve };
+    }
+    if (algorithm === "ecdsa-p384-sha384") {
+      const namedCurve = getNistCurveFromOid(parsed.parameter);
+      if (namedCurve !== "P-384") {
+        throw new DraftKeyHashValidationError(`curve is not P-384: ${namedCurve}`);
+      }
+      return { name: "ECDSA", hash: "SHA-256", namedCurve: getNistCurveFromOid(parsed.parameter) };
+    }
+    const [dsaOrDH, hash] = algorithm.split("-");
+    if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
+      throw new DraftKeyHashValidationError(`unsupported hash: ${hash}`);
+    }
+    if (dsaOrDH === "ecdsa") {
+      return { name: "ECDSA", hash: keyHashAlgosForDraftDecoding[hash], namedCurve: getNistCurveFromOid(parsed.parameter) };
+    }
+    if (dsaOrDH === "ecdh") {
+      return { name: "ECDH", hash: keyHashAlgosForDraftDecoding[hash], namedCurve: getNistCurveFromOid(parsed.parameter) };
+    }
+    throw new DraftKeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
+  }
+  if (realKeyType === "Ed25519") {
+    if (!algorithm || algorithm === "hs2019" || algorithm === "ed25519-sha512" || algorithm === "ed25519") {
+      return { name: "Ed25519" };
+    }
+    throw new DraftKeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
+  }
+  if (realKeyType === "Ed448") {
+    if (!algorithm || algorithm === "hs2019" || algorithm === "ed448") {
+      return { name: "Ed448" };
+    }
+    throw new DraftKeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
+  }
+  throw new DraftKeyHashValidationError(`unsupported keyAlgorithm: ${realKeyType} (provided: ${algorithm})`);
+}
+async function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   try {
     const parsedSpki = parsePublicKey(publicKeyPem);
-    const publicKey = await crypto.subtle.importKey("spki", parsedSpki.der, genKeyImportParams(parsedSpki), false, ["verify"]);
-    const verify2 = await crypto.subtle.verify(genSignOrVerifyAlgorithm(parsedSpki), publicKey, decodeBase64ToUint8Array(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
-    return verify2;
+    const publicKey = await globalThis.crypto.subtle.importKey("spki", parsedSpki.der, genSignInfo(parsedSpki), false, ["verify"]);
+    const verify = await globalThis.crypto.subtle.verify(publicKey.algorithm, publicKey, decodeBase64ToUint8Array(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
+    return verify;
   } catch (e) {
     if (errorLogger)
       errorLogger(e);
@@ -1007,11 +953,13 @@ async function webVerifyDraftSignature(parsed, publicKeyPem, errorLogger) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   ClockSkewInvalidError,
+  DraftKeyHashValidationError,
   DraftSignatureHeaderClockInvalidError,
   DraftSignatureHeaderContentLackedError,
   DraftSignatureHeaderKeys,
   HTTPMessageSignaturesParseError,
   InvalidRequestError,
+  KeyValidationError,
   Pkcs1ParseError,
   Pkcs8ParseError,
   RequestHasMultipleDateHeadersError,
@@ -1023,7 +971,6 @@ async function webVerifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   checkClockSkew,
   decodeBase64ToUint8Array,
   decodePem,
-  detectAndVerifyAlgorithm,
   digestHashAlgosForDecoding,
   digestHeaderRegEx,
   encodeArrayBufferToBase64,
@@ -1034,14 +981,16 @@ async function webVerifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   genEcKeyPair,
   genEd25519KeyPair,
   genEd448KeyPair,
-  genKeyImportParams,
   genRFC3230DigestHeader,
   genRsaKeyPair,
-  genSignOrVerifyAlgorithm,
+  genSignInfo,
+  genSignInfoDraft,
   genSpkiFromPkcs1,
   getDraftAlgoString,
   getNistCurveFromOid,
   getPublicKeyAlgorithmNameFromOid,
+  keyHashAlgosForDraftDecoding,
+  keyHashAlgosForDraftEncofing,
   lcObjectGet,
   lcObjectKey,
   numberToUint8Array,
@@ -1054,18 +1003,14 @@ async function webVerifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   parsePublicKey,
   parseRequestSignature,
   parseSpki,
-  prepareSignInfo,
   requestIsRFC9421,
   rsaASN1AlgorithmIdentifier,
   signAsDraftToRequest,
-  signAsDraftToRequestWeb,
   signatureHeaderIsDraft,
   toSpkiPublicKey,
   validateAndProcessParsedDraftSignatureHeader,
   validateRequestAndGetSignatureHeader,
   verifyDigestHeader,
   verifyDraftSignature,
-  verifyRFC3230DigestHeader,
-  webGetDraftAlgoString,
-  webVerifyDraftSignature
+  verifyRFC3230DigestHeader
 });

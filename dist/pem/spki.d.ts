@@ -1,4 +1,5 @@
 import ASN1 from '@lapo/asn1js';
+import { ECNamedCurve, KeyAlgorithmName } from '../types';
 export declare class SpkiParseError extends Error {
     constructor(message: string);
 }
@@ -9,14 +10,14 @@ export declare class SpkiParseError extends Error {
  * @param oidStr e.g. '1.2.840.113549.1.1.1' or SpkiParsedAlgorithmIdentifier.algorithm
  * @returns e.g. 'RSASSA-PKCS1-v1_5'
  */
-export declare function getPublicKeyAlgorithmNameFromOid(oidStr: string): "RSASSA-PKCS1-v1_5" | "DSA" | "DH" | "KEA" | "EC" | "Ed25519" | "Ed448";
+export declare function getPublicKeyAlgorithmNameFromOid(oidStr: string): KeyAlgorithmName;
 /**
  * Get NIST Standard curve from OID
  * https://www.ibm.com/docs/ja/zos/3.1.0?topic=ssl-elliptic-curve-cryptography-support
  *
  * (Most environments may implement only P-256, P-384 and P-521)
  */
-export declare function getNistCurveFromOid(oidStr: string): "P-192" | "P-224" | "P-256" | "P-384" | "P-521";
+export declare function getNistCurveFromOid(oidStr: string): ECNamedCurve;
 /**
  * Convert ASN1(@lapo/asn1js).Binary to ArrayBuffer
  *
@@ -81,11 +82,3 @@ export declare function parseSpki(input: ASN1.StreamOrBinary): SpkiParsedAlgorit
  * @returns parsed object
  */
 export declare function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmIdentifier;
-export declare function genKeyImportParams(parsed: SpkiParsedAlgorithmIdentifier, defaults?: {
-    hash: 'SHA-256' | 'SHA-384' | 'SHA-512';
-    ec: 'DSA' | 'DH';
-}): Parameters<typeof crypto.subtle.importKey>[2];
-export declare function genSignOrVerifyAlgorithm(parsed: ParsedAlgorithmIdentifier, defaults?: {
-    hash: 'SHA-256' | 'SHA-384' | 'SHA-512';
-    ec: 'DSA' | 'DH';
-}): Parameters<typeof crypto.subtle.verify>[0] | Parameters<typeof crypto.subtle.sign>[0];
