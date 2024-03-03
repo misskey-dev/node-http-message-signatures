@@ -28,3 +28,7 @@ export declare function genASN1Length(length: number | bigint): Uint8Array;
  * For web
  */
 export declare function encodeArrayBufferToBase64(buffer: ArrayBuffer): string;
+/**
+ * for Web
+ */
+export declare function decodeBase64ToUint8Array(base64: string): Uint8Array;

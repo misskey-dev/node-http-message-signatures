@@ -57,6 +57,11 @@ console.log('Performance test, TRYES:', TRYES);
 		}
 		logPerf('web Sign RSA4096, SHA-256', process.hrtime(start));
 	}
+	{
+		const start = process.hrtime();
+		await Promise.all(Array(TRYES).fill().map(() => signAsDraftToRequestWeb(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'sha256' })));
+		logPerf('web(Promise.all) Sign RSA4096, SHA-256', process.hrtime(start));
+	}
 
 	/**
 	 * Ed25519
@@ -74,6 +79,11 @@ console.log('Performance test, TRYES:', TRYES);
 			await signAsDraftToRequestWeb(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null });
 		}
 		logPerf('web Sign Ed25519', process.hrtime(start));
+	}
+	{
+		const start = process.hrtime();
+		await Promise.all(Array(TRYES).fill().map(() => signAsDraftToRequestWeb(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null })));
+		logPerf('web(Promise.all) Sign Ed25519', process.hrtime(start));
 	}
 }
 
@@ -97,7 +107,6 @@ console.log('Performance test, TRYES:', TRYES);
 		}
 		logPerf(testCase, process.hrtime(start));
 	}
-
 	{
 		const testCase = 'web Verify RSA4096, SHA-256';
 		const start = process.hrtime();
@@ -107,6 +116,14 @@ console.log('Performance test, TRYES:', TRYES);
 				throw new Error(`failed: ${testCase}`);
 			}
 		}
+		logPerf(testCase, process.hrtime(start));
+	}
+	{
+		const testCase = 'web(Promise.all) Verify RSA4096, SHA-256';
+		const start = process.hrtime();
+		await Promise.all(Array(TRYES).fill().map(() =>
+			webVerifyDraftSignature(parsed.value, rsa4096.publicKey)
+				.then(r => r ? true : Promise.reject(new Error('failed')))));
 		logPerf(testCase, process.hrtime(start));
 	}
 
@@ -145,7 +162,6 @@ console.log('Performance test, TRYES:', TRYES);
 		}
 		logPerf(testCase, process.hrtime(start));
 	}
-
 	{
 		const testCase = 'web Verify Ed25519';
 		const start = process.hrtime();
@@ -156,6 +172,14 @@ console.log('Performance test, TRYES:', TRYES);
 			}
 		}
 		const end = performance.now();
+		logPerf(testCase, process.hrtime(start));
+	}
+	{
+		const testCase = 'web(Promise.all) Verify Ed25519';
+		const start = process.hrtime();
+		await Promise.all(Array(TRYES).fill().map(() =>
+			webVerifyDraftSignature(parsed.value, ed25519.publicKey)
+				.then(r => r ? true : Promise.reject(new Error('failed')))));
 		logPerf(testCase, process.hrtime(start));
 	}
 

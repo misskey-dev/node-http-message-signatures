@@ -126,3 +126,15 @@ export function encodeArrayBufferToBase64(buffer: ArrayBuffer): string {
 	const binary = String.fromCharCode(...uint8Array);
 	return btoa(binary);
 }
+
+/**
+ * for Web
+ */
+export function decodeBase64ToUint8Array(base64: string): Uint8Array {
+	const binary = atob(base64);
+	const uint8Array = new Uint8Array(binary.length);
+	for (let i = 0; i < binary.length; i++) {
+		uint8Array[i] = binary.charCodeAt(i);
+	}
+	return uint8Array;
+}

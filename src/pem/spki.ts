@@ -225,7 +225,7 @@ export function genSignOrVerifyAlgorithm(
 	if (!algorithm) throw new SpkiParseError('Unknown algorithm');
 
 	if (algorithm === 'RSASSA-PKCS1-v1_5') {
-		return { name: 'RSASSA-PKCS1-v1_5' };
+		return 'RSASSA-PKCS1-v1_5';
 	}
 	if (algorithm === 'EC') {
 		return {

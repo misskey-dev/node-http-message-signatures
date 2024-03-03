@@ -172,6 +172,14 @@ function encodeArrayBufferToBase64(buffer) {
   const binary = String.fromCharCode(...uint8Array);
   return btoa(binary);
 }
+function decodeBase64ToUint8Array(base64) {
+  const binary = atob(base64);
+  const uint8Array = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    uint8Array[i] = binary.charCodeAt(i);
+  }
+  return uint8Array;
+}
 
 // src/pem/pkcs8.ts
 import ASN13 from "@lapo/asn1js";
@@ -375,7 +383,7 @@ function genSignOrVerifyAlgorithm(parsed, defaults = {
   if (!algorithm)
     throw new SpkiParseError("Unknown algorithm");
   if (algorithm === "RSASSA-PKCS1-v1_5") {
-    return { name: "RSASSA-PKCS1-v1_5" };
+    return "RSASSA-PKCS1-v1_5";
   }
   if (algorithm === "EC") {
     return {
@@ -874,7 +882,6 @@ function detectAndVerifyAlgorithm(algorithm, publicKey, errorLogger) {
 
 // src/draft/verify.ts
 import * as ncrypto2 from "node:crypto";
-import Base642 from "@lapo/asn1js/base64.js";
 function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   const publicKey = ncrypto2.createPublicKey(publicKeyPem);
   try {
@@ -892,7 +899,7 @@ async function webVerifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   try {
     const parsedSpki = parsePublicKey(publicKeyPem);
     const publicKey = await crypto.subtle.importKey("spki", parsedSpki.der, genKeyImportParams(parsedSpki), false, ["verify"]);
-    const verify2 = await crypto.subtle.verify(genSignOrVerifyAlgorithm(parsedSpki), publicKey, Base642.decode(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
+    const verify2 = await crypto.subtle.verify(genSignOrVerifyAlgorithm(parsedSpki), publicKey, decodeBase64ToUint8Array(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
     return verify2;
   } catch (e) {
     if (errorLogger)
@@ -916,6 +923,7 @@ export {
   UnknownSignatureHeaderFormatError,
   asn1ToArrayBuffer,
   checkClockSkew,
+  decodeBase64ToUint8Array,
   decodePem,
   detectAndVerifyAlgorithm,
   digestHashAlgosForDecoding,

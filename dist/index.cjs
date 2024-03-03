@@ -45,6 +45,7 @@ __export(src_exports, {
   UnknownSignatureHeaderFormatError: () => UnknownSignatureHeaderFormatError,
   asn1ToArrayBuffer: () => asn1ToArrayBuffer,
   checkClockSkew: () => checkClockSkew,
+  decodeBase64ToUint8Array: () => decodeBase64ToUint8Array,
   decodePem: () => decodePem,
   detectAndVerifyAlgorithm: () => detectAndVerifyAlgorithm,
   digestHashAlgosForDecoding: () => digestHashAlgosForDecoding,
@@ -268,6 +269,14 @@ function encodeArrayBufferToBase64(buffer) {
   const binary = String.fromCharCode(...uint8Array);
   return btoa(binary);
 }
+function decodeBase64ToUint8Array(base64) {
+  const binary = atob(base64);
+  const uint8Array = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    uint8Array[i] = binary.charCodeAt(i);
+  }
+  return uint8Array;
+}
 
 // src/pem/pkcs8.ts
 var import_asn1js3 = __toESM(require("@lapo/asn1js"), 1);
@@ -471,7 +480,7 @@ function genSignOrVerifyAlgorithm(parsed, defaults = {
   if (!algorithm)
     throw new SpkiParseError("Unknown algorithm");
   if (algorithm === "RSASSA-PKCS1-v1_5") {
-    return { name: "RSASSA-PKCS1-v1_5" };
+    return "RSASSA-PKCS1-v1_5";
   }
   if (algorithm === "EC") {
     return {
@@ -970,7 +979,6 @@ function detectAndVerifyAlgorithm(algorithm, publicKey, errorLogger) {
 
 // src/draft/verify.ts
 var ncrypto2 = __toESM(require("node:crypto"), 1);
-var import_base642 = __toESM(require("@lapo/asn1js/base64.js"), 1);
 function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   const publicKey = ncrypto2.createPublicKey(publicKeyPem);
   try {
@@ -988,7 +996,7 @@ async function webVerifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   try {
     const parsedSpki = parsePublicKey(publicKeyPem);
     const publicKey = await crypto.subtle.importKey("spki", parsedSpki.der, genKeyImportParams(parsedSpki), false, ["verify"]);
-    const verify2 = await crypto.subtle.verify(genSignOrVerifyAlgorithm(parsedSpki), publicKey, import_base642.default.decode(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
+    const verify2 = await crypto.subtle.verify(genSignOrVerifyAlgorithm(parsedSpki), publicKey, decodeBase64ToUint8Array(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
     return verify2;
   } catch (e) {
     if (errorLogger)
@@ -1013,6 +1021,7 @@ async function webVerifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   UnknownSignatureHeaderFormatError,
   asn1ToArrayBuffer,
   checkClockSkew,
+  decodeBase64ToUint8Array,
   decodePem,
   detectAndVerifyAlgorithm,
   digestHashAlgosForDecoding,
