@@ -51,9 +51,15 @@ console.log('Performance test, TRYES:', TRYES);
 		logPerf('web Sign RSA4096, SHA-256', process.hrtime(start));
 	}
 	{
+		let cnt = 0;
 		const start = process.hrtime();
-		await Promise.all(Array(TRYES).fill().map(() => signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'SHA-256' })));
+		await Promise.all(
+			Array(TRYES).fill().map(() =>
+				signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: rsa4096.privateKey }, basicIncludeHeaders, { hashAlgorithm: 'SHA-256' })
+					.then(() => cnt++))
+		);
 		logPerf('web(Promise.all) Sign RSA4096, SHA-256', process.hrtime(start));
+		if (cnt !== TRYES) throw new Error('failed');
 	}
 
 	/**
@@ -67,9 +73,15 @@ console.log('Performance test, TRYES:', TRYES);
 		logPerf('web Sign Ed25519', process.hrtime(start));
 	}
 	{
+		let cnt = 0;
 		const start = process.hrtime();
-		await Promise.all(Array(TRYES).fill().map(() => signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null })));
+		await Promise.all(
+			Array(TRYES).fill().map(() =>
+				signAsDraftToRequest(request, { keyId: 'test', privateKeyPem: ed25519.privateKey }, basicIncludeHeaders, { hashAlgorithm: null })
+					.then(() => cnt++))
+		);
 		logPerf('web(Promise.all) Sign Ed25519', process.hrtime(start));
+		if (cnt !== TRYES) throw new Error('failed');
 	}
 }
 
@@ -95,11 +107,14 @@ console.log('Performance test, TRYES:', TRYES);
 	}
 	{
 		const testCase = 'web(Promise.all) Verify RSA4096, SHA-256';
+		let cnt = 0;
 		const start = process.hrtime();
 		await Promise.all(Array(TRYES).fill().map(() =>
 			verifyDraftSignature(parsed.value, rsa4096.publicKey)
-				.then(r => r ? true : Promise.reject(new Error('failed')))));
+				.then(r => r ? true : Promise.reject(new Error('failed')))
+				.then(() => cnt++)));
 		logPerf(testCase, process.hrtime(start));
+		if (cnt !== TRYES) throw new Error('failed');
 	}
 
 	request.headers = lcObjectKey(request.headers);
@@ -140,11 +155,14 @@ console.log('Performance test, TRYES:', TRYES);
 	}
 	{
 		const testCase = 'web(Promise.all) Verify Ed25519';
+		let cnt = 0;
 		const start = process.hrtime();
 		await Promise.all(Array(TRYES).fill().map(() =>
 			verifyDraftSignature(parsed.value, ed25519.publicKey)
-				.then(r => r ? true : Promise.reject(new Error('failed')))));
+				.then(r => r ? true : Promise.reject(new Error('failed')))
+				.then(() => cnt++)));
 		logPerf(testCase, process.hrtime(start));
+		if (cnt !== TRYES) throw new Error('failed');
 	}
 
 	request.headers = lcObjectKey(request.headers);
