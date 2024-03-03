@@ -12,7 +12,7 @@ export class SpkiParseError extends Error {
  * Get algorithm name from OID
  * https://datatracker.ietf.org/doc/html/rfc3279#section-2.3
  * https://datatracker.ietf.org/doc/html/rfc8420#appendix-A
- * @param oidStr e.g. '1.2.840.113549.1.1.1' or SpkiParsedAlgorithmIdentifier.algorithm
+ * @param oidStr e.g. '1.2.840.113549.1.1.1' or ParsedAlgorithmIdentifier.algorithm
  * @returns e.g. 'RSASSA-PKCS1-v1_5'
  */
 export function getPublicKeyAlgorithmNameFromOid(oidStr: string): KeyAlgorithmName {
@@ -162,6 +162,15 @@ export function parseSpki(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmIdenti
 
 /**
  * Parse X.509 SubjectPublicKeyInfo (SPKI) public key
+ *
+ * In Node.js, `createPublicKey(publicKey)` does not need any information,
+ * but `crypto.subtle.importKey` needs to be provided by us for the key type.
+ *
+ * So, this function parses the SPKI and parses the type of key stored.
+ *
+ * If the key is PKCS#1, the function wraps it in SPKI. In that case,
+ * it assumes that the algorithm is `RSASSA-PKCS1-v1_5`.
+ *
  * @param input SPKI public key PEM or DER
  * @returns parsed object
  */

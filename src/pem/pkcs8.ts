@@ -8,8 +8,6 @@ export class Pkcs8ParseError extends Error {
 export type ParsedPkcs8 = ParsedAlgorithmIdentifierBase & {
 	/**
 	 * DER
-	 *
-	 * (Somehow crypto.createPublicKey will cause `error:1E08010C:DECODER routines::unsupported`)
 	 */
 	der: ArrayBuffer;
 
