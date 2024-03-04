@@ -99,7 +99,7 @@ console.log('Performance test, TRYES:', TRYES);
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = await verifyDraftSignature(parsed.value, rsa4096.publicKey);
-			if (!verifyResult) {
+			if (verifyResult !== true) {
 				throw new Error(`failed: ${testCase}`);
 			}
 		}
@@ -124,7 +124,7 @@ console.log('Performance test, TRYES:', TRYES);
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = httpSignature.verifySignature(parsedJ, rsa4096.publicKey);
-			if (!verifyResult) {
+			if (verifyResult !== true) {
 				throw new Error(`failed: ${testCase}`);
 			}
 		}
@@ -146,7 +146,7 @@ console.log('Performance test, TRYES:', TRYES);
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = await verifyDraftSignature(parsed.value, ed25519.publicKey);
-			if (!verifyResult) {
+			if (verifyResult !== true) {
 				throw new Error(`failed: ${testCase}`);
 			}
 		}
@@ -172,7 +172,7 @@ console.log('Performance test, TRYES:', TRYES);
 		const start = process.hrtime();
 		for (let i = 0; i < TRYES; i++) {
 			const verifyResult = httpSignature.verifySignature(parsedJ, ed25519.publicKey);
-			if (!verifyResult) {
+			if (verifyResult !== true) {
 				throw new Error(`failed: ${testCase}`);
 			}
 		}
