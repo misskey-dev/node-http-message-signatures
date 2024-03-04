@@ -53,7 +53,7 @@ export async function verifyRFC3230DigestHeader(
 			return false;
 		}
 		throw e;
-	};
+	}
 
 	if (hash !== value) {
 		if (errorLogger) errorLogger(`Digest header hash mismatch`);
