@@ -85,16 +85,13 @@ export function genRFC9421SignatureBase(
 	 */
 	includeComponents: string[],
 	data?: {
-		/**
-		 * Used by `;req`
-		 */
-		request?: RequestLike;
+		req?: RequestLike;
 		signatureParams?: string;
 		scheme?: string;
 	},
 ) {
 	const factory = new RFC9421SignatureBaseFactory(requestOrResponse, data?.signatureParams, data?.scheme);
-	const requestFactory = data?.request ? new RFC9421SignatureBaseFactory(data?.request, data?.scheme) : null;
+	const requestFactory = data?.req ? new RFC9421SignatureBaseFactory(data?.req, data?.scheme) : null;
 
 	const results = [] as string[];
 	const push = (key: string, value?: string) => {
