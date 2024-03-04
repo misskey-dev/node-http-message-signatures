@@ -106,7 +106,7 @@ await fastify.register(fastifyRawBody, {
 });
 fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => {
 	const verifyDigest = await verifyDigestHeader(request.raw, request.rawBody, true);
-	if (!verifyDigest) {
+	if (verifyDigest !== true) {
 		reply.code(401);
 		return;
 	}
@@ -118,14 +118,14 @@ fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => 
 
 		// Get public key by keyId
 		const publicKeyPem = publicKeyMap.get(parsedSignature.keyId)
-		if (!publicKeyPem) {
+		if (publicKeyPem !== true) {
 			reply.code(401);
 			return;
 		}
 
 		// Verify Signature
 		const verifyResult =  await verifyDraftSignature(parsed!.value, keys.rsa4096.publicKey, errorLogger);
-		if (!verifyResult) {
+		if (verifyResult !== true) {
 			reply.code(401);
 			return;
 		}
