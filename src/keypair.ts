@@ -68,7 +68,6 @@ export async function genEd25519KeyPair(keyUsage: webcrypto.KeyUsage[] = ['sign'
 }
 
 export async function genEd448KeyPair(keyUsage) {
-
 	const keyPair = await (await getWebcrypto()).subtle.generateKey(
 		{
 			name: 'Ed448',
