@@ -34,6 +34,7 @@ export class RFC9421SignatureBaseFactory {
 
 	public get(
 		type: typeof RFC9421SignatureBaseFactory.availableDerivedComponents[number] | string,
+		params: string[] = [],
 	): string {
 		if (type === '@signature-params') {
 			if (!this.signatureParams) {
@@ -54,11 +55,33 @@ export class RFC9421SignatureBaseFactory {
 			return this.url.pathname;
 		} else if (type === '@query') {
 			return this.url.search;
+		} else if (type === '@query-param') {
+			const key = params.find(x => x.startsWith('name="') && x.endsWith('"'))?.slice(6, -1);
+			if (!key) {
+				throw new Error('Query parameter name not found or invalid');
+			}
+			const value = this.url.searchParams.get(key);
+			if (value === null) {
+				throw new Error(`Query parameter not found: ${key}`);
+			}
+			return value;
 		} else if (type.startsWith('@')) {
 			throw new Error(`Unknown derived component: ${type}`);
 		} else if (type === 'date' && !this.headers['date'] && this.headers['x-date']) {
 			return this.headers['x-date'];
 		} else {
+			// WIP
+			// https://datatracker.ietf.org/doc/html/rfc9421#section-2.1
+			const keyParam = params.find(x => x.startsWith('name="'));
+			const isSf = params.includes('sf'); // Structed Field
+			const isBs = params.includes('bs'); // Binary-Wrapped
+			const isTr = params.includes('tr'); // Trailer
+			if (keyParam) {
+				if (!keyParam.endsWith('"')) {
+					throw new Error(`Invalid key param: ${params.join(';')}`);
+				}
+			}
+
 			return this.headers[type];
 		}
 	}
@@ -93,30 +116,32 @@ export function genRFC9421SignatureBase(
 	const factory = new RFC9421SignatureBaseFactory(requestOrResponse, data?.signatureParams, data?.scheme);
 	const requestFactory = data?.req ? new RFC9421SignatureBaseFactory(data?.req, data?.scheme) : null;
 
-	const results = [] as string[];
-	const push = (key: string, value?: string) => {
-		results.push(`"${key}": ${value ?? ''}`);
+	const results = new Map<string, string>();
+	const push = (key: string, value = '') => {
+		if (results.has(key)) {
+			throw new Error(`Duplicate key: ${key}`);
+		}
+
+		if (key.startsWith('"')) {
+			results.set(key, value);
+		} else {
+			results.set(`"${key}"`, value ?? factory.get(key));
+		}
 	};
 
-	for (const _key of includeComponents.map(x => x.toLowerCase())) {
-		let key = _key;
-		if (key.startsWith('"') && key.endsWith('"')) {
-			key = key.slice(1, -1);
-		} else if (key.startsWith('"') && key.endsWith('";req')) {
-			if (!requestFactory) {
-				throw new Error('request is required for `;req`');
-			}
-			// req
-			key = key.slice(1, -5);
-			push(key, requestFactory.get(key));
-			continue;
+	for (const component of includeComponents.map(x => x.toLowerCase())) {
+		const params = component.split(';');
+		if (!params[0]) {
+			throw new Error('Component is empty');
+		}
+		const key = (params[0].startsWith('"') && params[0].endsWith('"')) ? params[0].slice(1, -1) : params[0];
+		const currentFactory = params.includes('req') ? factory : requestFactory;
+		if (!currentFactory) {
+			throw new Error('You request req component but req is not provided');
 		}
 
-		if (key.startsWith('"@query-param";name="')) {
-		} else {
-			push(key, factory.get(key));
-		}
+		push(key, currentFactory.get(key, params));
 	}
 
-	return results.join('\n');
+	return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join('\n');
 }
