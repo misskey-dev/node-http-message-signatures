@@ -744,7 +744,18 @@ async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true
       errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
     return false;
   }
-  const hash = await createBase64Digest(rawBody, algo);
+  let hash;
+  try {
+    hash = await createBase64Digest(rawBody, algo);
+  } catch (e) {
+    if (e.name === "NotSupportedError") {
+      if (errorLogger)
+        errorLogger(`Invalid Digest header algorithm: ${algo}`);
+      return false;
+    }
+    throw e;
+  }
+  ;
   if (hash !== value) {
     if (errorLogger)
       errorLogger(`Digest header hash mismatch`);
