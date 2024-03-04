@@ -45,6 +45,14 @@ describe('rfc3230', () => {
 			} as any;
 			expect(await verifyRFC3230DigestHeader(request, 'foo')).toBe(true);
 		});
+		test('Unrecognized algorithm name', async () => {
+			const request = {
+				headers: {
+					'digest': `FOO=${await createBase64Digest('foo', 'SHA-256')}`,
+				},
+			} as any;
+			expect(await verifyRFC3230DigestHeader(request, 'foo')).toBe(false);
+		});
 	});
 });
 
