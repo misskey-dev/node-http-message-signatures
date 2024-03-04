@@ -37,6 +37,7 @@ As a way of expressing the HTTP Message Signatures support status of software, I
 |:-:|:--|
 |`00`|"Draft", RFC 3230, RSA-SHA256 Only|
 |`01`|"Draft", RFC 3230, Supports multiple public keys and Ed25519|
+|`10`|RFC 9421, RFC 9530, RSA-SHA256 Only|
 |`11`|RFC 9421, RFC 9530, Supports multiple public keys and Ed25519|
 
 ### `additionalPublicKeys`
