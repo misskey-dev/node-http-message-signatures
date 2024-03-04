@@ -48,7 +48,7 @@ export function getNistCurveFromOid(oidStr: string): ECNamedCurve {
  *
  * @param asn1 ASN1 object
  * @param contentOnly If true, return content only, excluding tag and length
- * @examples `asn1BinaryToArrayBuffer(ASN1.decode(der).stream.enc);`
+ * @example `asn1BinaryToArrayBuffer(ASN1.decode(der).stream.enc);`
  */
 export function asn1ToArrayBuffer(asn1: ASN1, contentOnly = false) {
 	const fullEnc = asn1.stream.enc;

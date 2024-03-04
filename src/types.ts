@@ -95,4 +95,36 @@ export type ParsedDraftSignature = {
 	};
 };
 
-export type ParsedSignature = ParsedDraftSignature; // | ParsedRFC9421Signature;
+export type ParsedRFC9421SignatureValue = {
+	label: string,
+	keyid: string;
+
+	/**
+	 * @example 'rsa-v1_5-sha256'
+	 */
+	algorithm: string;
+
+	/**
+	 * @example ['@method', '@path', '@authority', 'date', 'content-digest', '@signature-params']
+	 */
+	components: string[];
+
+	/**
+	 * @example
+	 * ```
+	 * "@method": POST
+	 * "@path": /foo
+	 * "@authority": example.com
+	 * "date": Tue, 20 Apr 2021 02:07:55 GMT
+	 * ```
+	 */
+	base: string;
+}
+
+export type ParsedRFC9421Signature = {
+	version: 'rfc9421';
+
+	value: ParsedRFC9421SignatureValue[];
+}
+
+export type ParsedSignature = ParsedDraftSignature | ParsedRFC9421Signature;

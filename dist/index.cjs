@@ -551,8 +551,9 @@ function validateAndProcessParsedDraftSignatureHeader(parsed, options) {
   if (!parsed.headers)
     throw new DraftSignatureHeaderContentLackedError("headers");
   const headersArray = parsed.headers.split(" ");
-  if (options?.requiredInputs?.draft) {
-    for (const requiredInput of options.requiredInputs.draft) {
+  const requiredHeaders = options?.requiredComponents?.draft || options?.requiredInputs?.draft;
+  if (requiredHeaders) {
+    for (const requiredInput of requiredHeaders) {
       if (requiredInput === "x-date" || requiredInput === "date") {
         if (headersArray.includes("date"))
           continue;
