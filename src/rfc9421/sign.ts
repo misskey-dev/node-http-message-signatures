@@ -36,6 +36,15 @@ export class RFC9421SignatureBaseFactory {
 		type: typeof RFC9421SignatureBaseFactory.availableDerivedComponents[number] | string,
 		params: string[] = [],
 	): string {
+		if (!type) {
+			throw new Error('Type is empty');
+		}
+		if (type.startsWith('"')) {
+			if (type.endsWith('"')) {
+				type = type.slice(1, -1);
+			}
+			throw new Error(`Invalid component type string: ${type}`);
+		}
 		if (type === '@signature-params') {
 			if (!this.signatureParams) {
 				throw new Error('signatureParams is not provided');
@@ -134,13 +143,12 @@ export function genRFC9421SignatureBase(
 		if (!params[0]) {
 			throw new Error('Component is empty');
 		}
-		const key = (params[0].startsWith('"') && params[0].endsWith('"')) ? params[0].slice(1, -1) : params[0];
 		const currentFactory = params.includes('req') ? factory : requestFactory;
 		if (!currentFactory) {
 			throw new Error('You request req component but req is not provided');
 		}
 
-		push(key, currentFactory.get(key, params));
+		push(params[0], currentFactory.get(params[0], params));
 	}
 
 	return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join('\n');
