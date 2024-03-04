@@ -118,7 +118,7 @@ fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => 
 
 		// Get public key by keyId
 		const publicKeyPem = publicKeyMap.get(parsedSignature.keyId)
-		if (publicKeyPem !== true) {
+		if (!publicKeyPem) {
 			reply.code(401);
 			return;
 		}
