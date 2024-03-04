@@ -1,6 +1,6 @@
 import { webcrypto as crypto } from 'node:crypto';
 import { DigestHashAlgorithm } from '../types';
-import { encodeArrayBufferToBase64 } from '../utils';
+import { encodeArrayBufferToBase64, getWebcrypto } from '../utils';
 
 export type DigestSource = crypto.BufferSource | string;
 
@@ -23,6 +23,6 @@ export async function createBase64Digest(
 	if (typeof body === 'string') {
 		body = (new TextEncoder()).encode(body);
 	}
-	const hashAb = await crypto.subtle.digest(hash, body);
+	const hashAb = await (await getWebcrypto()).subtle.digest(hash, body);
 	return encodeArrayBufferToBase64(hashAb);
 }
