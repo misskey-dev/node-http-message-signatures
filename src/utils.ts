@@ -1,6 +1,10 @@
 import type { SignInfo, SignatureHashAlgorithmUpperSnake } from './types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from './pem/spki.js';
 
+export async function getWebcrypto() {
+	return globalThis.crypto ?? (await import('node:crypto')).webcrypto;
+}
+
 /**
  * Convert object keys to lowercase
  */

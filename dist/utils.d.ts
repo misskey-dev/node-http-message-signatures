@@ -1,5 +1,7 @@
+/// <reference types="node" />
 import type { SignInfo, SignatureHashAlgorithmUpperSnake } from './types.js';
 import { ParsedAlgorithmIdentifier } from './pem/spki.js';
+export declare function getWebcrypto(): Promise<import("crypto").webcrypto.Crypto>;
 /**
  * Convert object keys to lowercase
  */

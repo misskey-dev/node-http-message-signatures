@@ -3,7 +3,7 @@ import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1';
 import { parsePkcs8 } from './pkcs8';
 import { rsa4096, ed25519 } from '../../test/keys';
 import { genEcKeyPair } from '../keypair';
-import { genSignInfo } from '../utils';
+import { genSignInfo, getWebcrypto } from '../utils';
 
 import { sign, generateKeyPair } from 'node:crypto';
 import * as util from 'node:util';
@@ -19,13 +19,13 @@ describe('spki', () => {
 		const importParams = genSignInfo(parsed);
 		expect(importParams).toEqual({ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' });
 
-		const publicKey = await crypto.subtle.importKey('spki', parsed.der, importParams, true, ['verify']);
+		const publicKey = await (await getWebcrypto()).subtle.importKey('spki', parsed.der, importParams, true, ['verify']);
 		expect((publicKey?.algorithm as any).modulusLength).toBe(4096);
 
 		const signed = sign('sha256', test_buffer, rsa4096.privateKey);
 
 		const verifyAlgorithm = genSignInfo(parsed);
-		const verify = await crypto.subtle.verify(verifyAlgorithm, publicKey, signed, test_buffer);
+		const verify = await (await getWebcrypto()).subtle.verify(verifyAlgorithm, publicKey, signed, test_buffer);
 		expect(verify).toBe(true);
 	});
 	test('ed25519', async () => {
@@ -36,13 +36,13 @@ describe('spki', () => {
 		const importParams = genSignInfo(parsed);
 		expect(importParams).toEqual({ name: 'Ed25519' });
 
-		const publicKey = await crypto.subtle.importKey('spki', parsed.der, importParams, true, ['verify']);
+		const publicKey = await (await getWebcrypto()).subtle.importKey('spki', parsed.der, importParams, true, ['verify']);
 		expect((publicKey?.algorithm as any).name).toBe('Ed25519');
 
 		const signed = sign(null, test_buffer, ed25519.privateKey);
 
 		const verifyAlgorithm = genSignInfo(parsed);
-		const verify = await crypto.subtle.verify(verifyAlgorithm, publicKey, signed, test_buffer);
+		const verify = await (await getWebcrypto()).subtle.verify(verifyAlgorithm, publicKey, signed, test_buffer);
 		expect(verify).toBe(true);
 	});
 	test('ec', async () => {
@@ -54,13 +54,13 @@ describe('spki', () => {
 		const importParams = genSignInfo(parsed);
 		expect(importParams).toEqual({ name: 'ECDSA', namedCurve: 'P-256', hash: 'SHA-256' });
 
-		const publicKey = await crypto.subtle.importKey('spki', parsed.der, importParams, true, ['verify']);
+		const publicKey = await (await getWebcrypto()).subtle.importKey('spki', parsed.der, importParams, true, ['verify']);
 		expect((publicKey?.algorithm as any).name).toBe('ECDSA');
 
 		const signed = sign('sha256', test_buffer, { key: keyPair.privateKey, dsaEncoding: 'ieee-p1363' });
 
 		const verifyAlgorithm = genSignInfo(parsed, { hash: 'SHA-256', ec: 'DSA' });
-		const verify = await crypto.subtle.verify(verifyAlgorithm, publicKey, signed, test_buffer);
+		const verify = await (await getWebcrypto()).subtle.verify(verifyAlgorithm, publicKey, signed, test_buffer);
 		expect(verify).toBe(true);
 	});
 	test('invalid input', () => {
@@ -95,10 +95,10 @@ describe('pkcs1', () => {
 
 		const signed = sign('sha256', test_buffer, kp.privateKey);
 
-		const publicKey = await crypto.subtle.importKey('spki', spki, genSignInfo(parsed), true, ['verify']);
+		const publicKey = await (await getWebcrypto()).subtle.importKey('spki', spki, genSignInfo(parsed), true, ['verify']);
 		expect((publicKey?.algorithm as any).modulusLength).toBe(4096);
 
-		const verify = await crypto.subtle.verify(genSignInfo(parsed), publicKey, signed, test_buffer);
+		const verify = await (await getWebcrypto()).subtle.verify(genSignInfo(parsed), publicKey, signed, test_buffer);
 		expect(verify).toBe(true);
 	});
 });
