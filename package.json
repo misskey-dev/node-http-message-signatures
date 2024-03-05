@@ -3,6 +3,9 @@
   "version": "0.0.2",
   "description": "",
   "type": "module",
+	"engines": {
+		"node": ">=18.4.0"
+	},
   "keywords": [
     "rfc9421",
     "rfc3230",
