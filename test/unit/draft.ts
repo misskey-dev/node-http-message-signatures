@@ -68,7 +68,7 @@ describe('draft', () => {
 
 			test('sign and verify by itself, by pre-imported key', async () => {
 				const privateKeyPreImported = {
-					privateKey: await importPrivateKey(key.privateKeyPem, ['sign']),
+					privateKey: await importPrivateKey(key.privateKeyPem),
 					keyId: key.keyId,
 				};
 				const request = getBasicOutgoingRequest();
@@ -79,7 +79,7 @@ describe('draft', () => {
 				expect(parsed.version).toBe('draft');
 				if (parsed.version !== 'draft') return;
 
-				const publicKeyPreImported = await importPublicKey(keys.rsa4096.publicKey, ['verify']);
+				const publicKeyPreImported = await importPublicKey(keys.rsa4096.publicKey);
 				const verifyResult = await verifyDraftSignature(parsed.value, publicKeyPreImported, errorLogger);
 				expect(verifyResult).toBe(true);
 			});

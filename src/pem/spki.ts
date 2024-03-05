@@ -200,7 +200,7 @@ export function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmI
  * @param defaults
  * @returns CryptoKey
  */
-export async function importPublicKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.CryptoKey['usages'], defaults?: Parameters<typeof genSignInfo>[1]) {
+export async function importPublicKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.KeyUsage[] = ['verify'], defaults?: Parameters<typeof genSignInfo>[1]) {
 	const parsedPublicKey = parsePublicKey(key);
 	return await (await getWebcrypto()).subtle.importKey('spki', parsedPublicKey.der, genSignInfo(parsedPublicKey), false, keyUsages);
 }

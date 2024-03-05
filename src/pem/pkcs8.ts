@@ -58,7 +58,7 @@ export function parsePkcs8(input: ASN1.StreamOrBinary): ParsedPkcs8 {
  * @param defaults
  * @returns CryptoKey
  */
-export async function importPrivateKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.KeyUsage[], defaults?: Parameters<typeof genSignInfo>[1]) {
+export async function importPrivateKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.KeyUsage[] = ['sign'], defaults?: Parameters<typeof genSignInfo>[1]) {
 	const parsedPrivateKey = parsePkcs8(key);
 	const importParams = genSignInfo(parsedPrivateKey, defaults);
 	return await (await getWebcrypto()).subtle.importKey('pkcs8', parsedPrivateKey.der, importParams, false, keyUsages);
