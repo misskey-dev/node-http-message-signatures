@@ -89,7 +89,7 @@ export class RFC9421SignatureBaseFactory {
 		} else {
 			// WIP
 			// https://datatracker.ietf.org/doc/html/rfc9421#section-2.1
-			const keyParam = params.find(x => x.startsWith('name="'));
+			const keyParam = params.find(x => x.startsWith('key="'));
 			const isSf = params.includes('sf'); // Structed Field
 			const isBs = params.includes('bs'); // Binary-Wrapped
 			const isTr = params.includes('tr'); // Trailer
