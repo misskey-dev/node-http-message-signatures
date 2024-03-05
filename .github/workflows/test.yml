@@ -32,3 +32,6 @@ jobs:
       - name: Test
         run: |
           pnpm test
+      - name: Performance
+        run: |
+          pnpm performance

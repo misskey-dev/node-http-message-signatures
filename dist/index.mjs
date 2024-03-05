@@ -757,7 +757,6 @@ async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true
     }
     throw e;
   }
-  ;
   if (hash !== value) {
     if (errorLogger)
       errorLogger(`Digest header hash mismatch`);
