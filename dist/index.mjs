@@ -167,6 +167,9 @@ function parsePublicKey(input) {
 }
 
 // src/utils.ts
+async function getWebcrypto() {
+  return globalThis.crypto ?? (await import("node:crypto")).webcrypto;
+}
 function lcObjectKey(src) {
   return Object.entries(src).reduce((dst, [key, value]) => {
     if (key === "__proto__")
@@ -359,7 +362,7 @@ function genDraftSigningString(request, includeHeaders, additional) {
   return results.join("\n");
 }
 async function genDraftSignature(privateKey, signingString) {
-  const signatureAB = await globalThis.crypto.subtle.sign(privateKey.algorithm, privateKey, new TextEncoder().encode(signingString));
+  const signatureAB = await (await getWebcrypto()).subtle.sign(privateKey.algorithm, privateKey, new TextEncoder().encode(signingString));
   return encodeArrayBufferToBase64(signatureAB);
 }
 function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
@@ -369,7 +372,7 @@ async function signAsDraftToRequest(request, key, includeHeaders, opts = {}) {
   const hash = opts?.hashAlgorithm || "SHA-256";
   const parsedPrivateKey = parsePkcs8(key.privateKeyPem);
   const importParams = genSignInfo(parsedPrivateKey, { hash, ec: "DSA" });
-  const privateKey = await globalThis.crypto.subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, false, ["sign"]);
+  const privateKey = await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, false, ["sign"]);
   const algoString = getDraftAlgoString(importParams);
   const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
   const signature = await genDraftSignature(privateKey, signingString);
@@ -626,15 +629,15 @@ function parseRequestSignature(request, options) {
 
 // src/keypair.ts
 async function exportPublicKeyPem(key) {
-  const ab = await globalThis.crypto.subtle.exportKey("spki", key);
+  const ab = await (await getWebcrypto()).subtle.exportKey("spki", key);
   return "-----BEGIN PUBLIC KEY-----\n" + splitPer64Chars(encodeArrayBufferToBase64(ab)).join("\n") + "\n-----END PUBLIC KEY-----\n";
 }
 async function exportPrivateKeyPem(key) {
-  const ab = await globalThis.crypto.subtle.exportKey("pkcs8", key);
+  const ab = await (await getWebcrypto()).subtle.exportKey("pkcs8", key);
   return "-----BEGIN PRIVATE KEY-----\n" + splitPer64Chars(encodeArrayBufferToBase64(ab)).join("\n") + "\n-----END PRIVATE KEY-----\n";
 }
 async function genRsaKeyPair(modulusLength = 4096, keyUsage = ["sign", "verify"]) {
-  const keyPair = await globalThis.crypto.subtle.generateKey(
+  const keyPair = await (await getWebcrypto()).subtle.generateKey(
     {
       name: "RSASSA-PKCS1-v1_5",
       modulusLength,
@@ -650,7 +653,7 @@ async function genRsaKeyPair(modulusLength = 4096, keyUsage = ["sign", "verify"]
   };
 }
 async function genEcKeyPair(namedCurve = "P-256", keyUsage = ["sign", "verify"]) {
-  const keyPair = await globalThis.crypto.subtle.generateKey(
+  const keyPair = await (await getWebcrypto()).subtle.generateKey(
     {
       name: "ECDSA",
       namedCurve
@@ -664,7 +667,7 @@ async function genEcKeyPair(namedCurve = "P-256", keyUsage = ["sign", "verify"])
   };
 }
 async function genEd25519KeyPair(keyUsage = ["sign", "verify"]) {
-  const keyPair = await globalThis.crypto.subtle.generateKey(
+  const keyPair = await (await getWebcrypto()).subtle.generateKey(
     {
       name: "Ed25519"
     },
@@ -677,7 +680,7 @@ async function genEd25519KeyPair(keyUsage = ["sign", "verify"]) {
   };
 }
 async function genEd448KeyPair(keyUsage) {
-  const keyPair = await globalThis.crypto.subtle.generateKey(
+  const keyPair = await (await getWebcrypto()).subtle.generateKey(
     {
       name: "Ed448"
     },
@@ -691,7 +694,6 @@ async function genEd448KeyPair(keyUsage) {
 }
 
 // src/digest/utils.ts
-import { webcrypto as crypto } from "node:crypto";
 async function createBase64Digest(body, hash = "SHA-256") {
   if (Array.isArray(hash)) {
     return new Map(await Promise.all(hash.map((h) => {
@@ -704,7 +706,7 @@ async function createBase64Digest(body, hash = "SHA-256") {
   if (typeof body === "string") {
     body = new TextEncoder().encode(body);
   }
-  const hashAb = await crypto.subtle.digest(hash, body);
+  const hashAb = await (await getWebcrypto()).subtle.digest(hash, body);
   return encodeArrayBufferToBase64(hashAb);
 }
 
@@ -755,7 +757,6 @@ async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true
     }
     throw e;
   }
-  ;
   if (hash !== value) {
     if (errorLogger)
       errorLogger(`Digest header hash mismatch`);
@@ -863,8 +864,8 @@ var genSignInfoDraft = parseSignInfo;
 async function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   try {
     const parsedSpki = parsePublicKey(publicKeyPem);
-    const publicKey = await globalThis.crypto.subtle.importKey("spki", parsedSpki.der, genSignInfo(parsedSpki), false, ["verify"]);
-    const verify = await globalThis.crypto.subtle.verify(publicKey.algorithm, publicKey, decodeBase64ToUint8Array(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
+    const publicKey = await (await getWebcrypto()).subtle.importKey("spki", parsedSpki.der, genSignInfo(parsedSpki), false, ["verify"]);
+    const verify = await (await getWebcrypto()).subtle.verify(publicKey.algorithm, publicKey, decodeBase64ToUint8Array(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
     return verify;
   } catch (e) {
     if (errorLogger)
@@ -910,6 +911,7 @@ export {
   getDraftAlgoString,
   getNistCurveFromOid,
   getPublicKeyAlgorithmNameFromOid,
+  getWebcrypto,
   keyHashAlgosForDraftDecoding,
   keyHashAlgosForDraftEncofing,
   lcObjectGet,

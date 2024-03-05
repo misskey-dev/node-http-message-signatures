@@ -1,6 +1,6 @@
-import type { webcrypto as crypto } from 'node:crypto';
+import type { webcrypto } from 'node:crypto';
 import type { PrivateKey, RequestLike, SignInfo, SignatureHashAlgorithmUpperSnake } from '../types.js';
-import { encodeArrayBufferToBase64, genSignInfo, lcObjectKey } from '../utils.js';
+import { encodeArrayBufferToBase64, genSignInfo, getWebcrypto, lcObjectKey } from '../utils.js';
 import { parsePkcs8 } from '../pem/pkcs8.js';
 import { keyHashAlgosForDraftEncofing } from './const.js';
 
@@ -72,8 +72,8 @@ export function genDraftSigningString(
 	return results.join('\n');
 }
 
-export async function genDraftSignature(privateKey: crypto.CryptoKey, signingString: string) {
-	const signatureAB = await globalThis.crypto.subtle.sign(privateKey.algorithm, privateKey, new TextEncoder().encode(signingString));
+export async function genDraftSignature(privateKey: webcrypto.CryptoKey, signingString: string) {
+	const signatureAB = await (await getWebcrypto()).subtle.sign(privateKey.algorithm, privateKey, new TextEncoder().encode(signingString));
 	return encodeArrayBufferToBase64(signatureAB);
 }
 
@@ -86,7 +86,7 @@ export async function signAsDraftToRequest(request: RequestLike, key: PrivateKey
 
 	const parsedPrivateKey = parsePkcs8(key.privateKeyPem);
 	const importParams = genSignInfo(parsedPrivateKey, { hash, ec: 'DSA' });
-	const privateKey = await globalThis.crypto.subtle.importKey('pkcs8', parsedPrivateKey.der, importParams, false, ['sign']);
+	const privateKey = await (await getWebcrypto()).subtle.importKey('pkcs8', parsedPrivateKey.der, importParams, false, ['sign']);
 	const algoString = getDraftAlgoString(importParams);
 
 	const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
