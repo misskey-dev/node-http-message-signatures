@@ -6,6 +6,13 @@ export type RequestParseOptions = {
 	/**
 	 * Headers should be included in the signature string
 	 */
+	requiredComponents?: {
+		draft?: string[];
+		rfc9421?: string[];
+	};
+	/**
+	 * @deprecated Use `requiredComponents` instead
+	 */
 	requiredInputs?: {
 		draft?: string[];
 		rfc9421?: string[];

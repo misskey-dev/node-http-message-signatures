@@ -82,21 +82,21 @@ describe('parse', () => {
 			};
 			expect(() => validateAndProcessParsedDraftSignatureHeader(parsed, { clockSkew: { now: theDate } })).toThrow();
 		});
-		test('requiredInputs (success)', () => {
+		test('requiredComponents (success)', () => {
 			const parsed = {
 				...parsedBase
 			};
-			const result = validateAndProcessParsedDraftSignatureHeader(parsed, { requiredInputs: { draft: ['date'] } });
+			const result = validateAndProcessParsedDraftSignatureHeader(parsed, { requiredComponents: { draft: ['date'] } });
 			expect(result).toEqual({
 				...parsedBase,
 				headers: ['(request-target)', 'host', 'date', 'accept'],
 			});
 		});
-		test('requiredInputs (error)', () => {
+		test('requiredComponents (error)', () => {
 			const parsed = {
 				...parsedBase
 			};
-			expect(() => validateAndProcessParsedDraftSignatureHeader(parsed, { requiredInputs: { draft: ['digest'] } })).toThrow();
+			expect(() => validateAndProcessParsedDraftSignatureHeader(parsed, { requiredComponents: { draft: ['digest'] } })).toThrow();
 		});
 	});
 

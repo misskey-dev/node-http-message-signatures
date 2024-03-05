@@ -73,6 +73,8 @@ function getPublicKeyAlgorithmNameFromOid(oidStr) {
   const oid = oidStr.split("\n")[0].trim();
   if (oid === "1.2.840.113549.1.1.1")
     return "RSASSA-PKCS1-v1_5";
+  if (oid === "1.2.840.113549.1.1.7")
+    return "RSA-PSS";
   if (oid === "1.2.840.10040.4.1")
     return "DSA";
   if (oid === "1.2.840.10046.2.1")
@@ -457,8 +459,9 @@ function validateAndProcessParsedDraftSignatureHeader(parsed, options) {
   if (!parsed.headers)
     throw new DraftSignatureHeaderContentLackedError("headers");
   const headersArray = parsed.headers.split(" ");
-  if (options?.requiredInputs?.draft) {
-    for (const requiredInput of options.requiredInputs.draft) {
+  const requiredHeaders = options?.requiredComponents?.draft || options?.requiredInputs?.draft;
+  if (requiredHeaders) {
+    for (const requiredInput of requiredHeaders) {
       if (requiredInput === "x-date" || requiredInput === "date") {
         if (headersArray.includes("date"))
           continue;
@@ -743,7 +746,18 @@ async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true
       errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
     return false;
   }
-  const hash = await createBase64Digest(rawBody, algo);
+  let hash;
+  try {
+    hash = await createBase64Digest(rawBody, algo);
+  } catch (e) {
+    if (e.name === "NotSupportedError") {
+      if (errorLogger)
+        errorLogger(`Invalid Digest header algorithm: ${algo}`);
+      return false;
+    }
+    throw e;
+  }
+  ;
   if (hash !== value) {
     if (errorLogger)
       errorLogger(`Digest header hash mismatch`);
@@ -768,8 +782,8 @@ async function verifyDigestHeader(request, rawBody, failOnNoDigest = true, error
   return true;
 }
 
-// src/draft/verify.ts
-var DraftKeyHashValidationError = class extends Error {
+// src/shared/verify.ts
+var KeyHashValidationError = class extends Error {
   constructor(message) {
     super(message);
   }
@@ -777,43 +791,51 @@ var DraftKeyHashValidationError = class extends Error {
 function buildErrorMessage(providedAlgorithm, real) {
   return `Provided algorithm does not match the public key type: provided=${providedAlgorithm}, real=${real}`;
 }
-function genSignInfoDraft(algorithm, parsed, errorLogger) {
+function parseSignInfo(algorithm, parsed, errorLogger) {
   algorithm = algorithm?.toLowerCase();
   const realKeyType = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
+  if (realKeyType === "RSA-PSS") {
+    if (algorithm === "rsa-pss-sha512") {
+      return { name: "RSA-PSS", hash: "SHA-512" };
+    }
+  }
   if (realKeyType === "RSASSA-PKCS1-v1_5") {
     if (!algorithm || algorithm === "hs2019" || algorithm === "rsa-sha256" || algorithm === "rsa-v1_5-sha256") {
       return { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
     }
+    if (algorithm === "rsa-pss-sha512") {
+      return { name: "RSA-PSS", hash: "SHA-512" };
+    }
     const [parsedName, hash] = algorithm.split("-");
     if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
-      throw new DraftKeyHashValidationError(`unsupported hash: ${hash}`);
+      throw new KeyHashValidationError(`unsupported hash: ${hash}`);
     }
     if (parsedName === "rsa") {
       return { name: "RSASSA-PKCS1-v1_5", hash: keyHashAlgosForDraftDecoding[hash] };
     }
-    throw new DraftKeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
+    throw new KeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
   }
   if (realKeyType === "EC") {
-    if (!algorithm || algorithm === "hs2019" || algorithm === "ecdsa-sha256" || algorithm === "ecdsa-p256-sha256") {
+    if (!algorithm || algorithm === "hs2019" || algorithm === "ecdsa-sha256") {
       return { name: "ECDSA", hash: "SHA-256", namedCurve: getNistCurveFromOid(parsed.parameter) };
     }
     if (algorithm === "ecdsa-p256-sha256") {
       const namedCurve = getNistCurveFromOid(parsed.parameter);
       if (namedCurve !== "P-256") {
-        throw new DraftKeyHashValidationError(`curve is not P-256: ${namedCurve}`);
+        throw new KeyHashValidationError(`curve is not P-256: ${namedCurve}`);
       }
       return { name: "ECDSA", hash: "SHA-256", namedCurve };
     }
     if (algorithm === "ecdsa-p384-sha384") {
       const namedCurve = getNistCurveFromOid(parsed.parameter);
       if (namedCurve !== "P-384") {
-        throw new DraftKeyHashValidationError(`curve is not P-384: ${namedCurve}`);
+        throw new KeyHashValidationError(`curve is not P-384: ${namedCurve}`);
       }
       return { name: "ECDSA", hash: "SHA-256", namedCurve: getNistCurveFromOid(parsed.parameter) };
     }
     const [dsaOrDH, hash] = algorithm.split("-");
     if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
-      throw new DraftKeyHashValidationError(`unsupported hash: ${hash}`);
+      throw new KeyHashValidationError(`unsupported hash: ${hash}`);
     }
     if (dsaOrDH === "ecdsa") {
       return { name: "ECDSA", hash: keyHashAlgosForDraftDecoding[hash], namedCurve: getNistCurveFromOid(parsed.parameter) };
@@ -821,22 +843,25 @@ function genSignInfoDraft(algorithm, parsed, errorLogger) {
     if (dsaOrDH === "ecdh") {
       return { name: "ECDH", hash: keyHashAlgosForDraftDecoding[hash], namedCurve: getNistCurveFromOid(parsed.parameter) };
     }
-    throw new DraftKeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
+    throw new KeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
   }
   if (realKeyType === "Ed25519") {
     if (!algorithm || algorithm === "hs2019" || algorithm === "ed25519-sha512" || algorithm === "ed25519") {
       return { name: "Ed25519" };
     }
-    throw new DraftKeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
+    throw new KeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
   }
   if (realKeyType === "Ed448") {
     if (!algorithm || algorithm === "hs2019" || algorithm === "ed448") {
       return { name: "Ed448" };
     }
-    throw new DraftKeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
+    throw new KeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
   }
-  throw new DraftKeyHashValidationError(`unsupported keyAlgorithm: ${realKeyType} (provided: ${algorithm})`);
+  throw new KeyHashValidationError(`unsupported keyAlgorithm: ${realKeyType} (provided: ${algorithm})`);
 }
+
+// src/draft/verify.ts
+var genSignInfoDraft = parseSignInfo;
 async function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
   try {
     const parsedSpki = parsePublicKey(publicKeyPem);
@@ -851,7 +876,6 @@ async function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
 }
 export {
   ClockSkewInvalidError,
-  DraftKeyHashValidationError,
   DraftSignatureHeaderClockInvalidError,
   DraftSignatureHeaderContentLackedError,
   DraftSignatureHeaderKeys,

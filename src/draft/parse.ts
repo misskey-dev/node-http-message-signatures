@@ -89,8 +89,9 @@ export function validateAndProcessParsedDraftSignatureHeader(parsed: DraftSignat
 	if (!parsed.signature) throw new DraftSignatureHeaderContentLackedError('signature');
 	if (!parsed.headers) throw new DraftSignatureHeaderContentLackedError('headers');
 	const headersArray = parsed.headers.split(' ');
-	if (options?.requiredInputs?.draft) {
-		for (const requiredInput of options.requiredInputs.draft) {
+	const requiredHeaders = options?.requiredComponents?.draft || options?.requiredInputs?.draft;
+	if (requiredHeaders) {
+		for (const requiredInput of requiredHeaders) {
 			if (requiredInput === 'x-date' || requiredInput === 'date') {
 				// dateとx-dateは相互に読み替える
 				if (headersArray.includes('date')) continue;

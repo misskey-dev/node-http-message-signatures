@@ -37,6 +37,7 @@ As a way of expressing the HTTP Message Signatures support status of software, I
 |:-:|:--|
 |`00`|"Draft", RFC 3230, RSA-SHA256 Only|
 |`01`|"Draft", RFC 3230, Supports multiple public keys and Ed25519|
+|`10`|RFC 9421, RFC 9530, RSA-SHA256 Only|
 |`11`|RFC 9421, RFC 9530, Supports multiple public keys and Ed25519|
 
 ### `additionalPublicKeys`
@@ -106,7 +107,7 @@ await fastify.register(fastifyRawBody, {
 });
 fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => {
 	const verifyDigest = await verifyDigestHeader(request.raw, request.rawBody, true);
-	if (!verifyDigest) {
+	if (verifyDigest !== true) {
 		reply.code(401);
 		return;
 	}
@@ -125,7 +126,7 @@ fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => 
 
 		// Verify Signature
 		const verifyResult =  await verifyDraftSignature(parsed!.value, keys.rsa4096.publicKey, errorLogger);
-		if (!verifyResult) {
+		if (verifyResult !== true) {
 			reply.code(401);
 			return;
 		}

@@ -25,6 +25,11 @@ export type ClockSkewSettings = {
      */
     delay?: number;
 };
+export type SignInfoRSAPSS = {
+    name: 'RSA-PSS';
+    hash: NonNullable<SignatureHashAlgorithmUpperSnake>;
+    saltLength?: number;
+};
 export type SignInfoRSA = {
     name: 'RSASSA-PKCS1-v1_5';
     hash: NonNullable<SignatureHashAlgorithmUpperSnake>;
@@ -41,16 +46,17 @@ export type SignInfoEd448 = {
     name: 'Ed448';
     context?: string;
 };
-export type SignInfo = SignInfoRSA | SignInfoEC | SignInfoEd25519 | SignInfoEd448;
+export type SignInfo = SignInfoRSAPSS | SignInfoRSA | SignInfoEC | SignInfoEd25519 | SignInfoEd448;
 export type PrivateKey = {
     privateKeyPem: string;
     keyId: string;
 };
-export type KeyAlgorithmName = 'RSASSA-PKCS1-v1_5' | 'DSA' | 'DH' | 'KEA' | 'EC' | 'Ed25519' | 'Ed448';
+export type KeyAlgorithmName = 'RSA-PSS' | 'RSASSA-PKCS1-v1_5' | 'DSA' | 'DH' | 'KEA' | 'EC' | 'Ed25519' | 'Ed448';
 export type ECNamedCurve = 'P-192' | 'P-224' | 'P-256' | 'P-384' | 'P-521';
 export type SignatureHashAlgorithmUpperSnake = 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512' | null;
 export type DigestHashAlgorithm = 'SHA' | 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512';
 export type DraftSignatureAlgorithm = 'rsa-sha1' | 'rsa-sha256' | 'rsa-sha384' | 'rsa-sha512' | 'ecdsa-sha1' | 'ecdsa-sha256' | 'ecdsa-sha384' | 'ecdsa-sha512' | 'ed25519-sha512' | 'ed25519' | 'ed448';
+export type RFC9421SignatuerAlgorithm = 'rsa-pss-sha512' | 'rsa-v1_5-sha256' | 'hmac-sha256' | 'ecdsa-p256-sha256' | 'ecdsa-p384-sha384' | 'ed25519';
 export type ParsedDraftSignature = {
     version: 'draft';
     /**
@@ -81,4 +87,30 @@ export type ParsedDraftSignature = {
         keyId: string;
     };
 };
-export type ParsedSignature = ParsedDraftSignature;
+export type ParsedRFC9421SignatureValue = {
+    label: string;
+    keyid: string;
+    /**
+     * @example 'rsa-v1_5-sha256'
+     */
+    algorithm: string;
+    /**
+     * @example ['@method', '@path', '@authority', 'date', 'content-digest', '@signature-params']
+     */
+    components: string[];
+    /**
+     * @example
+     * ```
+     * "@method": POST
+     * "@path": /foo
+     * "@authority": example.com
+     * "date": Tue, 20 Apr 2021 02:07:55 GMT
+     * ```
+     */
+    base: string;
+};
+export type ParsedRFC9421Signature = {
+    version: 'rfc9421';
+    value: ParsedRFC9421SignatureValue[];
+};
+export type ParsedSignature = ParsedDraftSignature | ParsedRFC9421Signature;

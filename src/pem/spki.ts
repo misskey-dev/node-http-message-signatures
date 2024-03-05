@@ -18,6 +18,7 @@ export class SpkiParseError extends Error {
 export function getPublicKeyAlgorithmNameFromOid(oidStr: string): KeyAlgorithmName {
 	const oid = oidStr.split('\n')[0].trim();
 	if (oid === '1.2.840.113549.1.1.1') return 'RSASSA-PKCS1-v1_5';
+	if (oid === '1.2.840.113549.1.1.7') return 'RSA-PSS';
 	if (oid === '1.2.840.10040.4.1') return 'DSA';
 	if (oid === '1.2.840.10046.2.1') return 'DH';
 	if (oid === '2.16.840.1.101.2.1.1.22') return 'KEA';
@@ -48,7 +49,7 @@ export function getNistCurveFromOid(oidStr: string): ECNamedCurve {
  *
  * @param asn1 ASN1 object
  * @param contentOnly If true, return content only, excluding tag and length
- * @examples `asn1BinaryToArrayBuffer(ASN1.decode(der).stream.enc);`
+ * @example `asn1BinaryToArrayBuffer(ASN1.decode(der).stream.enc);`
  */
 export function asn1ToArrayBuffer(asn1: ASN1, contentOnly = false) {
 	const fullEnc = asn1.stream.enc;
