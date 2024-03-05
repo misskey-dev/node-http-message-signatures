@@ -32,6 +32,14 @@ export class RFC9421SignatureBaseFactory {
 		this.url = new URL(this.targetUri);
 	}
 
+	/**
+	 * Return component value from component type and parameters
+	 * @param type component type (first part of component key)
+	 *  e.g. `@method` or `"@method"`
+	 * @param params component parameters
+	 * 	e.g. ['"@query-param"', 'name="foo"']	 (Result of '"@query-param";name="foo"'.split(';'))
+	 * @returns component value
+	 */
 	public get(
 		type: typeof RFC9421SignatureBaseFactory.availableDerivedComponents[number] | string,
 		params: string[] = [],
