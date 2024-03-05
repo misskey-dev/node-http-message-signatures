@@ -165,6 +165,10 @@ function parsePublicKey(input) {
     }
   }
 }
+async function importPublicKey(key, keyUsages, defaults) {
+  const parsedPublicKey = parsePublicKey(key);
+  return await (await getWebcrypto()).subtle.importKey("spki", parsedPublicKey.der, genSignInfo(parsedPublicKey), false, keyUsages);
+}
 
 // src/utils.ts
 async function getWebcrypto() {
@@ -289,6 +293,11 @@ function parsePkcs8(input) {
     attributesRaw: attributes ? asn1ToArrayBuffer(attributes) : null
   };
 }
+async function importPrivateKey(key, keyUsages, defaults) {
+  const parsedPrivateKey = parsePkcs8(key);
+  const importParams = genSignInfo(parsedPrivateKey, defaults);
+  return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, false, keyUsages);
+}
 
 // src/draft/const.ts
 var keyHashAlgosForDraftEncofing = {
@@ -308,29 +317,29 @@ var keyHashAlgosForDraftDecoding = {
 };
 
 // src/draft/sign.ts
-function getDraftAlgoString(algorithm) {
+function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
   const verifyHash = () => {
-    if (!algorithm.hash)
+    if (!hashAlgorithm)
       throw new Error(`hash is required`);
-    if (!(algorithm.hash in keyHashAlgosForDraftEncofing))
-      throw new Error(`unsupported hash: ${algorithm.hash}`);
+    if (!(hashAlgorithm in keyHashAlgosForDraftEncofing))
+      throw new Error(`unsupported hash: ${hashAlgorithm}`);
   };
-  if (algorithm.name === "RSASSA-PKCS1-v1_5") {
+  if (keyAlgorithm === "RSASSA-PKCS1-v1_5") {
     verifyHash();
-    return `rsa-${keyHashAlgosForDraftEncofing[algorithm.hash]}`;
+    return `rsa-${keyHashAlgosForDraftEncofing[hashAlgorithm]}`;
   }
-  if (algorithm.name === "ECDSA") {
+  if (keyAlgorithm === "ECDSA") {
     verifyHash();
-    return `ecdsa-${keyHashAlgosForDraftEncofing[algorithm.hash]}`;
+    return `ecdsa-${keyHashAlgosForDraftEncofing[hashAlgorithm]}`;
   }
-  if (algorithm.name === "ECDH") {
+  if (keyAlgorithm === "ECDH") {
     verifyHash();
-    return `ecdh-${keyHashAlgosForDraftEncofing[algorithm.hash]}`;
+    return `ecdh-${keyHashAlgosForDraftEncofing[hashAlgorithm]}`;
   }
-  if (algorithm.name === "Ed25519") {
+  if (keyAlgorithm === "Ed25519") {
     return `ed25519-sha512`;
   }
-  if (algorithm.name === "Ed448") {
+  if (keyAlgorithm === "Ed448") {
     return `ed448`;
   }
   throw new Error(`unsupported keyAlgorithm`);
@@ -370,10 +379,8 @@ function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
 }
 async function signAsDraftToRequest(request, key, includeHeaders, opts = {}) {
   const hash = opts?.hashAlgorithm || "SHA-256";
-  const parsedPrivateKey = parsePkcs8(key.privateKeyPem);
-  const importParams = genSignInfo(parsedPrivateKey, { hash, ec: "DSA" });
-  const privateKey = await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, false, ["sign"]);
-  const algoString = getDraftAlgoString(importParams);
+  const privateKey = "privateKey" in key ? key.privateKey : await importPrivateKey(key.privateKeyPem, ["sign"], { hash, ec: "DSA" });
+  const algoString = getDraftAlgoString(privateKey.algorithm.name, hash);
   const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
   const signature = await genDraftSignature(privateKey, signingString);
   const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, algoString);
@@ -861,10 +868,9 @@ function parseSignInfo(algorithm, parsed, errorLogger) {
 
 // src/draft/verify.ts
 var genSignInfoDraft = parseSignInfo;
-async function verifyDraftSignature(parsed, publicKeyPem, errorLogger) {
+async function verifyDraftSignature(parsed, key, errorLogger) {
   try {
-    const parsedSpki = parsePublicKey(publicKeyPem);
-    const publicKey = await (await getWebcrypto()).subtle.importKey("spki", parsedSpki.der, genSignInfo(parsedSpki), false, ["verify"]);
+    const publicKey = typeof key === "string" ? await importPublicKey(key, ["verify"]) : key;
     const verify = await (await getWebcrypto()).subtle.verify(publicKey.algorithm, publicKey, decodeBase64ToUint8Array(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
     return verify;
   } catch (e) {
@@ -912,6 +918,8 @@ export {
   getNistCurveFromOid,
   getPublicKeyAlgorithmNameFromOid,
   getWebcrypto,
+  importPrivateKey,
+  importPublicKey,
   keyHashAlgosForDraftDecoding,
   keyHashAlgosForDraftEncofing,
   lcObjectGet,

@@ -1,4 +1,4 @@
-import { signAsDraftToRequest, parseRequestSignature, genRFC3230DigestHeader, verifyDraftSignature, lcObjectKey } from '../../dist/index.mjs';
+import { signAsDraftToRequest, parseRequestSignature, genRFC3230DigestHeader, verifyDraftSignature, lcObjectKey, importPrivateKey, importPublicKey } from '../../dist/index.mjs';
 import { rsa4096, ed25519 } from '../keys.js';
 import httpSignature from '@peertube/http-signature';
 
@@ -32,6 +32,42 @@ function logPerf(name, diff) {
 }
 
 console.log('Performance test, TRYES:', TRYES);
+
+/**
+ * importPrivateKey
+ */
+{
+	const start = process.hrtime();
+	for (let i = 0; i < TRYES; i++) {
+		await importPrivateKey(rsa4096.privateKey, ['sign']);
+	}
+	logPerf('web importPrivateKey RSA4096', process.hrtime(start));
+}
+{
+	const start = process.hrtime();
+	for (let i = 0; i < TRYES; i++) {
+		await importPrivateKey(ed25519.privateKey, ['sign']);
+	}
+	logPerf('web importPrivateKey Ed25519', process.hrtime(start));
+}
+
+/**
+ * importPublicKey
+ */
+{
+	const start = process.hrtime();
+	for (let i = 0; i < TRYES; i++) {
+		await importPublicKey(rsa4096.publicKey, ['verify']);
+	}
+	logPerf('web importPublicKey RSA4096', process.hrtime(start));
+}
+{
+	const start = process.hrtime();
+	for (let i = 0; i < TRYES; i++) {
+		await importPublicKey(ed25519.publicKey, ['verify']);
+	}
+	logPerf('web importPublicKey Ed25519', process.hrtime(start));
+}
 
 /**
  * Sign

@@ -3,6 +3,8 @@ import Hex from '@lapo/asn1js/hex.js';
 import Base64 from '@lapo/asn1js/base64.js';
 import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1';
 import { ECNamedCurve, KeyAlgorithmName } from '../types';
+import type { webcrypto } from 'node:crypto';
+import { genSignInfo, getWebcrypto } from '../utils';
 
 export class SpkiParseError extends Error {
 	constructor(message: string) { super(message); }
@@ -189,4 +191,16 @@ export function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmI
 			throw new SpkiParseError('Invalid SPKI or PKCS#1');
 		}
 	}
+}
+
+/**
+ * Parse public key and run `crypto.subtle.importKey`
+ * @param key string or ArrayBuffer
+ * @param keyUsages e.g. ['verify']
+ * @param defaults
+ * @returns CryptoKey
+ */
+export async function importPublicKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.CryptoKey['usages'], defaults?: Parameters<typeof genSignInfo>[1]) {
+	const parsedPublicKey = parsePublicKey(key);
+	return await (await getWebcrypto()).subtle.importKey('spki', parsedPublicKey.der, genSignInfo(parsedPublicKey), false, keyUsages);
 }

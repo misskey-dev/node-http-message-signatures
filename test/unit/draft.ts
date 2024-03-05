@@ -6,6 +6,9 @@ import { verifyDraftSignature } from '@/draft/verify.js';
 import { parseRequestSignature, ClockSkewInvalidError } from '@/parse.js';
 import * as keys from '../keys.js';
 import { lcObjectKey } from '@/utils.js';
+import { importPrivateKey } from '@/pem/pkcs8.js';
+import { importPublicKey } from '@/pem/spki.js';
+import { webcrypto } from 'node:crypto';
 
 //#region data
 const theDate = new Date('2024-02-28T17:44:06.000Z');
@@ -57,9 +60,30 @@ describe('draft', () => {
 				const request = getBasicOutgoingRequest();
 				await signAsDraftToRequest(request, key, basicIncludeHeaders, { hashAlgorithm: 'SHA-256' });
 				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
-				const verifyResult = await verifyDraftSignature(parsed!.value, keys.rsa4096.publicKey, errorLogger);
+				expect(parsed.version).toBe('draft');
+				if (parsed.version !== 'draft') return;
+				const verifyResult = await verifyDraftSignature(parsed.value, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
+
+			test('sign and verify by itself, by pre-imported key', async () => {
+				const privateKeyPreImported = {
+					privateKey: await importPrivateKey(key.privateKeyPem, ['sign']),
+					keyId: key.keyId,
+				};
+				const request = getBasicOutgoingRequest();
+				await signAsDraftToRequest(request, privateKeyPreImported, basicIncludeHeaders, { hashAlgorithm: 'SHA-256' });
+				expect((request.headers as any)['Signature']).toBe('keyId="https://example.com/users/012345678abcdef#main-key",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="ocCFDJtL100/4ug4nkfTVy17rV/H4gXKwrN9o82g89zEt2012ueg4RYlWwtF1waiRhEGXNXoiIbAsO2k0hFlD8/Vhm6BeRlqpgKzs0bd3XFKTRVIUACyg7efblKJ6o8DU+gdu6SlRx9V08n8i2ZEoLim2N0iMbjmDME9oh8rY8bM8uH3RnRIxpLwCmSLDSaPAop0rPQryZQQwoFhsTPvS9JhiyHmSqU1FiIX3Sz4ExcHFyO9MK/kvFmwMLQDJ3Z64npGACo155vBUahUH0RFe1mwRgHBZPyg3PJHomQXaGxc3Jb3PJL1zMQDAofw/hSB0YlN1WM5EApSUfJieOqdbbDeEf5qfpm3Vza3DVRpvQtSeok+X0TOBh6cPCfYmW7gIxKondxmwdP9d5g3pHXQuASE/bOmogh00+zFJGy7AS35j95rgzEUfjzuWOQDUs5pRnuAUDMQ2Q3+woWJGgp4C1YPdO8dL9pR2sBusZYeeIQieQRJIJib1wiXLyL8qgO3ukrECH8FPON6DKmlA3CcyQfUpFw4pVZUArukUKVGt3g4rH6BDJTVHdbeCvKyxG30tzI4jfbuMpj7Ekrj16gHjKwyhhH5vqcJ19ibeg2SoARmipUfRt+ufZGn3tZX3efaBEaTbOAkFGgG0voJjo1Q3+7EFwreHv2ABKXOJiSAIow="');
+
+				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
+				expect(parsed.version).toBe('draft');
+				if (parsed.version !== 'draft') return;
+
+				const publicKeyPreImported = await importPublicKey(keys.rsa4096.publicKey, ['verify']);
+				const verifyResult = await verifyDraftSignature(parsed.value, publicKeyPreImported, errorLogger);
+				expect(verifyResult).toBe(true);
+			});
+
 			test('verify by http-signature', async () => {
 				const request = getBasicOutgoingRequest();
 				await signAsDraftToRequest(request, key, basicIncludeHeaders, { hashAlgorithm: 'SHA-256' });
@@ -68,14 +92,18 @@ describe('draft', () => {
 				const verifyResult = httpSignature.verifySignature(parsed, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
+
 			test('verify by itself (failed)', async () => {
 				const request = getBasicOutgoingRequest();
 				request.headers = lcObjectKey(request.headers);
 				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#main-key",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="aaaaaaaa"';
 				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
-				const verifyResult = await verifyDraftSignature(parsed!.value, keys.rsa4096.publicKey, errorLogger);
+				expect(parsed.version).toBe('draft');
+				if (parsed.version !== 'draft') return;
+				const verifyResult = await verifyDraftSignature(parsed.value, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
 			});
+
 			test('verify by http-signature (failed)', () => {
 				const request = getBasicOutgoingRequest();
 				request.headers = lcObjectKey(request.headers);
@@ -101,9 +129,12 @@ describe('draft', () => {
 				const request = getBasicOutgoingRequest();
 				await signAsDraftToRequest(request, key, basicIncludeHeaders, { hashAlgorithm: null });
 				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
-				const verifyResult = await verifyDraftSignature(parsed!.value, keys.ed25519.publicKey, errorLogger);
+				expect(parsed.version).toBe('draft');
+				if (parsed.version !== 'draft') return;
+				const verifyResult = await verifyDraftSignature(parsed.value, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
+
 			test('verify by http-signature', async () => {
 				const request = getBasicOutgoingRequest();
 				await signAsDraftToRequest(request, key, basicIncludeHeaders, { hashAlgorithm: null });
@@ -112,6 +143,7 @@ describe('draft', () => {
 				const verifyResult = httpSignature.verifySignature(parsed, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
+
 			test('verify by itself (failed)', async () => {
 				const request = getBasicOutgoingRequest();
 				await signAsDraftToRequest(request, key, basicIncludeHeaders, { hashAlgorithm: null });
@@ -119,7 +151,9 @@ describe('draft', () => {
 				// Check clock skew error
 				expect(() => parseRequestSignature(request)).toThrow(ClockSkewInvalidError);
 				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
-				const verifyResult = await verifyDraftSignature(parsed!.value, keys.ed25519.publicKey, errorLogger);
+				expect(parsed.version).toBe('draft');
+				if (parsed.version !== 'draft') return;
+				const verifyResult = await verifyDraftSignature(parsed.value, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(false);
 			});
 			test('verify by http-signature (failed)', async () => {

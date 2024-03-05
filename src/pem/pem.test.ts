@@ -1,6 +1,6 @@
-import { parsePublicKey, parseSpki } from './spki';
+import { importPublicKey, parsePublicKey, parseSpki } from './spki';
 import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1';
-import { parsePkcs8 } from './pkcs8';
+import { importPrivateKey, parsePkcs8 } from './pkcs8';
 import { rsa4096, ed25519 } from '../../test/keys';
 import { genEcKeyPair } from '../keypair';
 import { genSignInfo, getWebcrypto } from '../utils';
@@ -116,6 +116,18 @@ describe(parsePublicKey, () => {
 	});
 });
 
+describe(importPublicKey, () => {
+	test('rsa4096', async () => {
+		const publicKey = await importPublicKey(rsa4096.publicKey, ['verify']);
+		expect(publicKey.algorithm.name).toBe('RSASSA-PKCS1-v1_5');
+		expect((publicKey.algorithm as any).modulusLength).toBe(4096);
+	});
+	test('ed25519', async () => {
+		const publicKey = await importPublicKey(ed25519.publicKey, ['verify']);
+		expect((publicKey?.algorithm as any).name).toBe('Ed25519');
+	});
+});
+
 describe('pkcs8', () => {
 	test('rsa4096', async () => {
 		const parsed = parsePkcs8(rsa4096.privateKey);
@@ -127,5 +139,17 @@ describe('pkcs8', () => {
 	});
 	test('fail', () => {
 		expect(() => parsePkcs8(rsa4096.publicKey)).toThrow();
+	});
+});
+
+describe(importPrivateKey, () => {
+	test('rsa4096', async () => {
+		const privateKey = await importPrivateKey(rsa4096.privateKey, ['sign']);
+		expect(privateKey.algorithm.name).toBe('RSASSA-PKCS1-v1_5');
+		expect((privateKey.algorithm as any).modulusLength).toBe(4096);
+	});
+	test('ed25519', async () => {
+		const privateKey = await importPrivateKey(ed25519.privateKey, ['sign']);
+		expect((privateKey.algorithm as any).name).toBe('Ed25519');
 	});
 });

@@ -1,32 +1,39 @@
 import type { webcrypto } from 'node:crypto';
-import type { PrivateKey, RequestLike, SignInfo, SignatureHashAlgorithmUpperSnake } from '../types.js';
-import { encodeArrayBufferToBase64, genSignInfo, getWebcrypto, lcObjectKey } from '../utils.js';
-import { parsePkcs8 } from '../pem/pkcs8.js';
+import type { PrivateKey, RequestLike, SignatureHashAlgorithmUpperSnake } from '../types.js';
+import { encodeArrayBufferToBase64, getWebcrypto, lcObjectKey } from '../utils.js';
+import { importPrivateKey } from '../pem/pkcs8.js';
 import { keyHashAlgosForDraftEncofing } from './const.js';
 
-export function getDraftAlgoString(algorithm: SignInfo) {
+/**
+ * Get the algorithm string for draft encoding
+ * @param keyAlgorithm Comes from `privateKey.algorithm.name` e.g. 'RSASSA-PKCS1-v1_5'
+ * @param hashAlgorithm e.g. 'SHA-256'
+ * @returns string e.g. 'rsa-sha256'
+ */
+export function getDraftAlgoString(keyAlgorithm: string, hashAlgorithm: NonNullable<SignatureHashAlgorithmUpperSnake>) {
 	const verifyHash = () => {
-		// @ts-expect-error hash is required
-		if (!algorithm.hash) throw new Error(`hash is required`);
-		// @ts-expect-error hash is required
-		if (!(algorithm.hash in keyHashAlgosForDraftEncofing)) throw new Error(`unsupported hash: ${algorithm.hash}`);
+		if (!hashAlgorithm) throw new Error(`hash is required`);
+		if (!(hashAlgorithm in keyHashAlgosForDraftEncofing)) throw new Error(`unsupported hash: ${hashAlgorithm}`);
 	};
-	if (algorithm.name === 'RSASSA-PKCS1-v1_5') {
+	if (keyAlgorithm === 'RSASSA-PKCS1-v1_5') {
+		// https://developer.mozilla.org/en-US/docs/Web/API/RsaHashedKeyGenParams
 		verifyHash();
-		return `rsa-${keyHashAlgosForDraftEncofing[algorithm.hash]}`;
+		return `rsa-${keyHashAlgosForDraftEncofing[hashAlgorithm]}`;
 	}
-	if (algorithm.name === 'ECDSA') {
+	if (keyAlgorithm === 'ECDSA') {
+		// https://developer.mozilla.org/en-US/docs/Web/API/EcKeyGenParams
 		verifyHash();
-		return `ecdsa-${keyHashAlgosForDraftEncofing[algorithm.hash]}`;
+		return `ecdsa-${keyHashAlgosForDraftEncofing[hashAlgorithm]}`;
 	}
-	if (algorithm.name === 'ECDH') {
+	if (keyAlgorithm === 'ECDH') {
+		// https://developer.mozilla.org/en-US/docs/Web/API/EcKeyGenParams
 		verifyHash();
-		return `ecdh-${keyHashAlgosForDraftEncofing[algorithm.hash]}`;
+		return `ecdh-${keyHashAlgosForDraftEncofing[hashAlgorithm]}`;
 	}
-	if (algorithm.name === 'Ed25519') {
+	if (keyAlgorithm === 'Ed25519') {
 		return `ed25519-sha512`; // Joyent/@peertube/http-signatureではこう指定する必要がある
 	}
-	if (algorithm.name === 'Ed448') {
+	if (keyAlgorithm === 'Ed448') {
 		return `ed448`;
 	}
 	throw new Error(`unsupported keyAlgorithm`);
@@ -81,13 +88,19 @@ export function genDraftSignatureHeader(includeHeaders: string[], keyId: string,
 	return `keyId="${keyId}",algorithm="${algorithm}",headers="${includeHeaders.join(' ')}",signature="${signature}"`;
 }
 
+/**
+ *
+ * @param request Request object to sign
+ * @param key Private key to sign
+ * @param includeHeaders Headers to build the sigining string
+ * @param opts
+ * @returns result object
+ */
 export async function signAsDraftToRequest(request: RequestLike, key: PrivateKey, includeHeaders: string[], opts: { hashAlgorithm?: SignatureHashAlgorithmUpperSnake } = {}) {
 	const hash = opts?.hashAlgorithm || 'SHA-256';
 
-	const parsedPrivateKey = parsePkcs8(key.privateKeyPem);
-	const importParams = genSignInfo(parsedPrivateKey, { hash, ec: 'DSA' });
-	const privateKey = await (await getWebcrypto()).subtle.importKey('pkcs8', parsedPrivateKey.der, importParams, false, ['sign']);
-	const algoString = getDraftAlgoString(importParams);
+	const privateKey = 'privateKey' in key ? key.privateKey : await importPrivateKey(key.privateKeyPem, ['sign'], { hash, ec: 'DSA' });
+	const algoString = getDraftAlgoString(privateKey.algorithm.name, hash);
 
 	const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
 

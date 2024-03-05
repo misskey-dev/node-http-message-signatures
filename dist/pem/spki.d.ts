@@ -1,5 +1,8 @@
+/// <reference types="node" />
 import ASN1 from '@lapo/asn1js';
 import { ECNamedCurve, KeyAlgorithmName } from '../types';
+import type { webcrypto } from 'node:crypto';
+import { genSignInfo } from '../utils';
 export declare class SpkiParseError extends Error {
     constructor(message: string);
 }
@@ -91,3 +94,11 @@ export declare function parseSpki(input: ASN1.StreamOrBinary): SpkiParsedAlgorit
  * @returns parsed object
  */
 export declare function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmIdentifier;
+/**
+ * Parse public key and run `crypto.subtle.importKey`
+ * @param key string or ArrayBuffer
+ * @param keyUsages e.g. ['verify']
+ * @param defaults
+ * @returns CryptoKey
+ */
+export declare function importPublicKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.CryptoKey['usages'], defaults?: Parameters<typeof genSignInfo>[1]): Promise<webcrypto.CryptoKey>;

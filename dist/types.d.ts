@@ -1,7 +1,9 @@
 /// <reference types="node" />
 /// <reference types="node" />
+/// <reference types="node" />
 import type { IncomingMessage } from "http";
 import type { Http2ServerRequest } from "http2";
+import type { webcrypto } from "node:crypto";
 export type RequestLike = {
     url: string;
     method: string;
@@ -47,10 +49,15 @@ export type SignInfoEd448 = {
     context?: string;
 };
 export type SignInfo = SignInfoRSAPSS | SignInfoRSA | SignInfoEC | SignInfoEd25519 | SignInfoEd448;
-export type PrivateKey = {
+export type PrivateKeyWithPem = {
     privateKeyPem: string;
     keyId: string;
 };
+export type PrivateKeyWithCryptoKey = {
+    privateKey: webcrypto.CryptoKey;
+    keyId: string;
+};
+export type PrivateKey = PrivateKeyWithPem | PrivateKeyWithCryptoKey;
 export type KeyAlgorithmName = 'RSA-PSS' | 'RSASSA-PKCS1-v1_5' | 'DSA' | 'DH' | 'KEA' | 'EC' | 'Ed25519' | 'Ed448';
 export type ECNamedCurve = 'P-192' | 'P-224' | 'P-256' | 'P-384' | 'P-521';
 export type SignatureHashAlgorithmUpperSnake = 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512' | null;
