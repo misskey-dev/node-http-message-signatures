@@ -47,13 +47,13 @@ export class RFC9421SignatureBaseFactory {
 		const params = component.split(';');
 		let type = params[0];
 		if (!type) {
-			throw new Error('Type is empty');
+			throw new Error(`Type is empty: ${component}`);
 		}
 		if (type.startsWith('"')) {
 			if (type.endsWith('"')) {
 				type = type.slice(1, -1);
 			}
-			throw new Error(`Invalid component type string: ${type}`);
+			throw new Error(`Invalid component type string: ${component}`);
 		}
 
 		if (type === '@signature-params') {
