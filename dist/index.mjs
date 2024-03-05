@@ -165,7 +165,7 @@ function parsePublicKey(input) {
     }
   }
 }
-async function importPublicKey(key, keyUsages, defaults) {
+async function importPublicKey(key, keyUsages = ["verify"], defaults) {
   const parsedPublicKey = parsePublicKey(key);
   return await (await getWebcrypto()).subtle.importKey("spki", parsedPublicKey.der, genSignInfo(parsedPublicKey), false, keyUsages);
 }
@@ -293,7 +293,7 @@ function parsePkcs8(input) {
     attributesRaw: attributes ? asn1ToArrayBuffer(attributes) : null
   };
 }
-async function importPrivateKey(key, keyUsages, defaults) {
+async function importPrivateKey(key, keyUsages = ["sign"], defaults) {
   const parsedPrivateKey = parsePkcs8(key);
   const importParams = genSignInfo(parsedPrivateKey, defaults);
   return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, false, keyUsages);

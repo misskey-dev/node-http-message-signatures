@@ -101,4 +101,4 @@ export declare function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAl
  * @param defaults
  * @returns CryptoKey
  */
-export declare function importPublicKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.CryptoKey['usages'], defaults?: Parameters<typeof genSignInfo>[1]): Promise<webcrypto.CryptoKey>;
+export declare function importPublicKey(key: ASN1.StreamOrBinary, keyUsages?: webcrypto.KeyUsage[], defaults?: Parameters<typeof genSignInfo>[1]): Promise<webcrypto.CryptoKey>;
