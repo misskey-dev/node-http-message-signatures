@@ -4,6 +4,10 @@
 import { RequestLike } from "../types";
 import { lcObjectKey } from "../utils";
 
+/**
+ * Class for creating signature base,
+ * construct with a request or a response
+ */
 export class RFC9421SignatureBaseFactory {
 	public static availableDerivedComponents: [
 		'@signature-params',
@@ -34,16 +38,14 @@ export class RFC9421SignatureBaseFactory {
 
 	/**
 	 * Return component value from component type and parameters
-	 * @param type component type (first part of component key)
-	 *  e.g. `@method` or `"@method"`
-	 * @param params component parameters
-	 * 	e.g. ['"@query-param"', 'name="foo"']	 (Result of '"@query-param";name="foo"'.split(';'))
+	 * @param component e.g. '"@query-param";name="foo"', '@method', 'content-digest'
 	 * @returns component value
 	 */
 	public get(
-		type: typeof RFC9421SignatureBaseFactory.availableDerivedComponents[number] | string,
-		params: string[] = [],
+		component: string,
 	): string {
+		const params = component.split(';');
+		let type = params[0];
 		if (!type) {
 			throw new Error('Type is empty');
 		}
@@ -53,6 +55,7 @@ export class RFC9421SignatureBaseFactory {
 			}
 			throw new Error(`Invalid component type string: ${type}`);
 		}
+
 		if (type === '@signature-params') {
 			if (!this.signatureParams) {
 				throw new Error('signatureParams is not provided');
@@ -156,7 +159,7 @@ export function genRFC9421SignatureBase(
 			throw new Error('You request req component but req is not provided');
 		}
 
-		push(params[0], currentFactory.get(params[0], params));
+		push(params[0], currentFactory.get(component));
 	}
 
 	return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join('\n');
