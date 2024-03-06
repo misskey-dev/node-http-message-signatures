@@ -16,7 +16,7 @@ const responseBase = {
 	req: requestBase,
 	status: 200,
 	headers: {
-		Date: 'Tue, 07 Jun 2014 20:51:35 GMT',
+		Date: 'Tue, 07 Jun 2024 20:51:35 GMT',
 	},
 } as ResponseLike;
 
@@ -236,6 +236,20 @@ describe(RFC9421SignatureBaseFactory, () => {
 				expect(() => factory.get('example-dict', { key: 'c', sf: true } as any)).toThrow();
 			});
 		});
+		describe('response', () => {
+			test('header', () => {
+				const factory = new RFC9421SignatureBaseFactory(
+					responseBase,
+					tinySignatureInput,
+					undefined,
+					{},
+					tinySignatureInput,
+				);
+				expect(factory.get('date')).toBe('Tue, 07 Jun 2024 20:51:35 GMT');
+				expect(factory.get('@method', { req: true })).toBe('GET');
+				expect(factory.get('date', { req: true })).toBe('Tue, 07 Jun 2014 20:51:35 GMT');
+			});
+		});
 	});
 	describe('generate', () => {
 		test('request', () => {
@@ -252,6 +266,26 @@ describe(RFC9421SignatureBaseFactory, () => {
 			expect(factory.generate('sig1')).toBe(
 				`"date": ${requestBase.headers.Date}\n` +
 				`"@authority": example.com\n` +
+				`"@signature-params": ${sh.serializeInnerList(RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(input).get('sig1')!)}`
+			);
+		});
+		test('response', () => {
+			const input = {
+				sig1: [
+					[['date', {}], ['@authority', { req: true }]],
+					{ keyid: 'https://example.com/users/:id#main-key', algo: 'rsa-pss-sha512' },
+				],
+			} satisfies SFVSignatureInputDictionaryForInput;
+			const factory = new RFC9421SignatureBaseFactory(
+				responseBase,
+				tinySignatureInput,
+				undefined,
+				{},
+				input,
+			);
+			expect(factory.generate('sig1')).toBe(
+				`"date": ${responseBase.headers.Date}\n` +
+				`"@authority";req: example.com\n` +
 				`"@signature-params": ${sh.serializeInnerList(RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(input).get('sig1')!)}`
 			);
 		});

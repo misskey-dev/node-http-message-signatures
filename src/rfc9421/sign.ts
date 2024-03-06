@@ -20,21 +20,21 @@ export const sfvHeaderTypeDictionaryIKnow = {
 	'content-digest': 'dict',
 } satisfies SFVHeaderTypeDictionary;
 
+export const availableDerivedComponents = [
+	'@method',
+	'@authority',
+	'@scheme',
+	'@target-uri',
+	'@request-target',
+	'@path',
+	'@query',
+];
+
 /**
  * Class for creating signature base,
  * construct with a request or a response
  */
 export class RFC9421SignatureBaseFactory {
-	public static availableDerivedComponents: [
-		'@method',
-		'@authority',
-		'@scheme',
-		'@target-uri',
-		'@request-target',
-		'@path',
-		'@query',
-	];
-
 	public sfvTypeDictionary: SFVHeaderTypeDictionary;
 
 	public response: OutgoingResponse | null;
@@ -145,7 +145,7 @@ export class RFC9421SignatureBaseFactory {
 			throw new Error(`Invalid component type string: ${componentIdentifier}`);
 		}
 
-		if (this.isResponse() && RFC9421SignatureBaseFactory.availableDerivedComponents.includes(name as any)) {
+		if (this.isResponse() && params.get('req') !== true && availableDerivedComponents.includes(name as any)) {
 			throw new Error(`component is not available in response (must use with ;req, or provided object is unintentionally treated as response (existing req prop.)): ${name}`);
 		}
 
