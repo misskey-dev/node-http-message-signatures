@@ -1,5 +1,6 @@
 import type { SignInfo, SignatureHashAlgorithmUpperSnake } from './types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from './pem/spki.js';
+import type { webcrypto } from 'node:crypto';
 
 export async function getWebcrypto() {
 	return globalThis.crypto ?? (await import('node:crypto')).webcrypto;
@@ -83,15 +84,19 @@ export class KeyValidationError extends Error {
 	constructor(message: string) { super(message); }
 }
 
+export type SignInfoDefaults = {
+	hash: SignatureHashAlgorithmUpperSnake,
+	ec: 'DSA' | 'DH',
+};
+
+export const defaultSignInfoDefaults: SignInfoDefaults = {
+	hash: 'SHA-256',
+	ec: 'DSA',
+};
+
 export function genSignInfo(
 	parsed: ParsedAlgorithmIdentifier,
-	defaults: {
-		hash: SignatureHashAlgorithmUpperSnake,
-		ec: 'DSA' | 'DH',
-	} = {
-		hash: 'SHA-256',
-		ec: 'DSA',
-	}
+	defaults: SignInfoDefaults = defaultSignInfoDefaults,
 ): SignInfo {
 	const algorithm = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
 	if (!algorithm) throw new KeyValidationError('Unknown algorithm');
@@ -116,6 +121,20 @@ export function genSignInfo(
 		return { name: 'Ed448' };
 	}
 	throw new KeyValidationError('Unknown algorithm');
+}
+
+/**
+ * Generate algorithm for sign and verify from key algorithm and defaults,
+ * because algorithm of ECDSA and ECDH does not have hash property.
+ * @param algorithm
+ * @param defaults default values
+ * @returns
+ */
+export function genAlgorithmForSignAndVerify(algorithm: webcrypto.KeyAlgorithm, defaults: SignInfoDefaults = defaultSignInfoDefaults) {
+	return {
+		hash: defaults.hash,
+		...algorithm,
+	};
 }
 
 export function splitPer64Chars(str: string): string[] {

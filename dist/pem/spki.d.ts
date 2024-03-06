@@ -2,7 +2,7 @@
 import ASN1 from '@lapo/asn1js';
 import { ECNamedCurve, KeyAlgorithmName } from '../types';
 import type { webcrypto } from 'node:crypto';
-import { genSignInfo } from '../utils';
+import { SignInfoDefaults } from '../utils';
 export declare class SpkiParseError extends Error {
     constructor(message: string);
 }
@@ -101,4 +101,4 @@ export declare function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAl
  * @param defaults
  * @returns CryptoKey
  */
-export declare function importPublicKey(key: ASN1.StreamOrBinary, keyUsages?: webcrypto.KeyUsage[], defaults?: Parameters<typeof genSignInfo>[1]): Promise<webcrypto.CryptoKey>;
+export declare function importPublicKey(key: ASN1.StreamOrBinary, keyUsages?: webcrypto.KeyUsage[], defaults?: SignInfoDefaults): Promise<webcrypto.CryptoKey>;

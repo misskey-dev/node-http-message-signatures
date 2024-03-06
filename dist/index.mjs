@@ -165,9 +165,9 @@ function parsePublicKey(input) {
     }
   }
 }
-async function importPublicKey(key, keyUsages = ["verify"], defaults) {
+async function importPublicKey(key, keyUsages = ["verify"], defaults = defaultSignInfoDefaults) {
   const parsedPublicKey = parsePublicKey(key);
-  return await (await getWebcrypto()).subtle.importKey("spki", parsedPublicKey.der, genSignInfo(parsedPublicKey), false, keyUsages);
+  return await (await getWebcrypto()).subtle.importKey("spki", parsedPublicKey.der, genSignInfo(parsedPublicKey, defaults), false, keyUsages);
 }
 
 // src/utils.ts
@@ -226,10 +226,11 @@ var KeyValidationError = class extends Error {
     super(message);
   }
 };
-function genSignInfo(parsed, defaults = {
+var defaultSignInfoDefaults = {
   hash: "SHA-256",
   ec: "DSA"
-}) {
+};
+function genSignInfo(parsed, defaults = defaultSignInfoDefaults) {
   const algorithm = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
   if (!algorithm)
     throw new KeyValidationError("Unknown algorithm");
@@ -255,6 +256,12 @@ function genSignInfo(parsed, defaults = {
     return { name: "Ed448" };
   }
   throw new KeyValidationError("Unknown algorithm");
+}
+function genAlgorithmForSignAndVerify(algorithm, defaults = defaultSignInfoDefaults) {
+  return {
+    hash: defaults.hash,
+    ...algorithm
+  };
 }
 function splitPer64Chars(str) {
   const result = [];
@@ -293,7 +300,7 @@ function parsePkcs8(input) {
     attributesRaw: attributes ? asn1ToArrayBuffer(attributes) : null
   };
 }
-async function importPrivateKey(key, keyUsages = ["sign"], defaults) {
+async function importPrivateKey(key, keyUsages = ["sign"], defaults = defaultSignInfoDefaults) {
   const parsedPrivateKey = parsePkcs8(key);
   const importParams = genSignInfo(parsedPrivateKey, defaults);
   return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, false, keyUsages);
@@ -320,7 +327,7 @@ var keyHashAlgosForDraftDecoding = {
 function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
   const verifyHash = () => {
     if (!hashAlgorithm)
-      throw new Error(`hash is required`);
+      throw new Error(`hash is required or must not be null`);
     if (!(hashAlgorithm in keyHashAlgosForDraftEncofing))
       throw new Error(`unsupported hash: ${hashAlgorithm}`);
   };
@@ -370,19 +377,21 @@ function genDraftSigningString(request, includeHeaders, additional) {
   }
   return results.join("\n");
 }
-async function genDraftSignature(privateKey, signingString) {
-  const signatureAB = await (await getWebcrypto()).subtle.sign(privateKey.algorithm, privateKey, new TextEncoder().encode(signingString));
+async function genDraftSignature(privateKey, signingString, defaults = defaultSignInfoDefaults) {
+  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults), privateKey, new TextEncoder().encode(signingString));
   return encodeArrayBufferToBase64(signatureAB);
 }
 function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
   return `keyId="${keyId}",algorithm="${algorithm}",headers="${includeHeaders.join(" ")}",signature="${signature}"`;
 }
-async function signAsDraftToRequest(request, key, includeHeaders, opts = {}) {
-  const hash = opts?.hashAlgorithm || "SHA-256";
-  const privateKey = "privateKey" in key ? key.privateKey : await importPrivateKey(key.privateKeyPem, ["sign"], { hash, ec: "DSA" });
-  const algoString = getDraftAlgoString(privateKey.algorithm.name, hash);
+async function signAsDraftToRequest(request, key, includeHeaders, opts = defaultSignInfoDefaults) {
+  if (opts.hashAlgorithm) {
+    opts.hash = opts.hashAlgorithm;
+  }
+  const privateKey = "privateKey" in key ? key.privateKey : await importPrivateKey(key.privateKeyPem, ["sign"], opts);
+  const algoString = getDraftAlgoString(privateKey.algorithm.name, opts.hash);
   const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
-  const signature = await genDraftSignature(privateKey, signingString);
+  const signature = await genDraftSignature(privateKey, signingString, opts);
   const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, algoString);
   Object.assign(request.headers, {
     Signature: signatureHeader
@@ -868,10 +877,14 @@ function parseSignInfo(algorithm, parsed, errorLogger) {
 
 // src/draft/verify.ts
 var genSignInfoDraft = parseSignInfo;
-async function verifyDraftSignature(parsed, key, errorLogger) {
+async function verifyDraftSignature(parsed, key, p3, p4) {
+  const errorLogger = p3 && typeof p3 === "function" ? p3 : p4;
+  const defaults = p3 && typeof p3 === "object" ? p3 : defaultSignInfoDefaults;
   try {
     const publicKey = typeof key === "string" ? await importPublicKey(key, ["verify"]) : key;
-    const verify = await (await getWebcrypto()).subtle.verify(publicKey.algorithm, publicKey, decodeBase64ToUint8Array(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
+    const verify = await (await getWebcrypto()).subtle.verify(genAlgorithmForSignAndVerify(publicKey.algorithm, defaults), publicKey, decodeBase64ToUint8Array(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
+    if (verify !== true)
+      throw new Error(`verification simply failed, result: ${verify}`);
     return verify;
   } catch (e) {
     if (errorLogger)
@@ -898,11 +911,13 @@ export {
   checkClockSkew,
   decodeBase64ToUint8Array,
   decodePem,
+  defaultSignInfoDefaults,
   digestHeaderRegEx,
   encodeArrayBufferToBase64,
   exportPrivateKeyPem,
   exportPublicKeyPem,
   genASN1Length,
+  genAlgorithmForSignAndVerify,
   genDraftSignature,
   genDraftSignatureHeader,
   genDraftSigningString,

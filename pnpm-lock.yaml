@@ -55,6 +55,9 @@ devDependencies:
   jest:
     specifier: ^29.7.0
     version: 29.7.0(@types/node@20.11.20)
+  jest-mock:
+    specifier: ^29.7.0
+    version: 29.7.0
   typescript:
     specifier: ^5.3.3
     version: 5.3.3

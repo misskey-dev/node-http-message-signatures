@@ -4,7 +4,7 @@ import Base64 from '@lapo/asn1js/base64.js';
 import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1';
 import { ECNamedCurve, KeyAlgorithmName } from '../types';
 import type { webcrypto } from 'node:crypto';
-import { genSignInfo, getWebcrypto } from '../utils';
+import { SignInfoDefaults, defaultSignInfoDefaults, genSignInfo, getWebcrypto } from '../utils';
 
 export class SpkiParseError extends Error {
 	constructor(message: string) { super(message); }
@@ -200,7 +200,7 @@ export function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmI
  * @param defaults
  * @returns CryptoKey
  */
-export async function importPublicKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.KeyUsage[] = ['verify'], defaults?: Parameters<typeof genSignInfo>[1]) {
+export async function importPublicKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.KeyUsage[] = ['verify'], defaults: SignInfoDefaults = defaultSignInfoDefaults) {
 	const parsedPublicKey = parsePublicKey(key);
-	return await (await getWebcrypto()).subtle.importKey('spki', parsedPublicKey.der, genSignInfo(parsedPublicKey), false, keyUsages);
+	return await (await getWebcrypto()).subtle.importKey('spki', parsedPublicKey.der, genSignInfo(parsedPublicKey, defaults), false, keyUsages);
 }

@@ -1,6 +1,6 @@
 import ASN1 from '@lapo/asn1js';
 import { ParsedAlgorithmIdentifierBase, asn1ToArrayBuffer, decodePem, parseAlgorithmIdentifier } from './spki.js';
-import { genSignInfo, getWebcrypto } from '../utils.js';
+import { SignInfoDefaults, defaultSignInfoDefaults, genSignInfo, getWebcrypto } from '../utils.js';
 import type { webcrypto } from 'node:crypto';
 
 export class Pkcs8ParseError extends Error {
@@ -58,7 +58,7 @@ export function parsePkcs8(input: ASN1.StreamOrBinary): ParsedPkcs8 {
  * @param defaults
  * @returns CryptoKey
  */
-export async function importPrivateKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.KeyUsage[] = ['sign'], defaults?: Parameters<typeof genSignInfo>[1]) {
+export async function importPrivateKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.KeyUsage[] = ['sign'], defaults: SignInfoDefaults = defaultSignInfoDefaults) {
 	const parsedPrivateKey = parsePkcs8(key);
 	const importParams = genSignInfo(parsedPrivateKey, defaults);
 	return await (await getWebcrypto()).subtle.importKey('pkcs8', parsedPrivateKey.der, importParams, false, keyUsages);

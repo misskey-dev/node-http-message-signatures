@@ -1,7 +1,8 @@
 /// <reference types="node" />
 import type { SignInfo, SignatureHashAlgorithmUpperSnake } from './types.js';
 import { ParsedAlgorithmIdentifier } from './pem/spki.js';
-export declare function getWebcrypto(): Promise<import("crypto").webcrypto.Crypto>;
+import type { webcrypto } from 'node:crypto';
+export declare function getWebcrypto(): Promise<webcrypto.Crypto>;
 /**
  * Convert object keys to lowercase
  */
@@ -35,8 +36,21 @@ export declare function decodeBase64ToUint8Array(base64: string): Uint8Array;
 export declare class KeyValidationError extends Error {
     constructor(message: string);
 }
-export declare function genSignInfo(parsed: ParsedAlgorithmIdentifier, defaults?: {
+export type SignInfoDefaults = {
     hash: SignatureHashAlgorithmUpperSnake;
     ec: 'DSA' | 'DH';
-}): SignInfo;
+};
+export declare const defaultSignInfoDefaults: SignInfoDefaults;
+export declare function genSignInfo(parsed: ParsedAlgorithmIdentifier, defaults?: SignInfoDefaults): SignInfo;
+/**
+ * Generate algorithm for sign and verify from key algorithm and defaults,
+ * because algorithm of ECDSA and ECDH does not have hash property.
+ * @param algorithm
+ * @param defaults default values
+ * @returns
+ */
+export declare function genAlgorithmForSignAndVerify(algorithm: webcrypto.KeyAlgorithm, defaults?: SignInfoDefaults): {
+    name: string;
+    hash: SignatureHashAlgorithmUpperSnake;
+};
 export declare function splitPer64Chars(str: string): string[];
