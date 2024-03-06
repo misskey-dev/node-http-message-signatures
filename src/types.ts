@@ -17,7 +17,6 @@ export type ResponseLike = {
 	 * If 'req' is set, the object treated as a response
 	 */
 	req: RequestLike;
-	url: string;
 	headers: Record<string, string>;
 	body?: string;
 	trailers?: Record<string, string>;
@@ -25,7 +24,6 @@ export type ResponseLike = {
 
 export type IncomingRequest = RequestLike | IncomingMessage | Http2ServerRequest;
 export type OutgoingResponse = ResponseLike | OutgoingMessage | Http2ServerResponse;
-export type IncomingOrOutgoing = RequestLike | IncomingMessage | Http2ServerRequest | OutgoingMessage | Http2ServerResponse;
 
 export type ClockSkewSettings = {
 	/**

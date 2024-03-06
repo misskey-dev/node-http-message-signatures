@@ -2,7 +2,7 @@
 // TODO
 
 import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getLc, lcObjectKey } from "../utils";
-import { IncomingOrOutgoing, IncomingRequest, OutgoingResponse } from "../types";
+import { IncomingRequest, OutgoingResponse } from "../types";
 import * as sh from "structured-headers";
 
 /**
@@ -31,8 +31,8 @@ export class RFC9421SignatureBaseFactory {
 	];
 
 	public sfvTypeDictionary: SFVTypeDictionary;
-	public response: OutgoingResponse | null;
 
+	public response: OutgoingResponse | null;
 	public isRequest() {
 		return this.response === null;
 	}
@@ -46,7 +46,7 @@ export class RFC9421SignatureBaseFactory {
 	public targetUri: string;
 	public url: URL;
 	constructor(
-		source: IncomingOrOutgoing,
+		source: IncomingRequest | OutgoingResponse,
 		/**
 		 * Must be signature params of the request
 		 */
@@ -267,7 +267,7 @@ export function genRFC9421SignatureBase(
 	/**
 	 * Request or response to sign
 	 */
-	requestOrResponse: IncomingOrOutgoing,
+	requestOrResponse: IncomingRequest | OutgoingResponse,
 
 	/**
 	 * Components to include in the signature string
