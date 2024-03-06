@@ -15,15 +15,15 @@ export async function verifyRFC3230DigestHeader(
 	errorLogger?: ((message: any) => any)
 ) {
 	let digestHeader = getHeaderValue(request.headers, 'digest');
+	if (Array.isArray(digestHeader)) {
+		digestHeader = digestHeader[0];
+	}
 	if (!digestHeader) {
 		if (failOnNoDigest) {
 			if (errorLogger) errorLogger('Digest header not found');
 			return false;
 		}
 		return true;
-	}
-	if (Array.isArray(digestHeader)) {
-		digestHeader = digestHeader[0];
 	}
 
 	const match = digestHeader.match(digestHeaderRegEx);
