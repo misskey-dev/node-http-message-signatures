@@ -1,6 +1,7 @@
 import { RequestLike, ResponseLike } from '../types';
 import { RFC9421SignatureBaseFactory } from './sign';
 
+const tinySignatureInput = `x=(x)`;
 const requestBase = {
 	method: 'GET',
 	url: 'https://example.com/resource/1',
@@ -23,6 +24,7 @@ describe(RFC9421SignatureBaseFactory, () => {
 		test('request basic', () => {
 			const factory = new RFC9421SignatureBaseFactory(
 				requestBase,
+				tinySignatureInput,
 			);
 			expect(factory).toBeInstanceOf(RFC9421SignatureBaseFactory);
 			expect(factory.request).toBe(requestBase);
@@ -43,6 +45,7 @@ describe(RFC9421SignatureBaseFactory, () => {
 			} satisfies RequestLike;
 			const factory = new RFC9421SignatureBaseFactory(
 				request,
+				tinySignatureInput,
 			);
 
 			expect(factory.scheme).toBe('https');
@@ -53,6 +56,10 @@ describe(RFC9421SignatureBaseFactory, () => {
 		test('response basic', () => {
 			const factory = new RFC9421SignatureBaseFactory(
 				responseBase,
+				tinySignatureInput,
+				undefined,
+				{},
+				tinySignatureInput
 			);
 			expect(factory).toBeInstanceOf(RFC9421SignatureBaseFactory);
 			expect(factory.request).toBe(requestBase);
@@ -65,5 +72,9 @@ describe(RFC9421SignatureBaseFactory, () => {
 			expect(factory.targetUri).toBe('https://example.com/resource/1');
 			expect(factory.url.href).toBe('https://example.com/resource/1');
 		});
+	});
+
+	describe('get', () => {
+
 	});
 });

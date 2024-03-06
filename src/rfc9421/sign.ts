@@ -6,13 +6,20 @@ import { IncomingRequest, OutgoingResponse } from "../types";
 import * as sh from "structured-headers";
 
 /**
+ * sh.InnerList
+ * @examples [["@method", Map([])], Map({keyid: "x", algo: ""})]
+ */
+export type SFVSignatureParams = [[string, sh.Parameters][], Map<string, string | boolean>];
+export type SFVSignatureInputDictionary = Map<string, SFVSignatureParams>;
+
+/**
  * Structured Field Value Type Dictionary
  * https://datatracker.ietf.org/doc/html/rfc8941
  *
  * key: field (header) name
  * value: item, list, dict
  */
-export type SFVTypeDictionary = Record<string, 'item' | 'list' | 'dict'>
+export type SFVHeaderTypeDictionary = Record<string, 'item' | 'list' | 'dict'>
 
 /**
  * Class for creating signature base,
@@ -30,7 +37,7 @@ export class RFC9421SignatureBaseFactory {
 		'@query',
 	];
 
-	public sfvTypeDictionary: SFVTypeDictionary;
+	public sfvTypeDictionary: SFVHeaderTypeDictionary;
 
 	public response: OutgoingResponse | null;
 	public isRequest() {
@@ -45,18 +52,20 @@ export class RFC9421SignatureBaseFactory {
 	public scheme: string;
 	public targetUri: string;
 	public url: URL;
+	public requestSignatureInput: SFVSignatureInputDictionary | undefined;
+	public responseSignatureInput: SFVSignatureInputDictionary | undefined;
 	constructor(
 		source: IncomingRequest | OutgoingResponse,
 		/**
 		 * Must be signature params of the request
 		 */
-		public requestSignatureParams?: string,
+		requestSignatureParams?: sh.Dictionary | string,
 		scheme: string = 'https',
-		sfvTypeDictionary: SFVTypeDictionary = {},
+		sfvTypeDictionary: SFVHeaderTypeDictionary = {},
 		/**
 		 * Set if provided object is response
 		 */
-		public responseSignatureParams?: string,
+		responseSignatureParams?: sh.Dictionary | string,
 	) {
 		if ('req' in source) {
 			this.response = source;
@@ -73,6 +82,19 @@ export class RFC9421SignatureBaseFactory {
 			throw new Error('Request method is empty');
 		}
 
+		this.requestSignatureInput = typeof requestSignatureParams === 'string' ?
+			sh.parseDictionary(requestSignatureParams) as SFVSignatureInputDictionary
+			: requestSignatureParams as SFVSignatureInputDictionary;
+		if (this.isRequest() && !this.requestSignatureInput) {
+			throw new Error('requestSignatureParams is not provided');
+		}
+		this.responseSignatureInput = typeof responseSignatureParams === 'string' ?
+			sh.parseDictionary(responseSignatureParams) as SFVSignatureInputDictionary
+			: responseSignatureParams as SFVSignatureInputDictionary;
+		if (this.isResponse() && !this.responseSignatureInput) {
+			throw new Error('responseSignatureParams is not provided');
+		}
+
 		this.requestHeaders = lcObjectKey(('headersDistinct' in this.request && this.request.headersDistinct) ? this.request.headersDistinct : this.request.headers);
 
 		this.sfvTypeDictionary = lcObjectKey(sfvTypeDictionary);
@@ -85,16 +107,12 @@ export class RFC9421SignatureBaseFactory {
 		this.url = new URL(this.targetUri);
 	}
 
-	/**
-	 * Return component value from component type and parameters
-	 * @param componentIdentifier e.g. '"@query-param";name="foo"', '@method', 'content-digest'
-	 * @returns component value
-	 */
 	public get(
-		componentIdentifier: string,
+		name: string,
+		params: sh.Parameters = new Map(),
+		keyParams?: SFVSignatureParams,
 	): string {
-		const params = componentIdentifier.split(';');
-		let name = params[0];
+		const componentIdentifier = sh.serializeItem([name, params]);
 		if (!name) {
 			throw new Error(`Type is empty: ${componentIdentifier}`);
 		}
@@ -111,24 +129,17 @@ export class RFC9421SignatureBaseFactory {
 			}
 		}
 
-		const isReq = this.isRequest() || params.includes('req'); // Request
+		const isReq = this.isRequest() || params.get('req') === true; // Request
 
 		if (isReq && this.isRequest()) {
 			throw new Error('req param is not available in request (provided object is treated as request, please set req param with Request)');
 		}
 
 		if (name === '@signature-params') {
-			if (isReq) {
-				if (!this.requestSignatureParams) {
-					throw new Error('requestSignatureParams is not provided');
-				}
-				return this.requestSignatureParams;
-			} else {
-				if (!this.responseSignatureParams) {
-					throw new Error('signatureParams is not provided');
-				}
-				return this.responseSignatureParams;
+			if (!keyParams) {
+				throw new Error('requestSignatureParams is not provided');
 			}
+			return sh.serializeInnerList(keyParams);
 		} else if (name === '@method') {
 			if (!this.request.method) {
 				throw new Error('Request method is empty');
@@ -150,23 +161,23 @@ export class RFC9421SignatureBaseFactory {
 		} else if (name === '@query') {
 			return this.url.search;
 		} else if (name === '@query-param') {
-			const key = params.find(x => x.startsWith('name="') && x.endsWith('"'))?.slice(6, -1);
-			if (!key) {
+			const key = params.get('name');
+			if (key === undefined) {
 				throw new Error('Query parameter name not found or invalid');
 			}
-			const value = this.url.searchParams.get(key);
+			const value = this.url.searchParams.get(key.toString());
 			if (value === null) {
-				throw new Error(`Query parameter not found: ${key}`);
+				throw new Error(`Query parameter not found: ${key} (${componentIdentifier})`);
 			}
 			return value;
 		} else if (name.startsWith('@')) {
 			throw new Error(`Unknown derived component: ${name}`);
 		} else {
 			// https://datatracker.ietf.org/doc/html/rfc9421#section-2.1
-			const keyParam = params.find(x => x.startsWith('key="'));
-			const isSf = params.includes('sf'); // Structed Field
-			const isBs = params.includes('bs'); // Binary-Wrapped
-			const isTr = params.includes('tr'); // Trailer
+			const key = params.get('key') as string;
+			const isSf = params.get('sf') === true; // Structed Field
+			const isBs = params.get('bs') === true; // Binary-Wrapped
+			const isTr = params.get('tr') === true; // Trailer
 
 			if (isSf && isBs) {
 				throw new Error(`Invalid component: ${componentIdentifier} (sf and bs cannot be used together)`);
@@ -219,18 +230,14 @@ export class RFC9421SignatureBaseFactory {
 				}
 			}
 
-			if (keyParam) {
+			if (key) {
 				// https://datatracker.ietf.org/doc/html/rfc9421#name-dictionary-structured-field
 				if (!(name in this.sfvTypeDictionary)) {
 					throw new Error(`key specified but type unknown (Type not found in SFV type dictionary): ${componentIdentifier}`);
 				}
-				if (!keyParam.endsWith('"')) {
-					throw new Error(`Invalid key param: ${params.join(';')}`);
-				}
 				if (typeof rawValue !== 'string') {
 					throw new Error(`Key specified but value is not a string: ${componentIdentifier}`);
 				}
-				const key = keyParam.slice(5, -1);
 				if (this.sfvTypeDictionary[name] === 'dict') {
 					const dictionary = sh.parseDictionary(rawValue);
 					const value = dictionary.get(key);
@@ -261,60 +268,46 @@ export class RFC9421SignatureBaseFactory {
 			return canonicalizeHeaderValue(rawValue);
 		}
 	}
-}
 
-export function genRFC9421SignatureBase(
-	/**
-	 * Request or response to sign
-	 */
-	requestOrResponse: IncomingRequest | OutgoingResponse,
-
-	/**
-	 * Components to include in the signature string
-	 *
-	 * @examples
-	 * ```
-	 * [
-	 * 	'@method', // derived component
-	 *	'content-digest', // header
-	 *	'"content-digest";req' // req
-	 *  '"@query-param";name="foo"' // query param
-	 * ]
-	 * ```
-	 */
-	includeComponents: string[],
-	data?: {
-		signatureParams?: string;
-		requestSignatureParams?: string;
-		/**
-		 * Fallback scheme, e.g. 'https'
-		 */
-		scheme?: string;
-		sfvTypeDictionary?: SFVTypeDictionary;
-	},
-) {
-	const factory = new RFC9421SignatureBaseFactory(requestOrResponse, data?.signatureParams, data?.scheme, data?.sfvTypeDictionary);
-
-	const results = new Map<string, string>();
-	const push = (key: string, value = '') => {
-		if (results.has(key)) {
-			throw new Error(`Duplicate key: ${key}`);
+	public generate(label: string): string {
+		const item = this.isRequest() ? this.requestSignatureInput?.get(label) : this.responseSignatureInput?.get(label);
+		if (!item) {
+			throw new Error(`label not found: ${label}`);
+		}
+		if (!Array.isArray(item[0])) {
+			throw new Error(`Invalid item: ${label}`);
 		}
 
-		if (key.startsWith('"')) {
-			results.set(key, value);
-		} else {
-			results.set(`"${key}"`, value ?? factory.get(key));
+		const results = new Map<string, string>();
+		for (const component of item[0]) {
+			let name = component[0];
+			if (name.startsWith('"')) {
+				if (name.endsWith('"')) {
+					// Remove double quotes
+					name = name.slice(1, -1);
+				}
+				throw new Error(`Invalid component identifier name: ${name}`);
+			}
+			component[0] = `"${name}"`; // Wrap with double quotes
+			const componentIdentifier = sh.serializeItem(component);
+			if (results.has(componentIdentifier)) {
+				throw new Error(`Duplicate key: ${name}`);
+			}
+			if (name === '@signature-params') {
+				if (this.isRequest() || component[1].get('req') === true) {
+					results.set(componentIdentifier, this.get(name, component[1], item));
+				} else {
+					const responstItem = this.responseSignatureInput?.get(label);
+					if (!responstItem) {
+						throw new Error(`could not find a parameter from response signature input (${name})`);
+					}
+					results.set(componentIdentifier, this.get(name, component[1]));
+				}
+			} else {
+				results.set(componentIdentifier, this.get(name, component[1]));
+			}
 		}
-	};
 
-	for (const componentIdentifier of includeComponents.map(x => x.toLowerCase())) {
-		const params = componentIdentifier.split(';');
-		if (!params[0]) {
-			throw new Error('Component identifier is empty');
-		}
-		push(params[0], factory.get(componentIdentifier));
+		return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join('\n');
 	}
-
-	return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join('\n');
 }

@@ -127,6 +127,7 @@ export type ParsedRFC9421SignatureValue = {
 	keyid: string;
 
 	/**
+	 * alg
 	 * @example 'rsa-v1_5-sha256'
 	 */
 	algorithm: string;
@@ -136,6 +137,11 @@ export type ParsedRFC9421SignatureValue = {
 	 */
 	components: string[];
 
+	created?: number;
+	expires?: number;
+}
+
+export type ParsedRFC9421SignatureValueWithBase = ParsedRFC9421SignatureValue & {
 	/**
 	 * @example
 	 * ```
@@ -146,12 +152,12 @@ export type ParsedRFC9421SignatureValue = {
 	 * ```
 	 */
 	base: string;
-}
+};
 
 export type ParsedRFC9421Signature = {
 	version: 'rfc9421';
 
-	value: ParsedRFC9421SignatureValue[];
+	value: ParsedRFC9421SignatureValueWithBase[];
 }
 
 export type ParsedSignature = ParsedDraftSignature | ParsedRFC9421Signature;
