@@ -1,4 +1,4 @@
-import type { IncomingMessage, OutgoingMessage } from "http";
+import type { IncomingMessage, ServerResponse } from "http";
 import type { Http2ServerRequest, Http2ServerResponse } from "http2";
 import type { webcrypto } from "node:crypto";
 
@@ -13,6 +13,7 @@ export type RequestLike = {
 };
 
 export type ResponseLike = {
+	statusCode: number;
 	/**
 	 * If 'req' is set, the object treated as a response
 	 */
@@ -23,7 +24,7 @@ export type ResponseLike = {
 }
 
 export type IncomingRequest = RequestLike | IncomingMessage | Http2ServerRequest;
-export type OutgoingResponse = ResponseLike | OutgoingMessage | Http2ServerResponse;
+export type OutgoingResponse = ResponseLike | ServerResponse | Http2ServerResponse;
 
 export type ClockSkewSettings = {
 	/**

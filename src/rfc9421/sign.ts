@@ -20,7 +20,8 @@ export const sfvHeaderTypeDictionaryIKnow = {
 	'content-digest': 'dict',
 } satisfies SFVHeaderTypeDictionary;
 
-export const availableDerivedComponents = [
+// https://datatracker.ietf.org/doc/html/rfc9421#name-initial-contents-3
+export const requestTargetDerivedComponents = [
 	'@method',
 	'@authority',
 	'@scheme',
@@ -28,6 +29,10 @@ export const availableDerivedComponents = [
 	'@request-target',
 	'@path',
 	'@query',
+];
+// https://datatracker.ietf.org/doc/html/rfc9421#name-initial-contents-3
+export const responseTargetDerivedComponents = [
+	'@status',
 ];
 
 /**
@@ -141,12 +146,16 @@ export class RFC9421SignatureBaseFactory {
 		if (name.startsWith('"')) {
 			if (name.endsWith('"')) {
 				name = name.slice(1, -1);
+			} else {
+				throw new Error(`Invalid component type string: ${componentIdentifier}`);
 			}
-			throw new Error(`Invalid component type string: ${componentIdentifier}`);
 		}
 
-		if (this.isResponse() && params.get('req') !== true && availableDerivedComponents.includes(name as any)) {
+		if (this.isResponse() && params.get('req') !== true && requestTargetDerivedComponents.includes(name)) {
 			throw new Error(`component is not available in response (must use with ;req, or provided object is unintentionally treated as response (existing req prop.)): ${name}`);
+		}
+		if (this.isRequest() && responseTargetDerivedComponents.includes(name)) {
+			throw new Error(`component is not available in request (provided object is unintentionally treated as request (including req prop.)): ${name}`);
 		}
 
 		if (this.isRequest() && params.get('req') === true) {
@@ -187,6 +196,9 @@ export class RFC9421SignatureBaseFactory {
 				throw new Error(`Query parameter not found: ${key} (${componentIdentifier})`);
 			}
 			return value;
+		} else if (name === '@status') {
+			if (!this.response) throw new Error('response is empty (@status)');
+			return this.response.statusCode.toString();
 		} else if (name.startsWith('@')) {
 			throw new Error(`Unknown derived component: ${name}`);
 		} else {
@@ -203,7 +215,10 @@ export class RFC9421SignatureBaseFactory {
 			const rawValue: string | number | string[] | undefined = (() => {
 				if (isReq) {
 					if (isTr) {
-						return ('trailers' in this.request && this.request.trailers) ? getLc(this.request.trailers, name) : this.requestHeaders[name];
+						if ('trailers' in this.request && this.request.trailers) {
+							return getLc(this.request.trailers, name);
+						}
+						throw new Error(`Trailers not found in request object (${componentIdentifier})`);
 					} else {
 						return this.requestHeaders[name];
 					}
@@ -221,7 +236,10 @@ export class RFC9421SignatureBaseFactory {
 						throw new Error('cannot get header value from response object');
 					};
 					if (isTr) {
-						return ('trailers' in this.response && this.response.trailers) ? getLc(this.response.trailers, name) : getHeaderValue(name);
+						if ('trailers' in this.response && this.response.trailers) {
+							return getLc(this.response.trailers, name);
+						}
+						throw new Error(`Trailers not found in response object (${componentIdentifier})`);
 					} else {
 						return getHeaderValue(name);
 					}
@@ -302,8 +320,9 @@ export class RFC9421SignatureBaseFactory {
 				if (name.endsWith('"')) {
 					// Remove double quotes
 					name = name.slice(1, -1);
+				} else {
+					throw new Error(`Invalid component identifier name: ${name}`);
 				}
-				throw new Error(`Invalid component identifier name: ${name}`);
 			}
 			component[0] = name; // Must be wrapped with double quotes while serializing
 			const componentIdentifier = sh.serializeItem(component);

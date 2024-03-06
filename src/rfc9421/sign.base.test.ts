@@ -14,7 +14,7 @@ const requestBase = {
 
 const responseBase = {
 	req: requestBase,
-	status: 200,
+	statusCode: 200,
 	headers: {
 		Date: 'Tue, 07 Jun 2024 20:51:35 GMT',
 	},
@@ -115,6 +115,7 @@ describe(RFC9421SignatureBaseFactory, () => {
 				);
 				expect(() => factory.get('@signature-params')).toThrow();
 				expect(factory.get('@method')).toBe('GET');
+				expect(factory.get('"@method"')).toBe('GET');
 				expect(factory.get('@authority')).toBe('example.com');
 				expect(factory.get('@scheme')).toBe('https');
 				expect(factory.get('@target-uri')).toBe('https://example.com/resource/1');
@@ -146,6 +147,20 @@ describe(RFC9421SignatureBaseFactory, () => {
 
 				expect(factory.get('host', { bs: true })).toBe(':ZXhhbXBsZS5jb20=:');
 				expect(() => factory.get('host', { bs: true, sf: true })).toThrow();
+			});
+			test('trailer', () => {
+				const request = {
+					...requestBase,
+					trailers: {
+						'x-trailer': 'value',
+					},
+				} as RequestLike;
+				const factory = new RFC9421SignatureBaseFactory(
+					request,
+					tinySignatureInput,
+				);
+				expect(factory.get('x-trailer', { tr: true })).toBe('value');
+				expect(() => factory.get('date', { tr: true })).toThrow(`Header not found: "date";tr`);
 			});
 			test('header canonicalization', () => {
 				const request = {
@@ -247,6 +262,7 @@ describe(RFC9421SignatureBaseFactory, () => {
 				);
 				expect(factory.get('date')).toBe('Tue, 07 Jun 2024 20:51:35 GMT');
 				expect(factory.get('@method', { req: true })).toBe('GET');
+				expect(factory.get('@status')).toBe('200');
 				expect(factory.get('date', { req: true })).toBe('Tue, 07 Jun 2014 20:51:35 GMT');
 			});
 		});
