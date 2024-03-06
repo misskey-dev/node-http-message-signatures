@@ -117,6 +117,23 @@ describe('draft', () => {
 			});
 		});
 
+		describe('rsa-sha512', () => {
+			const key = {
+				privateKeyPem: keys.rsa4096.privateKey,
+				keyId: 'https://example.com/users/012345678abcdef#main-key',
+			};
+			test('sign and verify', async () => {
+				const request = getBasicOutgoingRequest();
+				await signAsDraftToRequest(request, key, basicIncludeHeaders, { hash: 'SHA-512', ec: 'DSA' });
+				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
+				expect(parsed.version).toBe('draft');
+				if (parsed.version !== 'draft') return;
+				expect(parsed.value.algorithm).toBe('RSA-SHA512');
+				const verifyResult = await verifyDraftSignature(parsed.value, keys.rsa4096.publicKey, errorLogger);
+				expect(verifyResult).toBe(true);
+			});
+		});
+
 		describe('ed25519', () => {
 			const key = {
 				privateKeyPem: keys.ed25519.privateKey,
