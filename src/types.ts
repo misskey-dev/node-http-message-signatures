@@ -122,6 +122,17 @@ export type ParsedDraftSignature = {
 	};
 };
 
+/**
+ * sh.InnerList
+ * @examples [["@method", Map([])], Map({keyid: "x", algo: ""})]
+ */
+export type SFVSignatureParams = [[string, Map<string, string | boolean>][], Map<string, string | boolean>];
+
+/**
+ * Result of `sh.parseDictionary('(value of signateure-input)')`
+ */
+export type SFVSignatureInputDictionary = Map<string, SFVSignatureParams>;
+
 export type ParsedRFC9421SignatureValue = {
 	label: string,
 	keyid: string;

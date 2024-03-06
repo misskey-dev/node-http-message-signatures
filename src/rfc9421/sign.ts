@@ -2,15 +2,8 @@
 // TODO
 
 import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getLc, lcObjectKey } from "../utils";
-import { IncomingRequest, OutgoingResponse } from "../types";
+import { IncomingRequest, OutgoingResponse, SFVSignatureParams, SFVSignatureInputDictionary } from "../types";
 import * as sh from "structured-headers";
-
-/**
- * sh.InnerList
- * @examples [["@method", Map([])], Map({keyid: "x", algo: ""})]
- */
-export type SFVSignatureParams = [[string, sh.Parameters][], Map<string, string | boolean>];
-export type SFVSignatureInputDictionary = Map<string, SFVSignatureParams>;
 
 /**
  * Structured Field Value Type Dictionary
@@ -27,7 +20,6 @@ export type SFVHeaderTypeDictionary = Record<string, 'item' | 'list' | 'dict'>
  */
 export class RFC9421SignatureBaseFactory {
 	public static availableDerivedComponents: [
-		'@signature-params',
 		'@method',
 		'@authority',
 		'@scheme',
@@ -124,9 +116,7 @@ export class RFC9421SignatureBaseFactory {
 		}
 
 		if (this.isResponse() && RFC9421SignatureBaseFactory.availableDerivedComponents.includes(name as any)) {
-			if (name !== '@signature-params') {
-				throw new Error(`component is not available in response (must use with ;req, or provided object is unintentionally treated as response (existing req prop.)): ${name}`);
-			}
+			throw new Error(`component is not available in response (must use with ;req, or provided object is unintentionally treated as response (existing req prop.)): ${name}`);
 		}
 
 		const isReq = this.isRequest() || params.get('req') === true; // Request
@@ -136,10 +126,7 @@ export class RFC9421SignatureBaseFactory {
 		}
 
 		if (name === '@signature-params') {
-			if (!keyParams) {
-				throw new Error('requestSignatureParams is not provided');
-			}
-			return sh.serializeInnerList(keyParams);
+			throw new Error(`@signature-params is not available in get method: ${componentIdentifier}`);
 		} else if (name === '@method') {
 			if (!this.request.method) {
 				throw new Error('Request method is empty');
@@ -293,20 +280,10 @@ export class RFC9421SignatureBaseFactory {
 			if (results.has(componentIdentifier)) {
 				throw new Error(`Duplicate key: ${name}`);
 			}
-			if (name === '@signature-params') {
-				if (this.isRequest() || component[1].get('req') === true) {
-					results.set(componentIdentifier, this.get(name, component[1], item));
-				} else {
-					const responstItem = this.responseSignatureInput?.get(label);
-					if (!responstItem) {
-						throw new Error(`could not find a parameter from response signature input (${name})`);
-					}
-					results.set(componentIdentifier, this.get(name, component[1], responstItem));
-				}
-			} else {
-				results.set(componentIdentifier, this.get(name, component[1]));
-			}
+			results.set(componentIdentifier, this.get(name, component[1]));
 		}
+
+		results.set('"@signature-params"', sh.serializeInnerList(item));
 
 		return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join('\n');
 	}
