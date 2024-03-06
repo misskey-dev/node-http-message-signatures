@@ -65,7 +65,7 @@ export class RFC9421SignatureBaseFactory {
 		 */
 		responseSignatureParams?: SFVSignatureInputDictionaryForInput | string,
 	) {
-		this.sfvTypeDictionary = { ...sfvHeaderTypeDictionaryIKnow, ...additionalSfvTypeDictionary };
+		this.sfvTypeDictionary = lcObjectKey({ ...sfvHeaderTypeDictionaryIKnow, ...additionalSfvTypeDictionary });
 
 		if ('req' in source) {
 			this.response = source;
