@@ -1,8 +1,8 @@
 
 // TODO
 
-import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getLc, lcObjectKey } from "../utils";
-import { IncomingRequest, OutgoingResponse, SFVSignatureInputDictionary } from "../types";
+import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getLc, lcObjectKey, getMap } from "../utils";
+import { IncomingRequest, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput } from "../types";
 import * as sh from "structured-headers";
 
 /**
@@ -51,13 +51,13 @@ export class RFC9421SignatureBaseFactory {
 		/**
 		 * Must be signature params of the request
 		 */
-		requestSignatureParams?: sh.Dictionary | string,
+		requestSignatureParams?: SFVSignatureInputDictionaryForInput | string,
 		scheme: string = 'https',
 		sfvTypeDictionary: SFVHeaderTypeDictionary = {},
 		/**
 		 * Set if provided object is response
 		 */
-		responseSignatureParams?: sh.Dictionary | string,
+		responseSignatureParams?: SFVSignatureInputDictionaryForInput | string,
 	) {
 		if ('req' in source) {
 			this.response = source;
@@ -76,13 +76,13 @@ export class RFC9421SignatureBaseFactory {
 
 		this.requestSignatureInput = typeof requestSignatureParams === 'string' ?
 			sh.parseDictionary(requestSignatureParams) as SFVSignatureInputDictionary
-			: requestSignatureParams as SFVSignatureInputDictionary;
+			: (requestSignatureParams && RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(requestSignatureParams));
 		if (this.isRequest() && !this.requestSignatureInput) {
 			throw new Error('requestSignatureParams is not provided');
 		}
 		this.responseSignatureInput = typeof responseSignatureParams === 'string' ?
 			sh.parseDictionary(responseSignatureParams) as SFVSignatureInputDictionary
-			: responseSignatureParams as SFVSignatureInputDictionary;
+			: (responseSignatureParams && RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(responseSignatureParams));
 		if (this.isResponse() && !this.responseSignatureInput) {
 			throw new Error('responseSignatureParams is not provided');
 		}
@@ -99,10 +99,25 @@ export class RFC9421SignatureBaseFactory {
 		this.url = new URL(this.targetUri);
 	}
 
+	static inputSignatureParamsDictionary(input: SFVSignatureInputDictionaryForInput): SFVSignatureInputDictionary {
+		const output = getMap(input) as unknown as SFVSignatureInputDictionary;
+		for (const [label, item] of output) {
+			if (Array.isArray(item)) {
+				const [components, params] = item;
+				for (let i = 0; i < components.length; i++) {
+					components[i][1] = getMap(components[i][1]);
+				}
+				output.set(label, [components, getMap(params)]);
+			}
+		}
+		return output;
+	}
+
 	public get(
 		name: string,
-		params: sh.Parameters = new Map(),
+		paramsLike: sh.Parameters | SFVParametersLike = new Map(),
 	): string {
+		const params = getMap(paramsLike) as Map<string, sh.BareItem>;
 		const componentIdentifier = sh.serializeItem([name, params]);
 		if (!name) {
 			throw new Error(`Type is empty: ${componentIdentifier}`);
@@ -118,11 +133,11 @@ export class RFC9421SignatureBaseFactory {
 			throw new Error(`component is not available in response (must use with ;req, or provided object is unintentionally treated as response (existing req prop.)): ${name}`);
 		}
 
-		const isReq = this.isRequest() || params.get('req') === true; // Request
-
-		if (isReq && this.isRequest()) {
+		if (this.isRequest() && params.get('req') === true) {
 			throw new Error('req param is not available in request (provided object is treated as request, please set req param with Request)');
 		}
+
+		const isReq = this.isRequest() || params.get('req') === true; // Request
 
 		if (name === '@signature-params') {
 			throw new Error(`@signature-params is not available in get method: ${componentIdentifier}`);
@@ -261,7 +276,7 @@ export class RFC9421SignatureBaseFactory {
 			throw new Error(`label not found: ${label}`);
 		}
 		if (!Array.isArray(item[0])) {
-			throw new Error(`Invalid item: ${label}`);
+			throw new Error(`item is not InnerList: ${sh.serializeDictionary(new Map([[label, item]]))}`);
 		}
 
 		const results = new Map<string, string>();

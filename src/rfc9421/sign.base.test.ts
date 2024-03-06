@@ -20,6 +20,37 @@ const responseBase = {
 } as ResponseLike;
 
 describe(RFC9421SignatureBaseFactory, () => {
+	describe('input dictionary', () => {
+		test('record', () => {
+			const result = RFC9421SignatureBaseFactory.inputSignatureParamsDictionary({
+				sig1: [
+					[['"@method"', {}], ['"@query-param"', { name: 'foo', hoge: 'fuga' }]],
+					{ keyid: 'x', algo: 'rsa-v1_5-sha256' },
+				],
+			});
+			expect(result).toEqual(new Map([
+				['sig1', [
+					[['"@method"', new Map()], ['"@query-param"', new Map([['name', 'foo'], ['hoge', 'fuga']])]],
+					new Map([['keyid', 'x'], ['algo', 'rsa-v1_5-sha256']]),
+				]],
+			]));
+		});
+		test('array', () => {
+			const result = RFC9421SignatureBaseFactory.inputSignatureParamsDictionary([
+				['sig1', [
+					[['"@method"', []], ['"@query-param"', [['name', 'foo']]]],
+					{ keyid: 'x', algo: 'rsa-v1_5-sha256' },
+				]],
+			]);
+			expect(result).toEqual(new Map([
+				['sig1', [
+					[['"@method"', new Map()], ['"@query-param"', new Map([['name', 'foo']])]],
+					new Map([['keyid', 'x'], ['algo', 'rsa-v1_5-sha256']]),
+				]],
+			]));
+		});
+	});
+
 	describe('construct', () => {
 		test('request basic', () => {
 			const factory = new RFC9421SignatureBaseFactory(
@@ -75,6 +106,35 @@ describe(RFC9421SignatureBaseFactory, () => {
 	});
 
 	describe('get', () => {
-
+		describe('request', () => {
+			test('derived with no query', () => {
+				const factory = new RFC9421SignatureBaseFactory(
+					requestBase,
+					tinySignatureInput,
+				);
+				expect(() => factory.get('@signature-params')).toThrow();
+				expect(factory.get('@method')).toBe('GET');
+				expect(factory.get('@authority')).toBe('example.com');
+				expect(factory.get('@scheme')).toBe('https');
+				expect(factory.get('@target-uri')).toBe('https://example.com/resource/1');
+				expect(factory.get('@request-target')).toBe('get /resource/1');
+				expect(factory.get('@path')).toBe('/resource/1');
+				expect(factory.get('@query')).toBe('');
+				expect(() => factory.get('@query-param')).toThrow();
+			});
+			test('derived with query', () => {
+				const request = {
+					...requestBase,
+					url: 'https://example.com/resource/1?foo=bar',
+				} satisfies RequestLike;
+				const factory = new RFC9421SignatureBaseFactory(
+					request,
+					tinySignatureInput,
+				);
+				expect(factory.get('@query')).toBe('?foo=bar');
+				expect(factory.get('@query-param', new Map([['name', 'foo']]))).toBe('bar');
+				expect(factory.get('@query-param', { name: 'foo' })).toBe('bar');
+			});
+		});
 	});
 });

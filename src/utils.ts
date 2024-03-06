@@ -1,4 +1,4 @@
-import type { SignInfo, SignatureHashAlgorithmUpperSnake } from './types.js';
+import type { MapLike, SignInfo, SignatureHashAlgorithmUpperSnake } from './types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from './pem/spki.js';
 import type { webcrypto } from 'node:crypto';
 import type { IncomingHttpHeaders } from 'node:http';
@@ -18,7 +18,7 @@ export function removeObsoleteLineFolding(str: string): string {
 /**
  * RFC 9421 2.1 (If the correctly combined value is not directly available for a given field by an implementation, ...)
  */
-export function canonicalizeHeaderValue(value: string | number | string[]): string {
+export function canonicalizeHeaderValue(value: string | number | string[] | undefined): string {
 	if (typeof value === 'number') return value.toString();
 	if (!value) return '';
 	if (typeof value === 'string') return removeObsoleteLineFolding(value).trim();
@@ -187,4 +187,12 @@ export function splitPer64Chars(str: string): string[] {
 		result.push(str.slice(i, i + 64));
 	}
 	return result;
+}
+
+export function getMap<T extends MapLike<K, V>, K, V>(
+	obj: T,
+): Map<K, V> {
+	if (obj instanceof Map) return obj;
+	if (Array.isArray(obj)) return new Map(obj);
+	return new Map(Object.entries(obj) as [K, V][]);
 }
