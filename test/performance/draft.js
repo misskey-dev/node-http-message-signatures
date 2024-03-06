@@ -2,7 +2,7 @@ import { signAsDraftToRequest, parseRequestSignature, genRFC3230DigestHeader, ve
 import { rsa4096, prime256v1, ed25519, ed448 } from '../keys.js';
 import httpSignature from '@peertube/http-signature';
 
-const TRYES = 1;
+const TRYES = 1600;
 
 const getBasicOutgoingRequest = () => ({
 	headers: {

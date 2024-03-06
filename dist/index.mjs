@@ -261,9 +261,9 @@ function parsePublicKey(input) {
     }
   }
 }
-async function importPublicKey(key, keyUsages = ["verify"], defaults = defaultSignInfoDefaults) {
+async function importPublicKey(key, keyUsages = ["verify"], defaults = defaultSignInfoDefaults, extractable = false) {
   const parsedPublicKey = parsePublicKey(key);
-  return await (await getWebcrypto()).subtle.importKey("spki", parsedPublicKey.der, genSignInfo(parsedPublicKey, defaults), false, keyUsages);
+  return await (await getWebcrypto()).subtle.importKey("spki", parsedPublicKey.der, genSignInfo(parsedPublicKey, defaults), extractable, keyUsages);
 }
 async function parseAndImportPublicKey(source, keyUsages = ["verify"], providedAlgorithm, errorLogger) {
   if (typeof source === "string" || typeof source === "object" && !("type" in source) && (source instanceof Uint8Array || source instanceof ArrayBuffer || Array.isArray(source) || "enc" in source)) {
@@ -412,10 +412,10 @@ function parsePkcs8(input) {
     attributesRaw: attributes ? asn1ToArrayBuffer(attributes) : null
   };
 }
-async function importPrivateKey(key, keyUsages = ["sign"], defaults = defaultSignInfoDefaults) {
+async function importPrivateKey(key, keyUsages = ["sign"], defaults = defaultSignInfoDefaults, extractable = false) {
   const parsedPrivateKey = parsePkcs8(key);
   const importParams = genSignInfo(parsedPrivateKey, defaults);
-  return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, true, keyUsages);
+  return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, extractable, keyUsages);
 }
 
 // src/draft/sign.ts
@@ -473,7 +473,7 @@ function genDraftSigningString(request, includeHeaders, additional) {
   return results.join("\n");
 }
 async function genDraftSignature(privateKey, signingString, defaults = defaultSignInfoDefaults) {
-  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults), privateKey, new TextEncoder().encode(signingString));
+  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, new TextEncoder().encode(signingString));
   return encodeArrayBufferToBase64(signatureAB);
 }
 function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
