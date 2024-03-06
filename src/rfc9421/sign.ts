@@ -2,7 +2,7 @@
 // TODO
 
 import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getLc, lcObjectKey, getMap } from "../utils";
-import { IncomingRequest, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput } from "../types";
+import { IncomingRequest, MapLike, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput } from "../types";
 import * as sh from "structured-headers";
 
 /**
@@ -122,6 +122,14 @@ export class RFC9421SignatureBaseFactory {
 	}
 
 	public get(
+		name: '@query-param',
+		paramsLike?: MapLike<'name', string>,
+	): string
+	public get(
+		name: string,
+		paramsLike?: MapLike<'req' | 'key', string> | MapLike<'sf' | 'bs' | 'tr', boolean>,
+	): string
+	public get(
 		name: string,
 		paramsLike: sh.Parameters | SFVParametersLike = new Map(),
 	): string {
@@ -188,8 +196,8 @@ export class RFC9421SignatureBaseFactory {
 			const isBs = params.get('bs') === true; // Binary-Wrapped
 			const isTr = params.get('tr') === true; // Trailer
 
-			if (isSf && isBs) {
-				throw new Error(`Invalid component: ${componentIdentifier} (sf and bs cannot be used together)`);
+			if ([key, isSf, isBs].filter(x => x).length > 1) {
+				throw new Error(`Invalid component: ${componentIdentifier} (multiple params are specified)`);
 			}
 
 			const rawValue: string | number | string[] | undefined = (() => {
@@ -302,7 +310,7 @@ export class RFC9421SignatureBaseFactory {
 			if (results.has(componentIdentifier)) {
 				throw new Error(`Duplicate key: ${name}`);
 			}
-			results.set(componentIdentifier, this.get(name, component[1]));
+			results.set(componentIdentifier, this.get(name, component[1] as any));
 		}
 
 		results.set('"@signature-params"', sh.serializeInnerList(item));

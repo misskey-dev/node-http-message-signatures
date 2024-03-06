@@ -163,6 +163,7 @@ describe(RFC9421SignatureBaseFactory, () => {
 				);
 				expect(factory.get('x-obsolete-line-folding')).toBe('value value value');
 				expect(factory.get('x-multi-value')).toBe('value1, value2');
+				expect(factory.get('x-multi-value', { bs: true })).toBe(':dmFsdWUx:, :dmFsdWUy:');
 				expect(factory.get('x-single-array')).toBe('value');
 			});
 			test('sfv header', () => {
@@ -210,6 +211,29 @@ describe(RFC9421SignatureBaseFactory, () => {
 				expect(factory.get('x-item-binary')).toBe(':ZXhhbXBsZS5jb20=:');
 				expect(factory.get('x-item-with-param')).toBe('value; param="foo"');
 				expect(factory.get('x-list')).toBe('("one" "two" "three")');
+			});
+			test('sfv dictionary', () => {
+				const request = {
+					...requestBase,
+					headers: {
+						...requestBase.headers,
+						'unknown-dict': '  a=1,    b=2;x=1;y=2,   c=(a   b   c)  ',
+						'example-dict': '  a=1,    b=2;x=1;y=2,   c=(a   b   c)  ',
+					},
+				} as RequestLike;
+				const factory = new RFC9421SignatureBaseFactory(
+					request,
+					tinySignatureInput,
+					undefined,
+					{ 'example-dict': 'dict' },
+				);
+				expect(() => factory.get('unknown-dict', { sf: true })).toThrow();
+				expect(factory.get('example-dict')).toBe('a=1,    b=2;x=1;y=2,   c=(a   b   c)');
+				expect(factory.get('example-dict', { sf: true })).toBe('a=1, b=2;x=1;y=2, c=(a b c)');
+				expect(factory.get('example-dict', { key: 'a' })).toBe('1');
+				expect(factory.get('example-dict', { key: 'b' })).toBe('2;x=1;y=2');
+				expect(factory.get('example-dict', { key: 'c' })).toBe('(a b c)');
+				expect(() => factory.get('example-dict', { key: 'c', sf: true } as any)).toThrow();
 			});
 		});
 	});
