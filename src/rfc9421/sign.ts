@@ -301,7 +301,7 @@ export class RFC9421SignatureBaseFactory {
 					if (!responstItem) {
 						throw new Error(`could not find a parameter from response signature input (${name})`);
 					}
-					results.set(componentIdentifier, this.get(name, component[1]));
+					results.set(componentIdentifier, this.get(name, component[1], responstItem));
 				}
 			} else {
 				results.set(componentIdentifier, this.get(name, component[1]));
