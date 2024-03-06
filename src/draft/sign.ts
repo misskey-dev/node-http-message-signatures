@@ -80,7 +80,7 @@ export function genDraftSigningString(
 }
 
 export async function genDraftSignature(privateKey: webcrypto.CryptoKey, signingString: string, defaults: SignInfoDefaults = defaultSignInfoDefaults) {
-	const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults), privateKey, new TextEncoder().encode(signingString));
+	const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, new TextEncoder().encode(signingString));
 	return encodeArrayBufferToBase64(signatureAB);
 }
 

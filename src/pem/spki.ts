@@ -4,7 +4,8 @@ import Base64 from '@lapo/asn1js/base64.js';
 import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1';
 import { ECNamedCurve, KeyAlgorithmName } from '../types';
 import type { webcrypto } from 'node:crypto';
-import { SignInfoDefaults, defaultSignInfoDefaults, genSignInfo, getWebcrypto } from '../utils';
+import { SignInfoDefaults, defaultSignInfoDefaults, genAlgorithmForSignAndVerify, genSignInfo, getWebcrypto } from '../utils';
+import { parseSignInfo } from '../shared/verify';
 
 export class SpkiParseError extends Error {
 	constructor(message: string) { super(message); }
@@ -200,7 +201,46 @@ export function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmI
  * @param defaults
  * @returns CryptoKey
  */
-export async function importPublicKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.KeyUsage[] = ['verify'], defaults: SignInfoDefaults = defaultSignInfoDefaults) {
+export async function importPublicKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.KeyUsage[] = ['verify'], defaults: SignInfoDefaults = defaultSignInfoDefaults, extractable = false) {
 	const parsedPublicKey = parsePublicKey(key);
-	return await (await getWebcrypto()).subtle.importKey('spki', parsedPublicKey.der, genSignInfo(parsedPublicKey, defaults), false, keyUsages);
+	return await (await getWebcrypto()).subtle.importKey('spki', parsedPublicKey.der, genSignInfo(parsedPublicKey, defaults), extractable, keyUsages);
+}
+
+/**
+ * Prepare public key for verification
+ * @param source PEM, DER or CryptoKey
+ * @param keyUsages e.g. ['verify']
+ * @param providedAlgorithm e.g. 'rsa-sha256' or 'rsa-v1_5-sha256
+ * @param errorLogger
+ * @returns
+ */
+export async function parseAndImportPublicKey(
+	source: ASN1.StreamOrBinary | webcrypto.CryptoKey,
+	keyUsages: webcrypto.KeyUsage[] = ['verify'],
+	providedAlgorithm?: string,
+	errorLogger?: ((message: any) => any)
+) {
+	if (
+		typeof source === 'string' ||
+		(
+			typeof source === 'object' && !('type' in source) &&
+			(source instanceof Uint8Array || source instanceof ArrayBuffer || Array.isArray(source) || 'enc' in source)
+		)
+	) {
+		// Not a CryptoKey
+		const keyAlgorithmIdentifier = parsePublicKey(source);
+		const signInfo = parseSignInfo(providedAlgorithm, keyAlgorithmIdentifier, errorLogger);
+		const publicKey = await (await getWebcrypto()).subtle.importKey('spki', keyAlgorithmIdentifier.der, signInfo, false, keyUsages);
+		return {
+			publicKey,
+			algorithm: genAlgorithmForSignAndVerify(publicKey.algorithm, 'hash' in signInfo ? signInfo.hash : null),
+		};
+	}
+
+	// Is a CryptoKey
+	const signInfo = parseSignInfo(providedAlgorithm, source.algorithm, errorLogger);
+	return {
+		publicKey: source,
+		algorithm: genAlgorithmForSignAndVerify(source.algorithm, 'hash' in signInfo ? signInfo.hash : null),
+	};
 }

@@ -63,6 +63,102 @@ function genSpkiFromPkcs1(input) {
   ]);
 }
 
+// src/draft/const.ts
+var keyHashAlgosForDraftEncofing = {
+  "SHA": "sha1",
+  "SHA-1": "sha1",
+  "SHA-256": "sha256",
+  "SHA-384": "sha384",
+  "SHA-512": "sha512",
+  "MD5": "md5"
+};
+var keyHashAlgosForDraftDecoding = {
+  "sha1": "SHA",
+  "sha256": "SHA-256",
+  "sha384": "SHA-384",
+  "sha512": "SHA-512",
+  "md5": "MD5"
+};
+
+// src/shared/verify.ts
+var KeyHashValidationError = class extends Error {
+  constructor(message) {
+    super(message);
+  }
+};
+function buildErrorMessage(providedAlgorithm, real) {
+  return `Provided algorithm does not match the public key type: provided=${providedAlgorithm}, real=${real}`;
+}
+function parseSignInfo(algorithm, real, errorLogger) {
+  algorithm = algorithm?.toLowerCase();
+  const realKeyType = typeof real === "string" ? real : "algorithm" in real ? getPublicKeyAlgorithmNameFromOid(real.algorithm) : real.name;
+  if (realKeyType === "RSA-PSS") {
+    if (algorithm === "rsa-pss-sha512") {
+      return { name: "RSA-PSS", hash: "SHA-512" };
+    }
+  }
+  if (realKeyType === "RSASSA-PKCS1-v1_5") {
+    if (!algorithm || algorithm === "hs2019" || algorithm === "rsa-sha256" || algorithm === "rsa-v1_5-sha256") {
+      return { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
+    }
+    if (algorithm === "rsa-pss-sha512") {
+      return { name: "RSA-PSS", hash: "SHA-512" };
+    }
+    const [parsedName, hash] = algorithm.split("-");
+    if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
+      throw new KeyHashValidationError(`unsupported hash: ${hash}`);
+    }
+    if (parsedName === "rsa") {
+      return { name: "RSASSA-PKCS1-v1_5", hash: keyHashAlgosForDraftDecoding[hash] };
+    }
+    throw new KeyHashValidationError(buildErrorMessage(algorithm, realKeyType));
+  }
+  if (realKeyType === "EC") {
+    const namedCurve = "parameter" in real ? getNistCurveFromOid(real.parameter) : real.namedCurve;
+    if (!namedCurve)
+      throw new KeyHashValidationError("could not get namedCurve");
+    if (!algorithm || algorithm === "hs2019" || algorithm === "ecdsa-sha256") {
+      return { name: "ECDSA", hash: "SHA-256", namedCurve };
+    }
+    if (algorithm === "ecdsa-p256-sha256") {
+      if (namedCurve !== "P-256") {
+        throw new KeyHashValidationError(`curve is not P-256: ${namedCurve}`);
+      }
+      return { name: "ECDSA", hash: "SHA-256", namedCurve };
+    }
+    if (algorithm === "ecdsa-p384-sha384") {
+      if (namedCurve !== "P-384") {
+        throw new KeyHashValidationError(`curve is not P-384: ${namedCurve}`);
+      }
+      return { name: "ECDSA", hash: "SHA-256", namedCurve };
+    }
+    const [dsaOrDH, hash] = algorithm.split("-");
+    if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
+      throw new KeyHashValidationError(`unsupported hash: ${hash}`);
+    }
+    if (dsaOrDH === "ecdsa") {
+      return { name: "ECDSA", hash: keyHashAlgosForDraftDecoding[hash], namedCurve };
+    }
+    if (dsaOrDH === "ecdh") {
+      return { name: "ECDH", hash: keyHashAlgosForDraftDecoding[hash], namedCurve };
+    }
+    throw new KeyHashValidationError(buildErrorMessage(algorithm, realKeyType));
+  }
+  if (realKeyType === "Ed25519") {
+    if (!algorithm || algorithm === "hs2019" || algorithm === "ed25519-sha512" || algorithm === "ed25519") {
+      return { name: "Ed25519" };
+    }
+    throw new KeyHashValidationError(buildErrorMessage(algorithm, realKeyType));
+  }
+  if (realKeyType === "Ed448") {
+    if (!algorithm || algorithm === "hs2019" || algorithm === "ed448") {
+      return { name: "Ed448" };
+    }
+    throw new KeyHashValidationError(buildErrorMessage(algorithm, realKeyType));
+  }
+  throw new KeyHashValidationError(`unsupported keyAlgorithm: ${realKeyType} (provided: ${algorithm})`);
+}
+
 // src/pem/spki.ts
 var SpkiParseError = class extends Error {
   constructor(message) {
@@ -169,6 +265,22 @@ async function importPublicKey(key, keyUsages = ["verify"], defaults = defaultSi
   const parsedPublicKey = parsePublicKey(key);
   return await (await getWebcrypto()).subtle.importKey("spki", parsedPublicKey.der, genSignInfo(parsedPublicKey, defaults), false, keyUsages);
 }
+async function parseAndImportPublicKey(source, keyUsages = ["verify"], providedAlgorithm, errorLogger) {
+  if (typeof source === "string" || typeof source === "object" && !("type" in source) && (source instanceof Uint8Array || source instanceof ArrayBuffer || Array.isArray(source) || "enc" in source)) {
+    const keyAlgorithmIdentifier = parsePublicKey(source);
+    const signInfo2 = parseSignInfo(providedAlgorithm, keyAlgorithmIdentifier, errorLogger);
+    const publicKey = await (await getWebcrypto()).subtle.importKey("spki", keyAlgorithmIdentifier.der, signInfo2, false, keyUsages);
+    return {
+      publicKey,
+      algorithm: genAlgorithmForSignAndVerify(publicKey.algorithm, "hash" in signInfo2 ? signInfo2.hash : null)
+    };
+  }
+  const signInfo = parseSignInfo(providedAlgorithm, source.algorithm, errorLogger);
+  return {
+    publicKey: source,
+    algorithm: genAlgorithmForSignAndVerify(source.algorithm, "hash" in signInfo ? signInfo.hash : null)
+  };
+}
 
 // src/utils.ts
 async function getWebcrypto() {
@@ -257,10 +369,10 @@ function genSignInfo(parsed, defaults = defaultSignInfoDefaults) {
   }
   throw new KeyValidationError("Unknown algorithm");
 }
-function genAlgorithmForSignAndVerify(algorithm, defaults = defaultSignInfoDefaults) {
+function genAlgorithmForSignAndVerify(keyAlgorithm, hashAlgorithm) {
   return {
-    hash: defaults.hash,
-    ...algorithm
+    hash: hashAlgorithm,
+    ...keyAlgorithm
   };
 }
 function splitPer64Chars(str) {
@@ -303,25 +415,8 @@ function parsePkcs8(input) {
 async function importPrivateKey(key, keyUsages = ["sign"], defaults = defaultSignInfoDefaults) {
   const parsedPrivateKey = parsePkcs8(key);
   const importParams = genSignInfo(parsedPrivateKey, defaults);
-  return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, false, keyUsages);
+  return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, true, keyUsages);
 }
-
-// src/draft/const.ts
-var keyHashAlgosForDraftEncofing = {
-  "SHA": "sha1",
-  "SHA-1": "sha1",
-  "SHA-256": "sha256",
-  "SHA-384": "sha384",
-  "SHA-512": "sha512",
-  "MD5": "md5"
-};
-var keyHashAlgosForDraftDecoding = {
-  "sha1": "SHA",
-  "sha256": "SHA-256",
-  "sha384": "SHA-384",
-  "sha512": "SHA-512",
-  "md5": "MD5"
-};
 
 // src/draft/sign.ts
 function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
@@ -797,92 +892,12 @@ async function verifyDigestHeader(request, rawBody, failOnNoDigest = true, error
   return true;
 }
 
-// src/shared/verify.ts
-var KeyHashValidationError = class extends Error {
-  constructor(message) {
-    super(message);
-  }
-};
-function buildErrorMessage(providedAlgorithm, real) {
-  return `Provided algorithm does not match the public key type: provided=${providedAlgorithm}, real=${real}`;
-}
-function parseSignInfo(algorithm, parsed, errorLogger) {
-  algorithm = algorithm?.toLowerCase();
-  const realKeyType = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
-  if (realKeyType === "RSA-PSS") {
-    if (algorithm === "rsa-pss-sha512") {
-      return { name: "RSA-PSS", hash: "SHA-512" };
-    }
-  }
-  if (realKeyType === "RSASSA-PKCS1-v1_5") {
-    if (!algorithm || algorithm === "hs2019" || algorithm === "rsa-sha256" || algorithm === "rsa-v1_5-sha256") {
-      return { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
-    }
-    if (algorithm === "rsa-pss-sha512") {
-      return { name: "RSA-PSS", hash: "SHA-512" };
-    }
-    const [parsedName, hash] = algorithm.split("-");
-    if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
-      throw new KeyHashValidationError(`unsupported hash: ${hash}`);
-    }
-    if (parsedName === "rsa") {
-      return { name: "RSASSA-PKCS1-v1_5", hash: keyHashAlgosForDraftDecoding[hash] };
-    }
-    throw new KeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
-  }
-  if (realKeyType === "EC") {
-    if (!algorithm || algorithm === "hs2019" || algorithm === "ecdsa-sha256") {
-      return { name: "ECDSA", hash: "SHA-256", namedCurve: getNistCurveFromOid(parsed.parameter) };
-    }
-    if (algorithm === "ecdsa-p256-sha256") {
-      const namedCurve = getNistCurveFromOid(parsed.parameter);
-      if (namedCurve !== "P-256") {
-        throw new KeyHashValidationError(`curve is not P-256: ${namedCurve}`);
-      }
-      return { name: "ECDSA", hash: "SHA-256", namedCurve };
-    }
-    if (algorithm === "ecdsa-p384-sha384") {
-      const namedCurve = getNistCurveFromOid(parsed.parameter);
-      if (namedCurve !== "P-384") {
-        throw new KeyHashValidationError(`curve is not P-384: ${namedCurve}`);
-      }
-      return { name: "ECDSA", hash: "SHA-256", namedCurve: getNistCurveFromOid(parsed.parameter) };
-    }
-    const [dsaOrDH, hash] = algorithm.split("-");
-    if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
-      throw new KeyHashValidationError(`unsupported hash: ${hash}`);
-    }
-    if (dsaOrDH === "ecdsa") {
-      return { name: "ECDSA", hash: keyHashAlgosForDraftDecoding[hash], namedCurve: getNistCurveFromOid(parsed.parameter) };
-    }
-    if (dsaOrDH === "ecdh") {
-      return { name: "ECDH", hash: keyHashAlgosForDraftDecoding[hash], namedCurve: getNistCurveFromOid(parsed.parameter) };
-    }
-    throw new KeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
-  }
-  if (realKeyType === "Ed25519") {
-    if (!algorithm || algorithm === "hs2019" || algorithm === "ed25519-sha512" || algorithm === "ed25519") {
-      return { name: "Ed25519" };
-    }
-    throw new KeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
-  }
-  if (realKeyType === "Ed448") {
-    if (!algorithm || algorithm === "hs2019" || algorithm === "ed448") {
-      return { name: "Ed448" };
-    }
-    throw new KeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
-  }
-  throw new KeyHashValidationError(`unsupported keyAlgorithm: ${realKeyType} (provided: ${algorithm})`);
-}
-
 // src/draft/verify.ts
 var genSignInfoDraft = parseSignInfo;
-async function verifyDraftSignature(parsed, key, p3, p4) {
-  const errorLogger = p3 && typeof p3 === "function" ? p3 : p4;
-  const defaults = p3 && typeof p3 === "object" ? p3 : defaultSignInfoDefaults;
+async function verifyDraftSignature(parsed, key, errorLogger) {
   try {
-    const publicKey = typeof key === "string" ? await importPublicKey(key, ["verify"]) : key;
-    const verify = await (await getWebcrypto()).subtle.verify(genAlgorithmForSignAndVerify(publicKey.algorithm, defaults), publicKey, decodeBase64ToUint8Array(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
+    const { publicKey, algorithm } = await parseAndImportPublicKey(key, ["verify"], parsed.algorithm);
+    const verify = await (await getWebcrypto()).subtle.verify(algorithm, publicKey, decodeBase64ToUint8Array(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
     if (verify !== true)
       throw new Error(`verification simply failed, result: ${verify}`);
     return verify;
@@ -942,6 +957,7 @@ export {
   numberToUint8Array,
   objectLcKeys,
   parseAlgorithmIdentifier,
+  parseAndImportPublicKey,
   parseDraftRequest,
   parseDraftRequestSignatureHeader,
   parsePkcs1,

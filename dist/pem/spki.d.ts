@@ -102,3 +102,18 @@ export declare function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAl
  * @returns CryptoKey
  */
 export declare function importPublicKey(key: ASN1.StreamOrBinary, keyUsages?: webcrypto.KeyUsage[], defaults?: SignInfoDefaults): Promise<webcrypto.CryptoKey>;
+/**
+ * Prepare public key for verification
+ * @param source PEM, DER or CryptoKey
+ * @param keyUsages e.g. ['verify']
+ * @param providedAlgorithm e.g. 'rsa-sha256' or 'rsa-v1_5-sha256
+ * @param errorLogger
+ * @returns
+ */
+export declare function parseAndImportPublicKey(source: ASN1.StreamOrBinary | webcrypto.CryptoKey, keyUsages?: webcrypto.KeyUsage[], providedAlgorithm?: string, errorLogger?: ((message: any) => any)): Promise<{
+    publicKey: webcrypto.CryptoKey;
+    algorithm: {
+        name: string;
+        hash: import("../types").SignatureHashAlgorithmUpperSnake;
+    };
+}>;

@@ -78,9 +78,10 @@ describe('draft', () => {
 				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 				expect(parsed.version).toBe('draft');
 				if (parsed.version !== 'draft') return;
+				expect(parsed.value.algorithm).toBe('RSA-SHA256');
 
-				const publicKeyPreImported = await importPublicKey(keys.rsa4096.publicKey);
-				const verifyResult = await verifyDraftSignature(parsed.value, publicKeyPreImported, { hash: 'SHA-256', ec: 'DSA' }, errorLogger);
+				const publicKeyPreImported = await importPublicKey(keys.rsa4096.publicKey, ['verify'], undefined);
+				const verifyResult = await verifyDraftSignature(parsed.value, publicKeyPreImported, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
 

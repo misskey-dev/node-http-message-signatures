@@ -126,14 +126,11 @@ export function genSignInfo(
 /**
  * Generate algorithm for sign and verify from key algorithm and defaults,
  * because algorithm of ECDSA and ECDH does not have hash property.
- * @param algorithm
- * @param defaults default values
- * @returns
  */
-export function genAlgorithmForSignAndVerify(algorithm: webcrypto.KeyAlgorithm, defaults: SignInfoDefaults = defaultSignInfoDefaults) {
+export function genAlgorithmForSignAndVerify(keyAlgorithm: webcrypto.KeyAlgorithm, hashAlgorithm: SignatureHashAlgorithmUpperSnake) {
 	return {
-		hash: defaults.hash,
-		...algorithm,
+		hash: hashAlgorithm,
+		...keyAlgorithm,
 	};
 }
 

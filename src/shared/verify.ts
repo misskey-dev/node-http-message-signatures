@@ -2,10 +2,11 @@
  * Verify Request (Parsed)
  */
 
-import type { SignInfo } from '../types.js';
+import type { ECNamedCurve, SignInfo } from '../types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from '../pem/spki.js';
 import type { SignatureHashAlgorithmUpperSnake } from '../types.js';
 import { keyHashAlgosForDraftDecoding } from '../draft/const.js';
+import type { webcrypto } from 'node:crypto';
 
 export class KeyHashValidationError extends Error {
 	constructor(message: string) { super(message); }
@@ -21,9 +22,9 @@ function buildErrorMessage(providedAlgorithm: string, real: string) {
  * @param algorithm ヘッダーのアルゴリズム
  * @param publicKey 実際の公開鍵
  */
-export function parseSignInfo(algorithm: string | undefined, parsed: ParsedAlgorithmIdentifier, errorLogger?: ((message: any) => any)): SignInfo {
+export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorithmIdentifier | webcrypto.CryptoKey['algorithm'], errorLogger?: ((message: any) => any)): SignInfo {
 	algorithm = algorithm?.toLowerCase();
-	const realKeyType = getPublicKeyAlgorithmNameFromOid(parsed.algorithm);
+	const realKeyType = typeof real === 'string' ? real : 'algorithm' in real ? getPublicKeyAlgorithmNameFromOid(real.algorithm) : real.name;
 
 	if (realKeyType === 'RSA-PSS') {
 		// 公開鍵にこれが使われることはないが、一応
@@ -54,30 +55,31 @@ export function parseSignInfo(algorithm: string | undefined, parsed: ParsedAlgor
 			return { name: 'RSASSA-PKCS1-v1_5', hash: keyHashAlgosForDraftDecoding[hash] };
 		}
 		//#endregion
-		throw new KeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
+		throw new KeyHashValidationError(buildErrorMessage(algorithm, realKeyType));
 	}
 
 	if (realKeyType === 'EC') {
+		const namedCurve = 'parameter' in real ? getNistCurveFromOid(real.parameter) : (real as webcrypto.EcKeyGenParams).namedCurve as ECNamedCurve;
+		if (!namedCurve) throw new KeyHashValidationError('could not get namedCurve');
+
 		if (
 			!algorithm ||
 			algorithm === 'hs2019' ||
 			algorithm === 'ecdsa-sha256'
 		) {
-			return { name: 'ECDSA', hash: 'SHA-256', namedCurve: getNistCurveFromOid(parsed.parameter) };
+			return { name: 'ECDSA', hash: 'SHA-256', namedCurve };
 		}
 		if (algorithm === 'ecdsa-p256-sha256') {
-			const namedCurve = getNistCurveFromOid(parsed.parameter);
 			if (namedCurve !== 'P-256') {
 				throw new KeyHashValidationError(`curve is not P-256: ${namedCurve}`);
 			}
-			return { name: 'ECDSA', hash: 'SHA-256', namedCurve: namedCurve };
+			return { name: 'ECDSA', hash: 'SHA-256', namedCurve };
 		}
 		if (algorithm === 'ecdsa-p384-sha384') {
-			const namedCurve = getNistCurveFromOid(parsed.parameter);
 			if (namedCurve !== 'P-384') {
 				throw new KeyHashValidationError(`curve is not P-384: ${namedCurve}`);
 			}
-			return { name: 'ECDSA', hash: 'SHA-256', namedCurve: getNistCurveFromOid(parsed.parameter) };
+			return { name: 'ECDSA', hash: 'SHA-256', namedCurve };
 		}
 
 		//#region draft parsing
@@ -86,13 +88,13 @@ export function parseSignInfo(algorithm: string | undefined, parsed: ParsedAlgor
 			throw new KeyHashValidationError(`unsupported hash: ${hash}`);
 		}
 		if (dsaOrDH === 'ecdsa') {
-			return { name: 'ECDSA', hash: keyHashAlgosForDraftDecoding[hash], namedCurve: getNistCurveFromOid(parsed.parameter) };
+			return { name: 'ECDSA', hash: keyHashAlgosForDraftDecoding[hash], namedCurve };
 		}
 		if (dsaOrDH === 'ecdh') {
-			return { name: 'ECDH', hash: keyHashAlgosForDraftDecoding[hash], namedCurve: getNistCurveFromOid(parsed.parameter) };
+			return { name: 'ECDH', hash: keyHashAlgosForDraftDecoding[hash], namedCurve };
 		}
 		//#endregion
-		throw new KeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
+		throw new KeyHashValidationError(buildErrorMessage(algorithm, realKeyType));
 	}
 
 	if (realKeyType === 'Ed25519') {
@@ -104,7 +106,7 @@ export function parseSignInfo(algorithm: string | undefined, parsed: ParsedAlgor
 		) {
 			return { name: 'Ed25519' };
 		}
-		throw new KeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
+		throw new KeyHashValidationError(buildErrorMessage(algorithm, realKeyType));
 	}
 	if (realKeyType === 'Ed448') {
 		if (
@@ -114,7 +116,7 @@ export function parseSignInfo(algorithm: string | undefined, parsed: ParsedAlgor
 		) {
 			return { name: 'Ed448' };
 		}
-		throw new KeyHashValidationError(buildErrorMessage(algorithm, parsed.algorithm));
+		throw new KeyHashValidationError(buildErrorMessage(algorithm, realKeyType));
 	}
 
 	throw new KeyHashValidationError(`unsupported keyAlgorithm: ${realKeyType} (provided: ${algorithm})`);
