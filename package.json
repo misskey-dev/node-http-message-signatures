@@ -3,9 +3,9 @@
   "version": "0.0.4",
   "description": "",
   "type": "module",
-	"engines": {
-		"node": ">=18.4.0"
-	},
+  "engines": {
+    "node": ">=18.4.0"
+  },
   "keywords": [
     "rfc9421",
     "rfc3230",
@@ -14,9 +14,9 @@
     "signature",
     "signing",
     "activitypub",
-		"webcrypto",
-		"pkcs1",
-		"rfc8017",
+    "webcrypto",
+    "pkcs1",
+    "rfc8017",
     "spki",
     "publickey",
     "rfc5280"
@@ -46,16 +46,17 @@
     "eslint": "eslint --quiet \"src/**/*.ts\"",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --silent=false --verbose false",
     "build": "NODE_ENV=production node build.js && tsc --project tsconfig.build.json",
-    "performance": "node ./test/performance/draft.js"
+    "performance": "node ./test/performance/draft.js",
+    "import-key-ram": "node --expose-gc ./test/performance/import-key-ram.js"
   },
   "packageManager": "pnpm@8.15.4",
   "files": [
     "dist",
     "LICENSE"
   ],
-	"dependencies": {
+  "dependencies": {
     "@lapo/asn1js": "^1.2.4"
-	},
+  },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@misskey-dev/eslint-plugin": "^1.0.0",
@@ -67,6 +68,7 @@
     "@types/node": "^20.11.20",
     "@typescript-eslint/eslint-plugin": "^7.1.0",
     "@typescript-eslint/parser": "^7.1.0",
+    "bytes": "^3.1.2",
     "esbuild": "^0.20.1",
     "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.29.1",
