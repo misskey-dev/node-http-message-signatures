@@ -2,7 +2,7 @@
 // TODO
 
 import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getLc, lcObjectKey } from "../utils";
-import { IncomingRequest, OutgoingResponse, SFVSignatureParams, SFVSignatureInputDictionary } from "../types";
+import { IncomingRequest, OutgoingResponse, SFVSignatureInputDictionary } from "../types";
 import * as sh from "structured-headers";
 
 /**
@@ -102,7 +102,6 @@ export class RFC9421SignatureBaseFactory {
 	public get(
 		name: string,
 		params: sh.Parameters = new Map(),
-		keyParams?: SFVSignatureParams,
 	): string {
 		const componentIdentifier = sh.serializeItem([name, params]);
 		if (!name) {
