@@ -55,7 +55,8 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@lapo/asn1js": "^1.2.4"
+    "@lapo/asn1js": "^1.2.4",
+    "structured-headers": "^1.0.1"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",

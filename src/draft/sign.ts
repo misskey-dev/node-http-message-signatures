@@ -1,6 +1,6 @@
 import type { webcrypto } from 'node:crypto';
 import type { PrivateKey, RequestLike, SignatureHashAlgorithmUpperSnake } from '../types.js';
-import { type SignInfoDefaults, defaultSignInfoDefaults, encodeArrayBufferToBase64, getWebcrypto, lcObjectKey, genAlgorithmForSignAndVerify } from '../utils.js';
+import { type SignInfoDefaults, defaultSignInfoDefaults, encodeArrayBufferToBase64, getWebcrypto, normalizeHeaders, genAlgorithmForSignAndVerify } from '../utils.js';
 import { importPrivateKey } from '../pem/pkcs8.js';
 import { keyHashAlgosForDraftEncofing } from './const.js';
 
@@ -50,7 +50,7 @@ export function genDraftSigningString(
 		opaque?: string;
 	}
 ) {
-	const headers = lcObjectKey(request.headers);
+	const headers = normalizeHeaders(request.headers);
 
 	const results: string[] = [];
 

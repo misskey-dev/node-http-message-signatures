@@ -1,6 +1,6 @@
 import { parseDraftRequest } from './draft/parse.js';
 import type { ClockSkewSettings, IncomingRequest, ParsedSignature } from './types.js';
-import { lcObjectKey, objectLcKeys } from './utils.js';
+import { normalizeHeaders, objectLcKeys } from './utils.js';
 
 export type RequestParseOptions = {
 	/**
@@ -97,7 +97,7 @@ export function validateRequestAndGetSignatureHeader(
 	clock?: ClockSkewSettings,
 ): string {
 	if (!request.headers) throw new SignatureHeaderNotFoundError();
-	const headers = lcObjectKey(request.headers);
+	const headers = normalizeHeaders(request.headers);
 
 	if (headers['date']) {
 		if (Array.isArray(headers['date'])) throw new RequestHasMultipleDateHeadersError();

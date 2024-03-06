@@ -1,4 +1,4 @@
-import { signAsDraftToRequest, parseRequestSignature, genRFC3230DigestHeader, verifyDraftSignature, lcObjectKey, importPrivateKey, importPublicKey } from '../../dist/index.mjs';
+import { signAsDraftToRequest, parseRequestSignature, genRFC3230DigestHeader, verifyDraftSignature, normalizeHeaders, importPrivateKey, importPublicKey } from '../../dist/index.mjs';
 import { rsa4096, prime256v1, ed25519, ed448 } from '../keys.js';
 import httpSignature from '@peertube/http-signature';
 
@@ -116,7 +116,7 @@ for (const [type, keypair] of [['rsa4096', rsa4096], ['prime256v1', prime256v1],
 			if (cnt !== TRYES) throw new Error('failed');
 		}
 
-		request.headers = lcObjectKey(request.headers);
+		request.headers = normalizeHeaders(request.headers);
 		if (type !== 'prime256v1' && type !== 'ed448') {
 			const parsedJ = httpSignature.parseRequest(request);
 			const testCase = `${type} Joyent Verify (default is SHA-256)`;

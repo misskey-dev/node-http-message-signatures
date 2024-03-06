@@ -1,4 +1,4 @@
-import { lcObjectGet } from '../utils';
+import { getHeaderValue } from '../utils';
 import { DigestSource, createBase64Digest } from './utils';
 import { DigestHashAlgorithm, IncomingRequest } from '../types';
 
@@ -14,7 +14,7 @@ export async function verifyRFC3230DigestHeader(
 	failOnNoDigest = true,
 	errorLogger?: ((message: any) => any)
 ) {
-	let digestHeader = lcObjectGet(request.headers, 'digest');
+	let digestHeader = getHeaderValue(request.headers, 'digest');
 	if (!digestHeader) {
 		if (failOnNoDigest) {
 			if (errorLogger) errorLogger('Digest header not found');

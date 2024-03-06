@@ -5,7 +5,7 @@ import { genDraftSigningString, signAsDraftToRequest } from '@/draft/sign.js';
 import { verifyDraftSignature } from '@/draft/verify.js';
 import { parseRequestSignature, ClockSkewInvalidError } from '@/parse.js';
 import * as keys from '../keys.js';
-import { lcObjectKey } from '@/utils.js';
+import { normalizeHeaders } from '@/utils.js';
 import { importPrivateKey } from '@/pem/pkcs8.js';
 import { importPublicKey } from '@/pem/spki.js';
 import jest from 'jest-mock';
@@ -23,7 +23,7 @@ const getBasicOutgoingRequest = () => ({
 		Date: theDate.toUTCString(),
 		Host: 'example.com',
 		Accept: '*/*',
-	},
+	} as Record<string, string>,
 	method: 'GET',
 	url: '/foo/bar',
 });
@@ -88,7 +88,7 @@ describe('draft', () => {
 			test('verify by http-signature', async () => {
 				const request = getBasicOutgoingRequest();
 				await signAsDraftToRequest(request, key, basicIncludeHeaders);
-				request.headers = lcObjectKey(request.headers);
+				request.headers = normalizeHeaders(request.headers);
 				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
@@ -96,7 +96,7 @@ describe('draft', () => {
 
 			test('verify by itself (failed)', async () => {
 				const request = getBasicOutgoingRequest();
-				request.headers = lcObjectKey(request.headers);
+				request.headers = normalizeHeaders(request.headers);
 				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#main-key",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="aaaaaaaa"';
 				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 				expect(parsed.version).toBe('draft');
@@ -110,7 +110,7 @@ describe('draft', () => {
 
 			test('verify by http-signature (failed)', () => {
 				const request = getBasicOutgoingRequest();
-				request.headers = lcObjectKey(request.headers);
+				request.headers = normalizeHeaders(request.headers);
 				(request.headers as any)['signature'] = 'keyId="https://example.com/users/012345678abcdef#main-key",algorithm="rsa-sha256",headers="(request-target) host date accept",signature="aaaaaaaa"';
 				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.rsa4096.publicKey, errorLogger);
@@ -159,7 +159,7 @@ describe('draft', () => {
 			test('verify by http-signature', async () => {
 				const request = getBasicOutgoingRequest();
 				await signAsDraftToRequest(request, key, basicIncludeHeaders);
-				request.headers = lcObjectKey(request.headers);
+				request.headers = normalizeHeaders(request.headers);
 				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });
 				const verifyResult = httpSignature.verifySignature(parsed, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
@@ -182,7 +182,7 @@ describe('draft', () => {
 			test('verify by http-signature (failed)', async () => {
 				const request = getBasicOutgoingRequest();
 				await signAsDraftToRequest(request, key, basicIncludeHeaders);
-				request.headers = lcObjectKey(request.headers);
+				request.headers = normalizeHeaders(request.headers);
 				// tweetnaclがバイト数でエラーを吐くため、signatureの長さをちゃんとしたものにしておく
 				(request.headers as any)['signature'] = `keyId="https://example.com/users/012345678abcdef#ed25519-key",algorithm="ed25519-sha512",headers="(request-target) host date accept",signature="${Array.from({ length: 86 }, () => 'A').join('')}=="`;
 				const parsed = httpSignature.parseRequest(request, { clockSkew: ThousandYearsBySeconds });

@@ -1,5 +1,5 @@
-import type { IncomingMessage } from "http";
-import type { Http2ServerRequest } from "http2";
+import type { IncomingMessage, OutgoingMessage } from "http";
+import type { Http2ServerRequest, Http2ServerResponse } from "http2";
 import type { webcrypto } from "node:crypto";
 
 export type RequestLike = {
@@ -7,9 +7,25 @@ export type RequestLike = {
 	method: string;
 	headers: Record<string, string>;
 	body?: string;
+	trailers?: Record<string, string>;
+	headersDistinct?: Record<string, string[]>;
+	httpVersionMajor?: number;
 };
 
+export type ResponseLike = {
+	/**
+	 * If 'req' is set, the object treated as a response
+	 */
+	req: RequestLike;
+	url: string;
+	headers: Record<string, string>;
+	body?: string;
+	trailers?: Record<string, string>;
+}
+
 export type IncomingRequest = RequestLike | IncomingMessage | Http2ServerRequest;
+export type OutgoingResponse = ResponseLike | OutgoingMessage | Http2ServerResponse;
+export type IncomingOrOutgoing = RequestLike | IncomingMessage | Http2ServerRequest | OutgoingMessage | Http2ServerResponse;
 
 export type ClockSkewSettings = {
 	/**

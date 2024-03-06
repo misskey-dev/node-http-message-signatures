@@ -1,8 +1,18 @@
 
 // TODO
 
-import { RequestLike } from "../types";
-import { lcObjectKey } from "../utils";
+import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getLc, lcObjectKey } from "../utils";
+import { IncomingOrOutgoing, IncomingRequest, OutgoingResponse } from "../types";
+import * as sh from "structured-headers";
+
+/**
+ * Structured Field Value Type Dictionary
+ * https://datatracker.ietf.org/doc/html/rfc8941
+ *
+ * key: field (header) name
+ * value: item, list, dict
+ */
+export type SFVTypeDictionary = Record<string, 'item' | 'list' | 'dict'>
 
 /**
  * Class for creating signature base,
@@ -20,62 +30,126 @@ export class RFC9421SignatureBaseFactory {
 		'@query',
 	];
 
-	public headers: Record<string, string>;
+	public sfvTypeDictionary: SFVTypeDictionary;
+	public response: OutgoingResponse | null;
+
+	public isRequest() {
+		return this.response === null;
+	}
+	public isResponse() {
+		return this.response !== null;
+	}
+
+	public request: IncomingRequest;
+	public requestHeaders: IncomingRequest['headers'];
 	public scheme: string;
 	public targetUri: string;
 	public url: URL;
 	constructor(
-		public request: RequestLike,
-		public signatureParams?: string,
+		source: IncomingOrOutgoing,
+		/**
+		 * Must be signature params of the request
+		 */
+		public requestSignatureParams?: string,
 		scheme: string = 'https',
+		sfvTypeDictionary: SFVTypeDictionary = {},
+		/**
+		 * Set if provided object is response
+		 */
+		public responseSignatureParams?: string,
 	) {
-		this.headers = lcObjectKey(request.headers);
+		if ('req' in source) {
+			this.response = source;
+			this.request = source.req;
+		} else {
+			this.response = null;
+			this.request = source;
+		}
 
-		this.scheme = request.url.startsWith('/') ? scheme : new URL(request.url).protocol.replace(':', '');
-		this.targetUri = request.url.startsWith('/') ? (new URL(request.url, `${scheme}://${this.headers.host}`)).href : request.url;
+		if (!this.request.url) {
+			throw new Error('Request URL is empty');
+		}
+		if (!this.request.method) {
+			throw new Error('Request method is empty');
+		}
+
+		this.requestHeaders = lcObjectKey(('headersDistinct' in this.request && this.request.headersDistinct) ? this.request.headersDistinct : this.request.headers);
+
+		this.sfvTypeDictionary = lcObjectKey(sfvTypeDictionary);
+
+		this.scheme = this.request.url.startsWith('/') ? scheme : new URL(this.request.url).protocol.replace(':', '');
+		const rawHost = this.request.httpVersionMajor === 2 ? this.requestHeaders[':authority'] : this.requestHeaders['host'];
+		if (!rawHost) throw new Error('Host header is empty');
+		const host = canonicalizeHeaderValue(rawHost);
+		this.targetUri = this.request.url.startsWith('/') ? (new URL(this.request.url, `${scheme}://${host}`)).href : this.request.url;
 		this.url = new URL(this.targetUri);
 	}
 
 	/**
 	 * Return component value from component type and parameters
-	 * @param component e.g. '"@query-param";name="foo"', '@method', 'content-digest'
+	 * @param componentIdentifier e.g. '"@query-param";name="foo"', '@method', 'content-digest'
 	 * @returns component value
 	 */
 	public get(
-		component: string,
+		componentIdentifier: string,
 	): string {
-		const params = component.split(';');
-		let type = params[0];
-		if (!type) {
-			throw new Error(`Type is empty: ${component}`);
+		const params = componentIdentifier.split(';');
+		let name = params[0];
+		if (!name) {
+			throw new Error(`Type is empty: ${componentIdentifier}`);
 		}
-		if (type.startsWith('"')) {
-			if (type.endsWith('"')) {
-				type = type.slice(1, -1);
+		if (name.startsWith('"')) {
+			if (name.endsWith('"')) {
+				name = name.slice(1, -1);
 			}
-			throw new Error(`Invalid component type string: ${component}`);
+			throw new Error(`Invalid component type string: ${componentIdentifier}`);
 		}
 
-		if (type === '@signature-params') {
-			if (!this.signatureParams) {
-				throw new Error('signatureParams is not provided');
+		if (this.isResponse() && RFC9421SignatureBaseFactory.availableDerivedComponents.includes(name as any)) {
+			if (name !== '@signature-params') {
+				throw new Error(`component is not available in response (must use with ;req, or provided object is unintentionally treated as response (existing req prop.)): ${name}`);
 			}
-			return this.signatureParams;
-		} else if (type === '@method') {
+		}
+
+		const isReq = this.isRequest() || params.includes('req'); // Request
+
+		if (isReq && this.isRequest()) {
+			throw new Error('req param is not available in request (provided object is treated as request, please set req param with Request)');
+		}
+
+		if (name === '@signature-params') {
+			if (isReq) {
+				if (!this.requestSignatureParams) {
+					throw new Error('requestSignatureParams is not provided');
+				}
+				return this.requestSignatureParams;
+			} else {
+				if (!this.responseSignatureParams) {
+					throw new Error('signatureParams is not provided');
+				}
+				return this.responseSignatureParams;
+			}
+		} else if (name === '@method') {
+			if (!this.request.method) {
+				throw new Error('Request method is empty');
+			}
 			return this.request.method.toUpperCase();
-		} else if (type === '@authority') {
+		} else if (name === '@authority') {
 			return this.url.host;
-		} else if (type === '@scheme') {
+		} else if (name === '@scheme') {
 			return this.scheme.toLocaleLowerCase();
-		}	else if (type === '@target-uri') {
+		}	else if (name === '@target-uri') {
 			return this.targetUri;
-		} else if (type === '@request-target') {
+		} else if (name === '@request-target') {
+			if (!this.request.method) {
+				throw new Error('Request method is empty');
+			}
 			return `${this.request.method.toLowerCase()} ${this.url.pathname}`;
-		} else if (type === '@path') {
+		} else if (name === '@path') {
 			return this.url.pathname;
-		} else if (type === '@query') {
+		} else if (name === '@query') {
 			return this.url.search;
-		} else if (type === '@query-param') {
+		} else if (name === '@query-param') {
 			const key = params.find(x => x.startsWith('name="') && x.endsWith('"'))?.slice(6, -1);
 			if (!key) {
 				throw new Error('Query parameter name not found or invalid');
@@ -85,24 +159,106 @@ export class RFC9421SignatureBaseFactory {
 				throw new Error(`Query parameter not found: ${key}`);
 			}
 			return value;
-		} else if (type.startsWith('@')) {
-			throw new Error(`Unknown derived component: ${type}`);
-		} else if (type === 'date' && !this.headers['date'] && this.headers['x-date']) {
-			return this.headers['x-date'];
+		} else if (name.startsWith('@')) {
+			throw new Error(`Unknown derived component: ${name}`);
 		} else {
-			// WIP
 			// https://datatracker.ietf.org/doc/html/rfc9421#section-2.1
 			const keyParam = params.find(x => x.startsWith('key="'));
 			const isSf = params.includes('sf'); // Structed Field
 			const isBs = params.includes('bs'); // Binary-Wrapped
 			const isTr = params.includes('tr'); // Trailer
-			if (keyParam) {
-				if (!keyParam.endsWith('"')) {
-					throw new Error(`Invalid key param: ${params.join(';')}`);
+
+			if (isSf && isBs) {
+				throw new Error(`Invalid component: ${componentIdentifier} (sf and bs cannot be used together)`);
+			}
+
+			const rawValue: string | number | string[] | undefined = (() => {
+				if (isReq) {
+					if (isTr) {
+						return ('trailers' in this.request && this.request.trailers) ? getLc(this.request.trailers, name) : this.requestHeaders[name];
+					} else {
+						return this.requestHeaders[name];
+					}
+				} else {
+					if (!this.response) throw new Error('response is not provided');
+					const getHeaderValue = (name: string) => {
+						if (!this.response) throw new Error('response is not provided');
+						if ('getHeaders' in this.response && typeof this.response.getHeader === 'function') {
+							return this.response.getHeaders()[name];
+						} else if ('getHeader' in this.response && typeof this.response.getHeader === 'function') {
+							return this.response.getHeader(name);
+						} else if ('headers' in this.response && this.response.headers) {
+							return getLc(this.response.headers, name);
+						}
+						throw new Error('cannot get header value from response object');
+					};
+					if (isTr) {
+						return ('trailers' in this.response && this.response.trailers) ? getLc(this.response.trailers, name) : getHeaderValue(name);
+					} else {
+						return getHeaderValue(name);
+					}
+				}
+			})();
+
+			if (rawValue === undefined) {
+				throw new Error(`Header not found: ${componentIdentifier}`);
+			}
+
+			if (isSf) {
+				// https://datatracker.ietf.org/doc/html/rfc9421#name-strict-serialization-of-htt
+				if (!(name in this.sfvTypeDictionary)) {
+					throw new Error(`Type not found in SFV type dictionary: ${name}`);
+				}
+				const canonicalized = canonicalizeHeaderValue(rawValue);
+				if (this.sfvTypeDictionary[name] === 'dict') {
+					return sh.serializeDictionary(sh.parseDictionary(canonicalized));
+				} else if (this.sfvTypeDictionary[name] === 'list') {
+					return sh.serializeList(sh.parseList(canonicalized));
+				} else if (this.sfvTypeDictionary[name] === 'item') {
+					return sh.serializeItem(sh.parseItem(canonicalized));
 				}
 			}
 
-			return this.headers[type];
+			if (keyParam) {
+				// https://datatracker.ietf.org/doc/html/rfc9421#name-dictionary-structured-field
+				if (!(name in this.sfvTypeDictionary)) {
+					throw new Error(`key specified but type unknown (Type not found in SFV type dictionary): ${componentIdentifier}`);
+				}
+				if (!keyParam.endsWith('"')) {
+					throw new Error(`Invalid key param: ${params.join(';')}`);
+				}
+				if (typeof rawValue !== 'string') {
+					throw new Error(`Key specified but value is not a string: ${componentIdentifier}`);
+				}
+				const key = keyParam.slice(5, -1);
+				if (this.sfvTypeDictionary[name] === 'dict') {
+					const dictionary = sh.parseDictionary(rawValue);
+					const value = dictionary.get(key);
+					if (value === undefined) {
+						throw new Error(`Key not found in dictionary: ${key} (${componentIdentifier})`);
+					}
+					if (Array.isArray(value[0])) {
+						return sh.serializeList([value as sh.InnerList]);
+					} else {
+						return sh.serializeItem(value as sh.Item);
+					}
+				} else {
+					throw new Error(`"${name}" is not dict: ${this.sfvTypeDictionary[name]} (${componentIdentifier})`);
+				}
+			}
+
+			if (isBs) {
+				// https://datatracker.ietf.org/doc/html/rfc9421#section-2.1.3
+				const sequences = (Array.isArray(rawValue) ? rawValue : [rawValue])
+					.map(x => canonicalizeHeaderValue(x))
+					.map(x => (new TextEncoder()).encode(x))
+					.map(x => encodeArrayBufferToBase64(x.buffer))
+					.map(x => new sh.ByteSequence(x))
+					.map(x => [x, new Map()] as sh.Item);
+				return sh.serializeList(sequences);
+			}
+
+			return canonicalizeHeaderValue(rawValue);
 		}
 	}
 }
@@ -111,7 +267,7 @@ export function genRFC9421SignatureBase(
 	/**
 	 * Request or response to sign
 	 */
-	requestOrResponse: RequestLike,
+	requestOrResponse: IncomingOrOutgoing,
 
 	/**
 	 * Components to include in the signature string
@@ -128,13 +284,16 @@ export function genRFC9421SignatureBase(
 	 */
 	includeComponents: string[],
 	data?: {
-		req?: RequestLike;
 		signatureParams?: string;
+		requestSignatureParams?: string;
+		/**
+		 * Fallback scheme, e.g. 'https'
+		 */
 		scheme?: string;
+		sfvTypeDictionary?: SFVTypeDictionary;
 	},
 ) {
-	const factory = new RFC9421SignatureBaseFactory(requestOrResponse, data?.signatureParams, data?.scheme);
-	const requestFactory = data?.req ? new RFC9421SignatureBaseFactory(data?.req, data?.scheme) : null;
+	const factory = new RFC9421SignatureBaseFactory(requestOrResponse, data?.signatureParams, data?.scheme, data?.sfvTypeDictionary);
 
 	const results = new Map<string, string>();
 	const push = (key: string, value = '') => {
@@ -149,17 +308,12 @@ export function genRFC9421SignatureBase(
 		}
 	};
 
-	for (const component of includeComponents.map(x => x.toLowerCase())) {
-		const params = component.split(';');
+	for (const componentIdentifier of includeComponents.map(x => x.toLowerCase())) {
+		const params = componentIdentifier.split(';');
 		if (!params[0]) {
-			throw new Error('Component is empty');
+			throw new Error('Component identifier is empty');
 		}
-		const currentFactory = params.includes('req') ? factory : requestFactory;
-		if (!currentFactory) {
-			throw new Error('You request req component but req is not provided');
-		}
-
-		push(params[0], currentFactory.get(component));
+		push(params[0], factory.get(componentIdentifier));
 	}
 
 	return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join('\n');
