@@ -5,7 +5,7 @@ import type { webcrypto } from "node:crypto";
 export type RequestLike = {
 	url: string;
 	method: string;
-	headers: Record<string, string>;
+	headers: Record<string, string | string[]>;
 	body?: string;
 	trailers?: Record<string, string>;
 	headersDistinct?: Record<string, string[]>;
@@ -17,7 +17,7 @@ export type ResponseLike = {
 	 * If 'req' is set, the object treated as a response
 	 */
 	req: RequestLike;
-	headers: Record<string, string>;
+	headers: Record<string, string | string[]>;
 	body?: string;
 	trailers?: Record<string, string>;
 }

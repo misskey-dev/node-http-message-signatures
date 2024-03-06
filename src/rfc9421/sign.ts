@@ -14,6 +14,12 @@ import * as sh from "structured-headers";
  */
 export type SFVHeaderTypeDictionary = Record<string, 'item' | 'list' | 'dict'>
 
+export const sfvHeaderTypeDictionaryIKnow = {
+	'signature': 'dict',
+	'signature-input': 'dict',
+	'content-digest': 'dict',
+} satisfies SFVHeaderTypeDictionary;
+
 /**
  * Class for creating signature base,
  * construct with a request or a response
@@ -53,12 +59,14 @@ export class RFC9421SignatureBaseFactory {
 		 */
 		requestSignatureParams?: SFVSignatureInputDictionaryForInput | string,
 		scheme: string = 'https',
-		sfvTypeDictionary: SFVHeaderTypeDictionary = {},
+		additionalSfvTypeDictionary: SFVHeaderTypeDictionary = {},
 		/**
 		 * Set if provided object is response
 		 */
 		responseSignatureParams?: SFVSignatureInputDictionaryForInput | string,
 	) {
+		this.sfvTypeDictionary = { ...sfvHeaderTypeDictionaryIKnow, ...additionalSfvTypeDictionary };
+
 		if ('req' in source) {
 			this.response = source;
 			this.request = source.req;
@@ -89,7 +97,7 @@ export class RFC9421SignatureBaseFactory {
 
 		this.requestHeaders = lcObjectKey(('headersDistinct' in this.request && this.request.headersDistinct) ? this.request.headersDistinct : this.request.headers);
 
-		this.sfvTypeDictionary = lcObjectKey(sfvTypeDictionary);
+		this.sfvTypeDictionary = lcObjectKey(additionalSfvTypeDictionary);
 
 		this.scheme = this.request.url.startsWith('/') ? scheme : new URL(this.request.url).protocol.replace(':', '');
 		const rawHost = this.request.httpVersionMajor === 2 ? this.requestHeaders[':authority'] : this.requestHeaders['host'];
@@ -289,7 +297,7 @@ export class RFC9421SignatureBaseFactory {
 				}
 				throw new Error(`Invalid component identifier name: ${name}`);
 			}
-			component[0] = `"${name}"`; // Wrap with double quotes
+			component[0] = name; // Must be wrapped with double quotes while serializing
 			const componentIdentifier = sh.serializeItem(component);
 			if (results.has(componentIdentifier)) {
 				throw new Error(`Duplicate key: ${name}`);
