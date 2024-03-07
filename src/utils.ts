@@ -100,13 +100,16 @@ export function toStringOrToLc(src: string | number | undefined): string {
 
 /**
  *	Convert rawHeaders to object
- *
- *	https://nodejs.org/api/http2.html#requestrawheaders
+ *	rawHeaders: https://nodejs.org/api/http2.html#requestrawheaders
  */
 export function correctHeaders(src: (string | number | undefined)[]): Record<string, (string | number)[]> {
 	return src.reduce((dst, prop, i) => {
 		if (i % 2 === 0) {
-			dst[toStringOrToLc(prop)] = [];
+			if (typeof prop !== 'string') {
+				throw new Error(`Invalid header key type '${typeof prop}' of ${prop}`);
+			}
+			if (prop in dst) return dst;
+			dst[prop.toLowerCase()] = [];
 		} else {
 			dst[toStringOrToLc(src[i - 1])].push(prop === undefined ? '' : prop.toString());
 		}
@@ -115,7 +118,7 @@ export function correctHeaders(src: (string | number | undefined)[]): Record<str
 }
 
 /**
- * convert number to Uint8Array, for ASN.1 length field
+ * Convert number to Uint8Array, for ASN.1 length field
  */
 export function numberToUint8Array(num: number | bigint): Uint8Array {
 	const buf = new ArrayBuffer(8);

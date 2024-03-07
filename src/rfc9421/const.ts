@@ -2,13 +2,13 @@
  * Structured Field Value Type Dictionary
  * https://datatracker.ietf.org/doc/html/rfc8941
  *
- * key: field (header) name
+ * key: field name
  * value: item, list, dict
  */
 export type SFVHeaderTypeDictionary = Record<string, 'item' | 'list' | 'dict'>
 
 /**
- * Dictionary of field (header) name known to be structured field value
+ * Dictionary of field name known to be structured field value
  * TODO: Find official registry
  */
 export const knownSfvHeaderTypeDictionary = {

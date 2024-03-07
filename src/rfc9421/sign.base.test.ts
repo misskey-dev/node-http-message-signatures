@@ -99,7 +99,11 @@ describe(RFC9421SignatureBaseFactory, () => {
 		test('request with raw headers', () => {
 			const request = {
 				...requestBase,
-				rawHeaders: Array.from(Object.entries(requestBase.headers)).flat(2),
+				rawHeaders: [
+					...Object.entries(requestBase.headers),
+					...['x-test', 'value'],
+					...['x-test', 'value2'],
+				].flat(2),
 			} satisfies RequestLike;
 			const factory = new RFC9421SignatureBaseFactory(
 				request,
@@ -108,6 +112,7 @@ describe(RFC9421SignatureBaseFactory, () => {
 			expect(factory.requestHeaders).toEqual({
 				date: ['Tue, 07 Jun 2014 20:51:35 GMT'],
 				host: ['example.com'],
+				'x-test': ['value', 'value2'],
 			});
 		});
 
