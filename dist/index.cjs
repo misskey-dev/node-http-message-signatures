@@ -45,7 +45,9 @@ __export(src_exports, {
   SpkiParseError: () => SpkiParseError,
   UnknownSignatureHeaderFormatError: () => UnknownSignatureHeaderFormatError,
   asn1ToArrayBuffer: () => asn1ToArrayBuffer,
+  canonicalizeHeaderValue: () => canonicalizeHeaderValue,
   checkClockSkew: () => checkClockSkew,
+  correctHeaders: () => correctHeaders,
   decodeBase64ToUint8Array: () => decodeBase64ToUint8Array,
   decodePem: () => decodePem,
   defaultSignInfoDefaults: () => defaultSignInfoDefaults,
@@ -67,17 +69,21 @@ __export(src_exports, {
   genSignInfoDraft: () => genSignInfoDraft,
   genSpkiFromPkcs1: () => genSpkiFromPkcs1,
   getDraftAlgoString: () => getDraftAlgoString,
+  getHeaderValue: () => getHeaderValue,
+  getMap: () => getMap,
   getNistCurveFromOid: () => getNistCurveFromOid,
   getPublicKeyAlgorithmNameFromOid: () => getPublicKeyAlgorithmNameFromOid,
+  getValueByLc: () => getValueByLc,
   getWebcrypto: () => getWebcrypto,
   importPrivateKey: () => importPrivateKey,
   importPublicKey: () => importPublicKey,
   keyHashAlgosForDraftDecoding: () => keyHashAlgosForDraftDecoding,
   keyHashAlgosForDraftEncofing: () => keyHashAlgosForDraftEncofing,
-  lcObjectGet: () => lcObjectGet,
   lcObjectKey: () => lcObjectKey,
+  normalizeHeaders: () => normalizeHeaders,
   numberToUint8Array: () => numberToUint8Array,
   objectLcKeys: () => objectLcKeys,
+  obsoleteLineFoldingRegEx: () => obsoleteLineFoldingRegEx,
   parseAlgorithmIdentifier: () => parseAlgorithmIdentifier,
   parseAndImportPublicKey: () => parseAndImportPublicKey,
   parseDraftRequest: () => parseDraftRequest,
@@ -87,11 +93,13 @@ __export(src_exports, {
   parsePublicKey: () => parsePublicKey,
   parseRequestSignature: () => parseRequestSignature,
   parseSpki: () => parseSpki,
+  removeObsoleteLineFolding: () => removeObsoleteLineFolding,
   requestIsRFC9421: () => requestIsRFC9421,
   rsaASN1AlgorithmIdentifier: () => rsaASN1AlgorithmIdentifier,
   signAsDraftToRequest: () => signAsDraftToRequest,
   signatureHeaderIsDraft: () => signatureHeaderIsDraft,
   splitPer64Chars: () => splitPer64Chars,
+  toStringOrToLc: () => toStringOrToLc,
   validateAndProcessParsedDraftSignatureHeader: () => validateAndProcessParsedDraftSignatureHeader,
   validateRequestAndGetSignatureHeader: () => validateRequestAndGetSignatureHeader,
   verifyDigestHeader: () => verifyDigestHeader,
@@ -388,6 +396,38 @@ async function parseAndImportPublicKey(source, keyUsages = ["verify"], providedA
 async function getWebcrypto() {
   return globalThis.crypto ?? (await import("node:crypto")).webcrypto;
 }
+var obsoleteLineFoldingRegEx = /[^\S\n]*\r?\n[^\S\n\r]+/g;
+function removeObsoleteLineFolding(str) {
+  return str.replaceAll(obsoleteLineFoldingRegEx, " ");
+}
+function canonicalizeHeaderValue(value) {
+  if (typeof value === "number")
+    return value.toString();
+  if (!value)
+    return "";
+  if (typeof value === "string")
+    return removeObsoleteLineFolding(value).trim();
+  if (Array.isArray(value)) {
+    return value.map((v) => {
+      if (v === void 0)
+        return "";
+      if (typeof v === "number")
+        return v.toString();
+      if (typeof v === "string")
+        return removeObsoleteLineFolding(v).trim();
+      throw new Error(`Invalid header value type ${v}`);
+    }).join(", ");
+  }
+  throw new Error(`Invalid header value type ${value}`);
+}
+function normalizeHeaders(src) {
+  return Object.entries(src).reduce((dst, [key, value]) => {
+    if (key === "__proto__")
+      return dst;
+    dst[key.toLowerCase()] = canonicalizeHeaderValue(value);
+    return dst;
+  }, {});
+}
 function lcObjectKey(src) {
   return Object.entries(src).reduce((dst, [key, value]) => {
     if (key === "__proto__")
@@ -396,11 +436,21 @@ function lcObjectKey(src) {
     return dst;
   }, {});
 }
-function lcObjectGet(src, key) {
+function getHeaderValue(src, key) {
   key = key.toLowerCase();
   for (const [k, v] of Object.entries(src)) {
-    if (k.toLowerCase() === key)
+    if (k.toLowerCase() === key) {
+      return canonicalizeHeaderValue(v);
+    }
+  }
+  return void 0;
+}
+function getValueByLc(src, key) {
+  key = key.toLowerCase();
+  for (const [k, v] of Object.entries(src)) {
+    if (k.toLowerCase() === key) {
       return v;
+    }
   }
   return void 0;
 }
@@ -411,6 +461,23 @@ function objectLcKeys(src) {
     dst.add(key.toLowerCase());
     return dst;
   }, /* @__PURE__ */ new Set());
+}
+function toStringOrToLc(src) {
+  if (typeof src === "number")
+    return src.toString();
+  if (typeof src === "string")
+    return src.toLowerCase();
+  return "";
+}
+function correctHeaders(src) {
+  return src.reduce((dst, prop, i) => {
+    if (i % 2 === 0) {
+      dst[toStringOrToLc(prop)] = [];
+    } else {
+      dst[toStringOrToLc(src[i - 1])].push(prop === void 0 ? "" : prop.toString());
+    }
+    return dst;
+  }, {});
 }
 function numberToUint8Array(num) {
   const buf = new ArrayBuffer(8);
@@ -484,6 +551,13 @@ function splitPer64Chars(str) {
   }
   return result;
 }
+function getMap(obj) {
+  if (obj instanceof Map)
+    return obj;
+  if (Array.isArray(obj))
+    return new Map(obj);
+  return new Map(Object.entries(obj));
+}
 
 // src/pem/pkcs8.ts
 var import_asn1js3 = __toESM(require("@lapo/asn1js"), 1);
@@ -549,7 +623,7 @@ function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
   throw new Error(`unsupported keyAlgorithm`);
 }
 function genDraftSigningString(request, includeHeaders, additional) {
-  const headers = lcObjectKey(request.headers);
+  const headers = normalizeHeaders(request.headers);
   const results = [];
   for (const key of includeHeaders.map((x) => x.toLowerCase())) {
     if (key === "(request-target)") {
@@ -803,7 +877,7 @@ function checkClockSkew(reqDate, nowDate, delay = 300 * 1e3, forward = 100) {
 function validateRequestAndGetSignatureHeader(request, clock) {
   if (!request.headers)
     throw new SignatureHeaderNotFoundError();
-  const headers = lcObjectKey(request.headers);
+  const headers = normalizeHeaders(request.headers);
   if (headers["date"]) {
     if (Array.isArray(headers["date"]))
       throw new RequestHasMultipleDateHeadersError();
@@ -929,7 +1003,10 @@ async function genRFC3230DigestHeader(body, hashAlgorithm) {
 }
 var digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
 async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
-  let digestHeader = lcObjectGet(request.headers, "digest");
+  let digestHeader = getHeaderValue(request.headers, "digest");
+  if (Array.isArray(digestHeader)) {
+    digestHeader = digestHeader[0];
+  }
   if (!digestHeader) {
     if (failOnNoDigest) {
       if (errorLogger)
@@ -937,9 +1014,6 @@ async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true
       return false;
     }
     return true;
-  }
-  if (Array.isArray(digestHeader)) {
-    digestHeader = digestHeader[0];
   }
   const match = digestHeader.match(digestHeaderRegEx);
   if (!match) {
@@ -1026,7 +1100,9 @@ async function verifyDraftSignature(parsed, key, errorLogger) {
   SpkiParseError,
   UnknownSignatureHeaderFormatError,
   asn1ToArrayBuffer,
+  canonicalizeHeaderValue,
   checkClockSkew,
+  correctHeaders,
   decodeBase64ToUint8Array,
   decodePem,
   defaultSignInfoDefaults,
@@ -1048,17 +1124,21 @@ async function verifyDraftSignature(parsed, key, errorLogger) {
   genSignInfoDraft,
   genSpkiFromPkcs1,
   getDraftAlgoString,
+  getHeaderValue,
+  getMap,
   getNistCurveFromOid,
   getPublicKeyAlgorithmNameFromOid,
+  getValueByLc,
   getWebcrypto,
   importPrivateKey,
   importPublicKey,
   keyHashAlgosForDraftDecoding,
   keyHashAlgosForDraftEncofing,
-  lcObjectGet,
   lcObjectKey,
+  normalizeHeaders,
   numberToUint8Array,
   objectLcKeys,
+  obsoleteLineFoldingRegEx,
   parseAlgorithmIdentifier,
   parseAndImportPublicKey,
   parseDraftRequest,
@@ -1068,11 +1148,13 @@ async function verifyDraftSignature(parsed, key, errorLogger) {
   parsePublicKey,
   parseRequestSignature,
   parseSpki,
+  removeObsoleteLineFolding,
   requestIsRFC9421,
   rsaASN1AlgorithmIdentifier,
   signAsDraftToRequest,
   signatureHeaderIsDraft,
   splitPer64Chars,
+  toStringOrToLc,
   validateAndProcessParsedDraftSignatureHeader,
   validateRequestAndGetSignatureHeader,
   verifyDigestHeader,

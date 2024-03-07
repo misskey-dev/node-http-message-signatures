@@ -2,12 +2,16 @@ import type { IncomingMessage, ServerResponse } from "http";
 import type { Http2ServerRequest, Http2ServerResponse } from "http2";
 import type { webcrypto } from "node:crypto";
 
+export type HeadersValueLike = string | number | undefined | (string | number | undefined)[];
+export type HeadersLike = Record<string, HeadersValueLike>;
+
 export type RequestLike = {
 	url: string;
 	method: string;
-	headers: Record<string, string | string[]>;
-	rawHeaders?: string[];
-	getHeaders?: () => Record<string, string | string[]>;
+	headers: HeadersLike
+	// https://nodejs.org/api/http2.html#requestrawheaders
+	rawHeaders?: (string | number | undefined)[];
+	getHeaders?: () => HeadersLike;
 	body?: string;
 	trailers?: Record<string, string>;
 	headersDistinct?: Record<string, string[]>;
@@ -20,9 +24,10 @@ export type ResponseLike = {
 	 */
 	req: RequestLike;
 	statusCode: number;
-	headers: Record<string, string | string[]>;
-	rawHeaders?: string[];
-	getHeaders?: () => Record<string, string | string[]>;
+	headers: HeadersLike;
+	// https://nodejs.org/api/http2.html#requestrawheaders
+	rawHeaders?: (string | number | undefined)[];
+	getHeaders?: () => HeadersLike;
 	body?: string;
 	trailers?: Record<string, string>;
 }

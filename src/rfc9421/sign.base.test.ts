@@ -70,7 +70,7 @@ describe(RFC9421SignatureBaseFactory, () => {
 			expect(factory.url.href).toBe('https://example.com/resource/1');
 		});
 
-		test('request with /resource/1', () => {
+		test('request with path url', () => {
 			const request = {
 				...requestBase,
 				url: '/resource/1',
@@ -83,6 +83,32 @@ describe(RFC9421SignatureBaseFactory, () => {
 			expect(factory.scheme).toBe('https');
 			expect(factory.targetUri).toBe('https://example.com/resource/1');
 			expect(factory.url.href).toBe('https://example.com/resource/1');
+		});
+
+		test('request with invalid headers', () => {
+			const request = {
+				...requestBase,
+				headers: undefined,
+			} as any;
+			expect(() => new RFC9421SignatureBaseFactory(
+				request,
+				tinySignatureInput,
+			)).toThrow();
+		});
+
+		test('request with raw headers', () => {
+			const request = {
+				...requestBase,
+				rawHeaders: Array.from(Object.entries(requestBase.headers)).flat(2),
+			} satisfies RequestLike;
+			const factory = new RFC9421SignatureBaseFactory(
+				request,
+				tinySignatureInput,
+			);
+			expect(factory.requestHeaders).toEqual({
+				date: ['Tue, 07 Jun 2014 20:51:35 GMT'],
+				host: ['example.com'],
+			});
 		});
 
 		test('response basic', () => {

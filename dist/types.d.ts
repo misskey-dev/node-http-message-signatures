@@ -1,16 +1,36 @@
 /// <reference types="node" />
 /// <reference types="node" />
 /// <reference types="node" />
-import type { IncomingMessage } from "http";
-import type { Http2ServerRequest } from "http2";
+import type { IncomingMessage, ServerResponse } from "http";
+import type { Http2ServerRequest, Http2ServerResponse } from "http2";
 import type { webcrypto } from "node:crypto";
+export type HeadersValueLike = string | number | undefined | (string | number | undefined)[];
+export type HeadersLike = Record<string, HeadersValueLike>;
 export type RequestLike = {
     url: string;
     method: string;
-    headers: Record<string, string>;
+    headers: HeadersLike;
+    rawHeaders?: (string | number | undefined)[];
+    getHeaders?: () => HeadersLike;
     body?: string;
+    trailers?: Record<string, string>;
+    headersDistinct?: Record<string, string[]>;
+    httpVersionMajor?: number;
+};
+export type ResponseLike = {
+    /**
+     * If 'req' is set, the object treated as a response
+     */
+    req: RequestLike;
+    statusCode: number;
+    headers: HeadersLike;
+    rawHeaders?: (string | number | undefined)[];
+    getHeaders?: () => HeadersLike;
+    body?: string;
+    trailers?: Record<string, string>;
 };
 export type IncomingRequest = RequestLike | IncomingMessage | Http2ServerRequest;
+export type OutgoingResponse = ResponseLike | ServerResponse | Http2ServerResponse;
 export type ClockSkewSettings = {
     /**
      * 基準とする時刻
@@ -94,10 +114,24 @@ export type ParsedDraftSignature = {
         keyId: string;
     };
 };
+export type MapLikeObj<K, V> = Map<K, V> | Record<string, V> | [K, V][];
+export type SFVParametersLike = MapLikeObj<string, string | boolean | number>;
+/**
+ * sh.InnerList
+ * @examples [["@method", Map([])], Map({keyid: "x", algo: ""})]
+ */
+export type SFVSignatureParams = [[string, Map<string, string | boolean>][], Map<string, string | boolean | number>];
+export type SFVSignatureParamsForInput = [[string, MapLikeObj<string, string | boolean>][], MapLikeObj<string, string | boolean | number>];
+/**
+ * Result of `sh.parseDictionary('(value of signateure-input)')`
+ */
+export type SFVSignatureInputDictionary = Map<string, SFVSignatureParams>;
+export type SFVSignatureInputDictionaryForInput = MapLikeObj<string, SFVSignatureParamsForInput>;
 export type ParsedRFC9421SignatureValue = {
     label: string;
     keyid: string;
     /**
+     * alg
      * @example 'rsa-v1_5-sha256'
      */
     algorithm: string;
@@ -105,6 +139,10 @@ export type ParsedRFC9421SignatureValue = {
      * @example ['@method', '@path', '@authority', 'date', 'content-digest', '@signature-params']
      */
     components: string[];
+    created?: number;
+    expires?: number;
+};
+export type ParsedRFC9421SignatureValueWithBase = ParsedRFC9421SignatureValue & {
     /**
      * @example
      * ```
@@ -118,6 +156,6 @@ export type ParsedRFC9421SignatureValue = {
 };
 export type ParsedRFC9421Signature = {
     version: 'rfc9421';
-    value: ParsedRFC9421SignatureValue[];
+    value: ParsedRFC9421SignatureValueWithBase[];
 };
 export type ParsedSignature = ParsedDraftSignature | ParsedRFC9421Signature;

@@ -1,7 +1,6 @@
-import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake } from './types.js';
+import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike } from './types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from './pem/spki.js';
 import type { webcrypto } from 'node:crypto';
-import type { IncomingHttpHeaders } from 'node:http';
 
 export async function getWebcrypto() {
 	return globalThis.crypto ?? (await import('node:crypto')).webcrypto;
@@ -18,11 +17,18 @@ export function removeObsoleteLineFolding(str: string): string {
 /**
  * RFC 9421 2.1 (If the correctly combined value is not directly available for a given field by an implementation, ...)
  */
-export function canonicalizeHeaderValue(value: string | number | string[] | undefined): string {
+export function canonicalizeHeaderValue(value: HeadersValueLike): string {
 	if (typeof value === 'number') return value.toString();
 	if (!value) return '';
 	if (typeof value === 'string') return removeObsoleteLineFolding(value).trim();
-	if (Array.isArray(value)) return value.map(v => removeObsoleteLineFolding(v).trim()).join(', ');
+	if (Array.isArray(value)) {
+		return value.map(v => {
+			if (v === undefined) return '';
+			if (typeof v === 'number') return v.toString();
+			if (typeof v === 'string') return removeObsoleteLineFolding(v).trim();
+			throw new Error(`Invalid header value type ${v}`);
+		}).join(', ');
+	}
 	throw new Error(`Invalid header value type ${value}`);
 }
 
@@ -30,7 +36,7 @@ export function canonicalizeHeaderValue(value: string | number | string[] | unde
  * Convert object keys to lowercase
  * (Headers in Fetch API joins multiple headers with ',', but it must be ', ' in RFC 9421)
  */
-export function normalizeHeaders<T extends IncomingHttpHeaders>(src: T): Record<string, string> {
+export function normalizeHeaders<T extends HeadersLike>(src: T): Record<string, string> {
 	return Object.entries(src).reduce((dst, [key, value]) => {
 		if (key === '__proto__') return dst;
 		dst[key.toLowerCase()] = canonicalizeHeaderValue(value);
@@ -52,7 +58,7 @@ export function lcObjectKey<T extends Record<string, any>>(src: T): T {
 /**
  * Get value from object, key is case-insensitive, with canonicalization
  */
-export function getHeaderValue<T extends IncomingHttpHeaders>(src: T, key: string): string | undefined {
+export function getHeaderValue<T extends HeadersLike>(src: T, key: string): string | undefined {
 	key = key.toLowerCase();
 	for (const [k, v] of Object.entries(src)) {
 		if (k.toLowerCase() === key) {
@@ -65,7 +71,7 @@ export function getHeaderValue<T extends IncomingHttpHeaders>(src: T, key: strin
 /**
  * Get value from object, key is case-insensitive
  */
-export function getLc<T extends Record<string, any>>(src: T, key: string): T[keyof T] | undefined {
+export function getValueByLc<T extends Record<string, any>>(src: T, key: string): T[keyof T] | undefined {
 	key = key.toLowerCase();
 	for (const [k, v] of Object.entries(src)) {
 		if (k.toLowerCase() === key) {
@@ -78,7 +84,7 @@ export function getLc<T extends Record<string, any>>(src: T, key: string): T[key
 /**
  *  Get the Set of keys of the object, lowercased
  */
-export function objectLcKeys<T extends IncomingHttpHeaders>(src: T): Set<string> {
+export function objectLcKeys<T extends HeadersLike>(src: T): Set<string> {
 	return Object.keys(src).reduce((dst, key) => {
 		if (key === '__proto__') return dst;
 		dst.add(key.toLowerCase());
@@ -86,20 +92,26 @@ export function objectLcKeys<T extends IncomingHttpHeaders>(src: T): Set<string>
 	}, new Set<string>() as any);
 }
 
+export function toStringOrToLc(src: string | number | undefined): string {
+	if (typeof src === 'number') return src.toString();
+	if (typeof src === 'string') return src.toLowerCase();
+	return '';
+}
+
 /**
  *	Convert rawHeaders to object
  *
  *	https://nodejs.org/api/http2.html#requestrawheaders
  */
-export function correctHeaders(src: string[]): Record<string, string[]> {
+export function correctHeaders(src: (string | number | undefined)[]): Record<string, (string | number)[]> {
 	return src.reduce((dst, prop, i) => {
 		if (i % 2 === 0) {
-			dst[prop.toLowerCase()] = [];
+			dst[toStringOrToLc(prop)] = [];
 		} else {
-			dst[src[i - 1].toLowerCase()].push(prop);
+			dst[toStringOrToLc(src[i - 1])].push(prop === undefined ? '' : prop.toString());
 		}
 		return dst;
-	}, {} as Record<string, string[]>);
+	}, {} as Record<string, (string | number)[]>);
 }
 
 /**

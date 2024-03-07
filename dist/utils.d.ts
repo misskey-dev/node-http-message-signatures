@@ -1,20 +1,45 @@
 /// <reference types="node" />
-import type { SignInfo, SignatureHashAlgorithmUpperSnake } from './types.js';
+import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike } from './types.js';
 import { ParsedAlgorithmIdentifier } from './pem/spki.js';
 import type { webcrypto } from 'node:crypto';
 export declare function getWebcrypto(): Promise<webcrypto.Crypto>;
+export declare const obsoleteLineFoldingRegEx: RegExp;
+/**
+ * RFC 9421 2.1 (Remove any obsolete line folding...)
+ */
+export declare function removeObsoleteLineFolding(str: string): string;
+/**
+ * RFC 9421 2.1 (If the correctly combined value is not directly available for a given field by an implementation, ...)
+ */
+export declare function canonicalizeHeaderValue(value: HeadersValueLike): string;
+/**
+ * Convert object keys to lowercase
+ * (Headers in Fetch API joins multiple headers with ',', but it must be ', ' in RFC 9421)
+ */
+export declare function normalizeHeaders<T extends HeadersLike>(src: T): Record<string, string>;
 /**
  * Convert object keys to lowercase
  */
 export declare function lcObjectKey<T extends Record<string, any>>(src: T): T;
 /**
+ * Get value from object, key is case-insensitive, with canonicalization
+ */
+export declare function getHeaderValue<T extends HeadersLike>(src: T, key: string): string | undefined;
+/**
  * Get value from object, key is case-insensitive
  */
-export declare function lcObjectGet<T extends Record<string, any>>(src: T, key: string): T[keyof T] | undefined;
+export declare function getValueByLc<T extends Record<string, any>>(src: T, key: string): T[keyof T] | undefined;
 /**
  *  Get the Set of keys of the object, lowercased
  */
-export declare function objectLcKeys<T extends Record<string, any>>(src: T): Set<string>;
+export declare function objectLcKeys<T extends HeadersLike>(src: T): Set<string>;
+export declare function toStringOrToLc(src: string | number | undefined): string;
+/**
+ *	Convert rawHeaders to object
+ *
+ *	https://nodejs.org/api/http2.html#requestrawheaders
+ */
+export declare function correctHeaders(src: (string | number | undefined)[]): Record<string, (string | number)[]>;
 /**
  * convert number to Uint8Array, for ASN.1 length field
  */
@@ -51,3 +76,4 @@ export declare function genAlgorithmForSignAndVerify(keyAlgorithm: webcrypto.Key
     hash: SignatureHashAlgorithmUpperSnake;
 };
 export declare function splitPer64Chars(str: string): string[];
+export declare function getMap<T extends MapLikeObj<K, V>, K, V>(obj: T): Map<K, V>;

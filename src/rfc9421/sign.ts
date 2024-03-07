@@ -1,8 +1,8 @@
 
 // TODO
 
-import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getLc, lcObjectKey, getMap, correctHeaders } from "../utils";
-import { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput } from "../types";
+import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, correctHeaders } from "../utils";
+import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike, HeadersValueLike } from "../types";
 import * as sh from "structured-headers";
 
 /**
@@ -37,8 +37,6 @@ export const responseTargetDerivedComponents = [
 
 export type Kot<T> = keyof T extends 'req' ? T : null;
 
-type SBFHeaders = Record<string, string | number | string[] | undefined>;
-
 /**
  * Class for creating signature base,
  * construct with a request or a response
@@ -47,7 +45,7 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 	public sfvTypeDictionary: SFVHeaderTypeDictionary;
 
 	public response: OutgoingResponse | null;
-	public responseHeaders: SBFHeaders | null;
+	public responseHeaders: HeadersLike | null;
 	public isRequest() {
 		return this.response === null;
 	}
@@ -56,7 +54,7 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 	}
 
 	public request: IncomingRequest;
-	public requestHeaders: SBFHeaders;
+	public requestHeaders: HeadersLike;
 	public scheme: string;
 	public targetUri: string;
 	public url: URL;
@@ -122,7 +120,7 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 	/**
 	 * Collect request or response headers
 	 */
-	public getHeadersMap(source: IncomingRequest | OutgoingResponse): Record<string, string | number | string[] | undefined> {
+	public getHeadersMap(source: IncomingRequest | OutgoingResponse): HeadersLike {
 		if ('rawHeaders' in source && source.rawHeaders) {
 			return correctHeaders(source.rawHeaders);
 		} else if ('getHeaders' in source && typeof source.getHeaders === 'function') {
@@ -233,11 +231,11 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 				throw new Error(`Invalid component: ${componentIdentifier} (multiple params are specified)`);
 			}
 
-			const rawValue: string | number | string[] | undefined = (() => {
+			const rawValue: HeadersValueLike = (() => {
 				if (isReq) {
 					if (isTr) {
 						if ('trailers' in this.request && this.request.trailers) {
-							return getLc(this.request.trailers, name);
+							return getValueByLc(this.request.trailers, name);
 						}
 						throw new Error(`Trailers not found in request object (${componentIdentifier})`);
 					} else {
@@ -247,7 +245,7 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 					if (!this.response || !this.responseHeaders) throw new Error('response is not provided');
 					if (isTr) {
 						if ('trailers' in this.response && this.response.trailers) {
-							return getLc(this.response.trailers, name);
+							return getValueByLc(this.response.trailers, name);
 						}
 						throw new Error(`Trailers not found in response object (${componentIdentifier})`);
 					} else {
