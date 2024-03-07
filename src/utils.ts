@@ -6,9 +6,9 @@ export async function getWebcrypto() {
 	return globalThis.crypto ?? (await import('node:crypto')).webcrypto;
 }
 
-export const obsoleteLineFoldingRegEx = /[^\S\n]*\r?\n[^\S\n\r]+/g;
+export const obsoleteLineFoldingRegEx = /[^\S\r\n]*\r?\n[^\S\r\n]+/g;
 /**
- * RFC 9421 2.1 (Remove any obsolete line folding...)
+ * RFC 9421 2.1 (3. Remove any obsolete line folding...) for HTTP/1.1
  */
 export function removeObsoleteLineFolding(str: string): string {
 	return str.replaceAll(obsoleteLineFoldingRegEx, ' ');
