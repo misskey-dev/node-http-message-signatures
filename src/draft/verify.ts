@@ -2,7 +2,6 @@ import { ParsedDraftSignature } from "../types";
 import { parseAndImportPublicKey } from "../pem/spki";
 import { parseSignInfo } from "../shared/verify";
 import { decodeBase64ToUint8Array, getWebcrypto } from "../utils";
-import type { webcrypto } from "node:crypto";
 
 /**
  * @deprecated Use `parseSignInfo`
@@ -17,7 +16,7 @@ export const genSignInfoDraft = parseSignInfo;
  */
 export async function verifyDraftSignature(
 	parsed: ParsedDraftSignature['value'],
-	key: string | webcrypto.CryptoKey,
+	key: string | CryptoKey,
 	errorLogger?: (message: any) => any
 ): Promise<boolean> {
 	try {

@@ -1,4 +1,3 @@
-import type { webcrypto } from 'node:crypto';
 import type { PrivateKey, RequestLike, SignatureHashAlgorithmUpperSnake } from '../types.js';
 import { type SignInfoDefaults, defaultSignInfoDefaults, encodeArrayBufferToBase64, getWebcrypto, normalizeHeaders, genAlgorithmForSignAndVerify } from '../utils.js';
 import { importPrivateKey } from '../pem/pkcs8.js';
@@ -79,7 +78,7 @@ export function genDraftSigningString(
 	return results.join('\n');
 }
 
-export async function genDraftSignature(privateKey: webcrypto.CryptoKey, signingString: string, defaults: SignInfoDefaults = defaultSignInfoDefaults) {
+export async function genDraftSignature(privateKey: CryptoKey, signingString: string, defaults: SignInfoDefaults = defaultSignInfoDefaults) {
 	const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, new TextEncoder().encode(signingString));
 	return encodeArrayBufferToBase64(signatureAB);
 }

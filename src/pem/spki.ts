@@ -3,7 +3,6 @@ import Hex from '@lapo/asn1js/hex.js';
 import Base64 from '@lapo/asn1js/base64.js';
 import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1';
 import { ECNamedCurve, KeyAlgorithmName } from '../types';
-import type { webcrypto } from 'node:crypto';
 import { SignInfoDefaults, defaultSignInfoDefaults, genAlgorithmForSignAndVerify, genSignInfo, getWebcrypto } from '../utils';
 import { parseSignInfo } from '../shared/verify';
 
@@ -201,7 +200,7 @@ export function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAlgorithmI
  * @param defaults
  * @returns CryptoKey
  */
-export async function importPublicKey(key: ASN1.StreamOrBinary, keyUsages: webcrypto.KeyUsage[] = ['verify'], defaults: SignInfoDefaults = defaultSignInfoDefaults, extractable = false) {
+export async function importPublicKey(key: ASN1.StreamOrBinary, keyUsages: KeyUsage[] = ['verify'], defaults: SignInfoDefaults = defaultSignInfoDefaults, extractable = false) {
 	const parsedPublicKey = parsePublicKey(key);
 	return await (await getWebcrypto()).subtle.importKey('spki', parsedPublicKey.der, genSignInfo(parsedPublicKey, defaults), extractable, keyUsages);
 }
@@ -215,8 +214,8 @@ export async function importPublicKey(key: ASN1.StreamOrBinary, keyUsages: webcr
  * @returns
  */
 export async function parseAndImportPublicKey(
-	source: ASN1.StreamOrBinary | webcrypto.CryptoKey,
-	keyUsages: webcrypto.KeyUsage[] = ['verify'],
+	source: ASN1.StreamOrBinary | CryptoKey,
+	keyUsages: KeyUsage[] = ['verify'],
 	providedAlgorithm?: string,
 	errorLogger?: ((message: any) => any)
 ) {

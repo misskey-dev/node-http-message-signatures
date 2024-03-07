@@ -3,25 +3,24 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { webcrypto } from 'node:crypto';
 import { encodeArrayBufferToBase64, getWebcrypto, splitPer64Chars } from './utils';
-import { ECNamedCurve } from './types';
+import type { ECNamedCurve } from './types';
 
-export async function exportPublicKeyPem(key: webcrypto.CryptoKey) {
+export async function exportPublicKeyPem(key: CryptoKey) {
 	const ab = await (await getWebcrypto()).subtle.exportKey('spki', key);
 	return '-----BEGIN PUBLIC KEY-----\n' +
 		splitPer64Chars(encodeArrayBufferToBase64(ab)).join('\n') +
 		'\n-----END PUBLIC KEY-----\n';
 }
 
-export async function exportPrivateKeyPem(key: webcrypto.CryptoKey) {
+export async function exportPrivateKeyPem(key: CryptoKey) {
 	const ab = await (await getWebcrypto()).subtle.exportKey('pkcs8', key);
 	return '-----BEGIN PRIVATE KEY-----\n' +
 	splitPer64Chars(encodeArrayBufferToBase64(ab)).join('\n') +
 		'\n-----END PRIVATE KEY-----\n';
 }
 
-export async function genRsaKeyPair(modulusLength = 4096, keyUsage: webcrypto.KeyUsage[] = ['sign', 'verify']) {
+export async function genRsaKeyPair(modulusLength = 4096, keyUsage: KeyUsage[] = ['sign', 'verify']) {
 	const keyPair = await (await getWebcrypto()).subtle.generateKey(
 		{
 			name: 'RSASSA-PKCS1-v1_5',
@@ -38,7 +37,7 @@ export async function genRsaKeyPair(modulusLength = 4096, keyUsage: webcrypto.Ke
 	};
 }
 
-export async function genEcKeyPair(namedCurve: ECNamedCurve = 'P-256', keyUsage: webcrypto.KeyUsage[] = ['sign', 'verify']) {
+export async function genEcKeyPair(namedCurve: ECNamedCurve = 'P-256', keyUsage: KeyUsage[] = ['sign', 'verify']) {
 	const keyPair = await (await getWebcrypto()).subtle.generateKey(
 		{
 			name: 'ECDSA',
@@ -53,14 +52,14 @@ export async function genEcKeyPair(namedCurve: ECNamedCurve = 'P-256', keyUsage:
 	};
 }
 
-export async function genEd25519KeyPair(keyUsage: webcrypto.KeyUsage[] = ['sign', 'verify']) {
+export async function genEd25519KeyPair(keyUsage: KeyUsage[] = ['sign', 'verify']) {
 	const keyPair = await (await getWebcrypto()).subtle.generateKey(
 		{
 			name: 'Ed25519',
 		},
 		true,
 		keyUsage,
-	) as webcrypto.CryptoKeyPair;
+	) as CryptoKeyPair;
 	return {
 		publicKey: await exportPublicKeyPem(keyPair.publicKey),
 		privateKey: await exportPrivateKeyPem(keyPair.privateKey)
@@ -74,7 +73,7 @@ export async function genEd448KeyPair(keyUsage) {
 		},
 		true,
 		keyUsage,
-	) as webcrypto.CryptoKeyPair;
+	) as CryptoKeyPair;
 	return {
 		publicKey: await exportPublicKeyPem(keyPair.publicKey),
 		privateKey: await exportPrivateKeyPem(keyPair.privateKey)

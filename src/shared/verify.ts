@@ -6,7 +6,6 @@ import type { ECNamedCurve, SignInfo } from '../types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from '../pem/spki.js';
 import type { SignatureHashAlgorithmUpperSnake } from '../types.js';
 import { keyHashAlgosForDraftDecoding } from '../draft/const.js';
-import type { webcrypto } from 'node:crypto';
 
 export class KeyHashValidationError extends Error {
 	constructor(message: string) { super(message); }
@@ -22,7 +21,7 @@ function buildErrorMessage(providedAlgorithm: string, real: string) {
  * @param algorithm ヘッダーのアルゴリズム
  * @param publicKey 実際の公開鍵
  */
-export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorithmIdentifier | webcrypto.CryptoKey['algorithm'], errorLogger?: ((message: any) => any)): SignInfo {
+export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorithmIdentifier | CryptoKey['algorithm'], errorLogger?: ((message: any) => any)): SignInfo {
 	algorithm = algorithm?.toLowerCase();
 	const realKeyType = typeof real === 'string' ? real : 'algorithm' in real ? getPublicKeyAlgorithmNameFromOid(real.algorithm) : real.name;
 
@@ -59,7 +58,7 @@ export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorit
 	}
 
 	if (realKeyType === 'EC') {
-		const namedCurve = 'parameter' in real ? getNistCurveFromOid(real.parameter) : (real as webcrypto.EcKeyGenParams).namedCurve as ECNamedCurve;
+		const namedCurve = 'parameter' in real ? getNistCurveFromOid(real.parameter) : (real as EcKeyGenParams).namedCurve as ECNamedCurve;
 		if (!namedCurve) throw new KeyHashValidationError('could not get namedCurve');
 
 		if (

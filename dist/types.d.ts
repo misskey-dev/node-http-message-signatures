@@ -1,9 +1,7 @@
 /// <reference types="node" />
 /// <reference types="node" />
-/// <reference types="node" />
 import type { IncomingMessage, ServerResponse } from "http";
 import type { Http2ServerRequest, Http2ServerResponse } from "http2";
-import type { webcrypto } from "node:crypto";
 export type HeadersValueLike = string | number | null | undefined;
 export type HeadersValueLikeArrayable = HeadersValueLike | HeadersValueLike[];
 export type HeadersLike = Record<string, HeadersValueLikeArrayable>;
@@ -75,7 +73,7 @@ export type PrivateKeyWithPem = {
     keyId: string;
 };
 export type PrivateKeyWithCryptoKey = {
-    privateKey: webcrypto.CryptoKey;
+    privateKey: CryptoKey;
     keyId: string;
 };
 export type PrivateKey = PrivateKeyWithPem | PrivateKeyWithCryptoKey;

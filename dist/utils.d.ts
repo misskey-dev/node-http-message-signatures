@@ -1,8 +1,6 @@
-/// <reference types="node" />
 import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike, HeadersValueLikeArrayable } from './types.js';
 import { ParsedAlgorithmIdentifier } from './pem/spki.js';
-import type { webcrypto } from 'node:crypto';
-export declare function getWebcrypto(): Promise<webcrypto.Crypto>;
+export declare function getWebcrypto(): Promise<Crypto>;
 export declare const obsoleteLineFoldingRegEx: RegExp;
 /**
  * RFC 9421 2.1 (3. Remove any obsolete line folding...) for HTTP/1.1
@@ -70,7 +68,7 @@ export declare function genSignInfo(parsed: ParsedAlgorithmIdentifier, defaults?
  * Generate algorithm for sign and verify from key algorithm and defaults,
  * because algorithm of ECDSA and ECDH does not have hash property.
  */
-export declare function genAlgorithmForSignAndVerify(keyAlgorithm: webcrypto.KeyAlgorithm, hashAlgorithm: SignatureHashAlgorithmUpperSnake): {
+export declare function genAlgorithmForSignAndVerify(keyAlgorithm: KeyAlgorithm, hashAlgorithm: SignatureHashAlgorithmUpperSnake): {
     name: string;
     hash: SignatureHashAlgorithmUpperSnake;
 };

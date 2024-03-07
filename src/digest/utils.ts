@@ -1,8 +1,7 @@
-import { webcrypto as crypto } from 'node:crypto';
 import { DigestHashAlgorithm } from '../types';
 import { encodeArrayBufferToBase64, getWebcrypto } from '../utils';
 
-export type DigestSource = crypto.BufferSource | string;
+export type DigestSource = BufferSource | string;
 
 export async function createBase64Digest(body: DigestSource, hash: DigestHashAlgorithm): Promise<string>;
 export async function createBase64Digest<Ks extends DigestHashAlgorithm[]>(body: DigestSource, hash: Ks): Promise<Map<Ks[number], string>>;

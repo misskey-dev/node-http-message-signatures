@@ -1,6 +1,5 @@
 import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike, HeadersValueLikeArrayable } from './types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from './pem/spki.js';
-import type { webcrypto } from 'node:crypto';
 
 export async function getWebcrypto() {
 	return globalThis.crypto ?? (await import('node:crypto')).webcrypto;
@@ -205,7 +204,7 @@ export function genSignInfo(
  * Generate algorithm for sign and verify from key algorithm and defaults,
  * because algorithm of ECDSA and ECDH does not have hash property.
  */
-export function genAlgorithmForSignAndVerify(keyAlgorithm: webcrypto.KeyAlgorithm, hashAlgorithm: SignatureHashAlgorithmUpperSnake) {
+export function genAlgorithmForSignAndVerify(keyAlgorithm: KeyAlgorithm, hashAlgorithm: SignatureHashAlgorithmUpperSnake) {
 	return {
 		hash: hashAlgorithm,
 		...keyAlgorithm,

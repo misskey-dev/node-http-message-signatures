@@ -1,7 +1,5 @@
-/// <reference types="node" />
 import ASN1 from '@lapo/asn1js';
 import { ECNamedCurve, KeyAlgorithmName } from '../types';
-import type { webcrypto } from 'node:crypto';
 import { SignInfoDefaults } from '../utils';
 export declare class SpkiParseError extends Error {
     constructor(message: string);
@@ -101,7 +99,7 @@ export declare function parsePublicKey(input: ASN1.StreamOrBinary): SpkiParsedAl
  * @param defaults
  * @returns CryptoKey
  */
-export declare function importPublicKey(key: ASN1.StreamOrBinary, keyUsages?: webcrypto.KeyUsage[], defaults?: SignInfoDefaults, extractable?: boolean): Promise<webcrypto.CryptoKey>;
+export declare function importPublicKey(key: ASN1.StreamOrBinary, keyUsages?: KeyUsage[], defaults?: SignInfoDefaults, extractable?: boolean): Promise<CryptoKey>;
 /**
  * Prepare public key for verification
  * @param source PEM, DER or CryptoKey
@@ -110,8 +108,8 @@ export declare function importPublicKey(key: ASN1.StreamOrBinary, keyUsages?: we
  * @param errorLogger
  * @returns
  */
-export declare function parseAndImportPublicKey(source: ASN1.StreamOrBinary | webcrypto.CryptoKey, keyUsages?: webcrypto.KeyUsage[], providedAlgorithm?: string, errorLogger?: ((message: any) => any)): Promise<{
-    publicKey: webcrypto.CryptoKey;
+export declare function parseAndImportPublicKey(source: ASN1.StreamOrBinary | CryptoKey, keyUsages?: KeyUsage[], providedAlgorithm?: string, errorLogger?: ((message: any) => any)): Promise<{
+    publicKey: CryptoKey;
     algorithm: {
         name: string;
         hash: import("../types").SignatureHashAlgorithmUpperSnake;

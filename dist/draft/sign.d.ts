@@ -1,5 +1,3 @@
-/// <reference types="node" />
-import type { webcrypto } from 'node:crypto';
 import type { PrivateKey, RequestLike, SignatureHashAlgorithmUpperSnake } from '../types.js';
 import { type SignInfoDefaults } from '../utils.js';
 /**
@@ -16,7 +14,7 @@ export declare function genDraftSigningString(request: RequestLike, includeHeade
     expires?: string;
     opaque?: string;
 }): string;
-export declare function genDraftSignature(privateKey: webcrypto.CryptoKey, signingString: string, defaults?: SignInfoDefaults): Promise<string>;
+export declare function genDraftSignature(privateKey: CryptoKey, signingString: string, defaults?: SignInfoDefaults): Promise<string>;
 export declare function genDraftSignatureHeader(includeHeaders: string[], keyId: string, signature: string, algorithm: string): string;
 /**
  *

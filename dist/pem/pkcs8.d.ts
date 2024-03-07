@@ -1,8 +1,6 @@
-/// <reference types="node" />
 import ASN1 from '@lapo/asn1js';
 import { ParsedAlgorithmIdentifierBase } from './spki.js';
 import { SignInfoDefaults } from '../utils.js';
-import type { webcrypto } from 'node:crypto';
 export declare class Pkcs8ParseError extends Error {
     constructor(message: string);
 }
@@ -37,4 +35,4 @@ export declare function parsePkcs8(input: ASN1.StreamOrBinary): ParsedPkcs8;
  * @param defaults
  * @returns CryptoKey
  */
-export declare function importPrivateKey(key: ASN1.StreamOrBinary, keyUsages?: webcrypto.KeyUsage[], defaults?: SignInfoDefaults, extractable?: boolean): Promise<webcrypto.CryptoKey>;
+export declare function importPrivateKey(key: ASN1.StreamOrBinary, keyUsages?: KeyUsage[], defaults?: SignInfoDefaults, extractable?: boolean): Promise<CryptoKey>;

@@ -33,7 +33,8 @@
 			"./src/@types"
 		],
 		"lib": [
-			"esnext"
+			"esnext",
+			"dom"
 		]
 	},
 	"compileOnSave": false,
