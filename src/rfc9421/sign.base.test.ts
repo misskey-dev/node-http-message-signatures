@@ -103,7 +103,7 @@ describe(RFC9421SignatureBaseFactory, () => {
 					...Object.entries(requestBase.headers),
 					...['x-test', 'value'],
 					...['x-test', 'value2'],
-					...['x-test', null],
+					...['X-Test', null],
 				].flat(2),
 			} satisfies RequestLike;
 			const factory = new RFC9421SignatureBaseFactory(

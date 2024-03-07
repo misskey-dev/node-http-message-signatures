@@ -1,4 +1,4 @@
-import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike } from './types.js';
+import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike, HeadersValueLikeArrayable } from './types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from './pem/spki.js';
 import type { webcrypto } from 'node:crypto';
 
@@ -17,7 +17,7 @@ export function removeObsoleteLineFolding(str: string): string {
 /**
  * RFC 9421 2.1 (If the correctly combined value is not directly available for a given field by an implementation, ...)
  */
-export function canonicalizeHeaderValue(value: HeadersValueLike): string {
+export function canonicalizeHeaderValue(value: HeadersValueLikeArrayable): string {
 	if (typeof value === 'number') return value.toString();
 	if (!value) return '';
 	if (typeof value === 'string') return removeObsoleteLineFolding(value).trim();
@@ -102,13 +102,13 @@ export function toStringOrToLc(src: string | number | undefined | null): string 
  *	Convert rawHeaders to object
  *	rawHeaders: https://nodejs.org/api/http2.html#requestrawheaders
  */
-export function correctHeaders(src: (string | number | undefined | null)[]): Record<string, (string | number)[]> {
+export function correctHeaders(src: HeadersValueLike[]): Record<string, (string | number)[]> {
 	return src.reduce((dst, prop, i) => {
 		if (i % 2 === 0) {
 			if (typeof prop !== 'string') {
 				throw new Error(`Invalid header key type '${typeof prop}' of ${prop}`);
 			}
-			if (prop in dst) return dst;
+			if (prop.toLowerCase() in dst) return dst;
 			dst[prop.toLowerCase()] = [];
 		} else {
 			dst[toStringOrToLc(src[i - 1])].push(prop == null ? '' : prop.toString());

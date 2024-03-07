@@ -2,7 +2,7 @@
 // TODO
 
 import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, correctHeaders } from "../utils";
-import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike, HeadersValueLike } from "../types";
+import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike, HeadersValueLikeArrayable } from "../types";
 import * as sh from "structured-headers";
 import { SFVHeaderTypeDictionary, knownSfvHeaderTypeDictionary } from "./const";
 
@@ -217,7 +217,7 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 				throw new Error(`Invalid component: ${componentIdentifier} (multiple params are specified)`);
 			}
 
-			const rawValue: HeadersValueLike = (() => {
+			const rawValue: HeadersValueLikeArrayable = (() => {
 				if (isReq) {
 					if (isTr) {
 						if ('trailers' in this.request && this.request.trailers) {
