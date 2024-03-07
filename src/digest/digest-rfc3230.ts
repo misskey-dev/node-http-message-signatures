@@ -1,8 +1,8 @@
-import { getHeaderValue } from '../utils';
+import { collectHeaders, getHeaderValue } from '../utils';
 import { DigestSource, createBase64Digest } from './utils';
 import { DigestHashAlgorithm, IncomingRequest } from '../types';
 
-export async function genRFC3230DigestHeader(body: string, hashAlgorithm: DigestHashAlgorithm) {
+export async function genRFC3230DigestHeader(body: DigestSource, hashAlgorithm: DigestHashAlgorithm) {
 	return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm)}`;
 }
 
@@ -14,10 +14,7 @@ export async function verifyRFC3230DigestHeader(
 	failOnNoDigest = true,
 	errorLogger?: ((message: any) => any)
 ) {
-	let digestHeader = getHeaderValue(request.headers, 'digest');
-	if (Array.isArray(digestHeader)) {
-		digestHeader = digestHeader[0];
-	}
+	const digestHeader = getHeaderValue(collectHeaders(request), 'digest');
 	if (!digestHeader) {
 		if (failOnNoDigest) {
 			if (errorLogger) errorLogger('Digest header not found');

@@ -1,4 +1,4 @@
-import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike, HeadersValueLikeArrayable } from './types.js';
+import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike, HeadersValueLikeArrayable, IncomingRequest, OutgoingResponse } from './types.js';
 import { ParsedAlgorithmIdentifier } from './pem/spki.js';
 export declare function getWebcrypto(): Promise<Crypto>;
 export declare const obsoleteLineFoldingRegEx: RegExp;
@@ -12,11 +12,6 @@ export declare function removeObsoleteLineFolding(str: string): string;
 export declare function canonicalizeHeaderValue(value: HeadersValueLikeArrayable): string;
 /**
  * Convert object keys to lowercase
- * (Headers in Fetch API joins multiple headers with ',', but it must be ', ' in RFC 9421)
- */
-export declare function normalizeHeaders<T extends HeadersLike>(src: T): Record<string, string>;
-/**
- * Convert object keys to lowercase
  */
 export declare function lcObjectKey<T extends Record<string, any>>(src: T): T;
 /**
@@ -27,16 +22,19 @@ export declare function getHeaderValue<T extends HeadersLike>(src: T, key: strin
  * Get value from object, key is case-insensitive
  */
 export declare function getValueByLc<T extends Record<string, any>>(src: T, key: string): T[keyof T] | undefined;
-/**
- *  Get the Set of keys of the object, lowercased
- */
-export declare function objectLcKeys<T extends HeadersLike>(src: T): Set<string>;
 export declare function toStringOrToLc(src: string | number | undefined | null): string;
 /**
  *	Convert rawHeaders to object
  *	rawHeaders: https://nodejs.org/api/http2.html#requestrawheaders
  */
-export declare function correctHeaders(src: HeadersValueLike[]): Record<string, (string | number)[]>;
+export declare function correctHeadersFromFlatArray(src: HeadersValueLike[]): Record<string, (string | number)[]>;
+/**
+ * Collect request or response headers
+ */
+export declare function collectHeaders(source: IncomingRequest | OutgoingResponse): HeadersLike;
+export declare function isBrowserResponse(input: any): input is Response;
+export declare function isBrowserRequest(input: any): input is Request;
+export declare function isBrowserHeader(input: any): input is Headers;
 /**
  * Convert number to Uint8Array, for ASN.1 length field
  */

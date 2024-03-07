@@ -310,14 +310,6 @@ function canonicalizeHeaderValue(value) {
   }
   throw new Error(`Invalid header value type ${value}`);
 }
-function normalizeHeaders(src) {
-  return Object.entries(src).reduce((dst, [key, value]) => {
-    if (key === "__proto__")
-      return dst;
-    dst[key.toLowerCase()] = canonicalizeHeaderValue(value);
-    return dst;
-  }, {});
-}
 function lcObjectKey(src) {
   return Object.entries(src).reduce((dst, [key, value]) => {
     if (key === "__proto__")
@@ -344,14 +336,6 @@ function getValueByLc(src, key) {
   }
   return void 0;
 }
-function objectLcKeys(src) {
-  return Object.keys(src).reduce((dst, key) => {
-    if (key === "__proto__")
-      return dst;
-    dst.add(key.toLowerCase());
-    return dst;
-  }, /* @__PURE__ */ new Set());
-}
 function toStringOrToLc(src) {
   if (typeof src === "number")
     return src.toString();
@@ -359,7 +343,7 @@ function toStringOrToLc(src) {
     return src.toLowerCase();
   return "";
 }
-function correctHeaders(src) {
+function correctHeadersFromFlatArray(src) {
   return src.reduce((dst, prop, i) => {
     if (i % 2 === 0) {
       if (typeof prop !== "string") {
@@ -373,6 +357,34 @@ function correctHeaders(src) {
     }
     return dst;
   }, {});
+}
+function collectHeaders(source) {
+  if ("rawHeaders" in source && source.rawHeaders) {
+    return correctHeadersFromFlatArray(source.rawHeaders.flat(1));
+  } else if ("getHeaders" in source && typeof source.getHeaders === "function") {
+    return lcObjectKey(source.getHeaders());
+  } else if ("headers" in source && source.headers) {
+    if (typeof source.headers !== "object") {
+      throw new Error("headers must be an object");
+    }
+    if (isBrowserHeader(source.headers)) {
+      return correctHeadersFromFlatArray(Array.from(source.headers.entries()).flat(1));
+    } else if (Array.isArray(source.headers)) {
+      return correctHeadersFromFlatArray(source.headers.flat(1));
+    } else {
+      return lcObjectKey(source.headers);
+    }
+  }
+  throw new Error("Cannot get headers from request object");
+}
+function isBrowserResponse(input) {
+  return "Response" in globalThis && typeof input === "object" && input instanceof Response;
+}
+function isBrowserRequest(input) {
+  return "Request" in globalThis && typeof input === "object" && input instanceof Request;
+}
+function isBrowserHeader(input) {
+  return "Headers" in globalThis && typeof input === "object" && input instanceof Headers;
 }
 function numberToUint8Array(num) {
   const buf = new ArrayBuffer(8);
@@ -517,12 +529,18 @@ function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
   }
   throw new Error(`unsupported keyAlgorithm`);
 }
-function genDraftSigningString(request, includeHeaders, additional) {
-  const headers = normalizeHeaders(request.headers);
+function genDraftSigningString(source, includeHeaders, additional) {
+  if (!source.method) {
+    throw new Error("Request method not found");
+  }
+  if (!source.url) {
+    throw new Error("Request URL not found");
+  }
+  const headers = collectHeaders(source);
   const results = [];
   for (const key of includeHeaders.map((x) => x.toLowerCase())) {
     if (key === "(request-target)") {
-      results.push(`(request-target): ${request.method.toLowerCase()} ${request.url.startsWith("/") ? request.url : new URL(request.url).pathname}`);
+      results.push(`(request-target): ${source.method.toLowerCase()} ${source.url.startsWith("/") ? source.url : new URL(source.url).pathname}`);
     } else if (key === "(keyid)") {
       results.push(`(keyid): ${additional?.keyId}`);
     } else if (key === "(algorithm)") {
@@ -759,7 +777,7 @@ function signatureHeaderIsDraft(signatureHeader) {
   return signatureHeader.includes('signature="');
 }
 function requestIsRFC9421(request) {
-  return objectLcKeys(request.headers).has("signature-input");
+  return "signature-input" in collectHeaders(request);
 }
 function checkClockSkew(reqDate, nowDate, delay = 300 * 1e3, forward = 100) {
   const reqTime = reqDate.getTime();
@@ -772,27 +790,24 @@ function checkClockSkew(reqDate, nowDate, delay = 300 * 1e3, forward = 100) {
 function validateRequestAndGetSignatureHeader(request, clock) {
   if (!request.headers)
     throw new SignatureHeaderNotFoundError();
-  const headers = normalizeHeaders(request.headers);
+  const headers = collectHeaders(request);
   if (headers["date"]) {
-    if (Array.isArray(headers["date"]))
+    if (Array.isArray(headers["date"]) && headers["date"].length > 1)
       throw new RequestHasMultipleDateHeadersError();
-    checkClockSkew(new Date(headers["date"]), clock?.now || /* @__PURE__ */ new Date(), clock?.delay, clock?.forward);
+    checkClockSkew(new Date([headers["date"]].flat(1)[0]), clock?.now || /* @__PURE__ */ new Date(), clock?.delay, clock?.forward);
   } else if (headers["x-date"]) {
     if (Array.isArray(headers["x-date"]))
       throw new RequestHasMultipleDateHeadersError();
-    checkClockSkew(new Date(headers["x-date"]), clock?.now || /* @__PURE__ */ new Date(), clock?.delay, clock?.forward);
+    checkClockSkew(new Date([headers["x-date"]].flat(1)[0]), clock?.now || /* @__PURE__ */ new Date(), clock?.delay, clock?.forward);
   }
   if (!request.method)
     throw new InvalidRequestError("Request method not found");
   if (!request.url)
     throw new InvalidRequestError("Request URL not found");
-  const signatureHeader = headers["signature"];
-  if (signatureHeader) {
-    if (Array.isArray(signatureHeader))
-      throw new RequestHasMultipleSignatureHeadersError();
+  const signatureHeader = headers["signature"] && canonicalizeHeaderValue(headers["signature"]);
+  if (signatureHeader)
     return signatureHeader;
-  }
-  const authorizationHeader = headers["authorization"];
+  const authorizationHeader = canonicalizeHeaderValue(headers["authorization"]);
   if (authorizationHeader) {
     if (authorizationHeader.startsWith("Signature "))
       return authorizationHeader.slice(10);
@@ -898,10 +913,7 @@ async function genRFC3230DigestHeader(body, hashAlgorithm) {
 }
 var digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
 async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
-  let digestHeader = getHeaderValue(request.headers, "digest");
-  if (Array.isArray(digestHeader)) {
-    digestHeader = digestHeader[0];
-  }
+  const digestHeader = getHeaderValue(collectHeaders(request), "digest");
   if (!digestHeader) {
     if (failOnNoDigest) {
       if (errorLogger)
@@ -949,7 +961,7 @@ async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true
 
 // src/digest/digest.ts
 async function verifyDigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
-  const headerKeys = objectLcKeys(request.headers);
+  const headerKeys = new Set(Object.keys(collectHeaders(request)));
   if (headerKeys.has("content-digest")) {
     throw new Error("Not implemented yet");
   } else if (headerKeys.has("digest")) {
@@ -996,7 +1008,8 @@ export {
   asn1ToArrayBuffer,
   canonicalizeHeaderValue,
   checkClockSkew,
-  correctHeaders,
+  collectHeaders,
+  correctHeadersFromFlatArray,
   decodeBase64ToUint8Array,
   decodePem,
   defaultSignInfoDefaults,
@@ -1026,12 +1039,13 @@ export {
   getWebcrypto,
   importPrivateKey,
   importPublicKey,
+  isBrowserHeader,
+  isBrowserRequest,
+  isBrowserResponse,
   keyHashAlgosForDraftDecoding,
   keyHashAlgosForDraftEncofing,
   lcObjectKey,
-  normalizeHeaders,
   numberToUint8Array,
-  objectLcKeys,
   obsoleteLineFoldingRegEx,
   parseAlgorithmIdentifier,
   parseAndImportPublicKey,

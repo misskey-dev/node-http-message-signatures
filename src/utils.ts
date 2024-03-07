@@ -1,10 +1,11 @@
-import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike, HeadersValueLikeArrayable } from './types.js';
+import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike, HeadersValueLikeArrayable, IncomingRequest, OutgoingResponse } from './types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from './pem/spki.js';
 
 export async function getWebcrypto() {
 	return globalThis.crypto ?? (await import('node:crypto')).webcrypto;
 }
 
+//#region req/res header
 export const obsoleteLineFoldingRegEx = /[^\S\r\n]*\r?\n[^\S\r\n]+/g;
 /**
  * RFC 9421 2.1 (3. Remove any obsolete line folding...) for HTTP/1.1
@@ -29,18 +30,6 @@ export function canonicalizeHeaderValue(value: HeadersValueLikeArrayable): strin
 		}).join(', ');
 	}
 	throw new Error(`Invalid header value type ${value}`);
-}
-
-/**
- * Convert object keys to lowercase
- * (Headers in Fetch API joins multiple headers with ',', but it must be ', ' in RFC 9421)
- */
-export function normalizeHeaders<T extends HeadersLike>(src: T): Record<string, string> {
-	return Object.entries(src).reduce((dst, [key, value]) => {
-		if (key === '__proto__') return dst;
-		dst[key.toLowerCase()] = canonicalizeHeaderValue(value);
-		return dst;
-	}, {} as any);
 }
 
 /**
@@ -80,17 +69,6 @@ export function getValueByLc<T extends Record<string, any>>(src: T, key: string)
 	return undefined;
 }
 
-/**
- *  Get the Set of keys of the object, lowercased
- */
-export function objectLcKeys<T extends HeadersLike>(src: T): Set<string> {
-	return Object.keys(src).reduce((dst, key) => {
-		if (key === '__proto__') return dst;
-		dst.add(key.toLowerCase());
-		return dst;
-	}, new Set<string>() as any);
-}
-
 export function toStringOrToLc(src: string | number | undefined | null): string {
 	if (typeof src === 'number') return src.toString();
 	if (typeof src === 'string') return src.toLowerCase();
@@ -101,7 +79,7 @@ export function toStringOrToLc(src: string | number | undefined | null): string 
  *	Convert rawHeaders to object
  *	rawHeaders: https://nodejs.org/api/http2.html#requestrawheaders
  */
-export function correctHeaders(src: HeadersValueLike[]): Record<string, (string | number)[]> {
+export function correctHeadersFromFlatArray(src: HeadersValueLike[]): Record<string, (string | number)[]> {
 	return src.reduce((dst, prop, i) => {
 		if (i % 2 === 0) {
 			if (typeof prop !== 'string') {
@@ -115,6 +93,42 @@ export function correctHeaders(src: HeadersValueLike[]): Record<string, (string 
 		return dst;
 	}, {} as Record<string, (string | number)[]>);
 }
+
+/**
+ * Collect request or response headers
+ */
+export function collectHeaders(source: IncomingRequest | OutgoingResponse): HeadersLike {
+	if ('rawHeaders' in source && source.rawHeaders) {
+		return correctHeadersFromFlatArray(source.rawHeaders.flat(1));
+	} else if ('getHeaders' in source && typeof source.getHeaders === 'function') {
+		return lcObjectKey(source.getHeaders());
+	} else if ('headers' in source && source.headers) {
+		if (typeof source.headers !== 'object') {
+			throw new Error('headers must be an object');
+		}
+		if (isBrowserHeader(source.headers)) {
+			// Browser Headers
+			return correctHeadersFromFlatArray(Array.from(source.headers.entries()).flat(1));
+		} else if (Array.isArray(source.headers)) {
+			// 一応対応
+			return correctHeadersFromFlatArray(source.headers.flat(1));
+		} else {
+			return lcObjectKey(source.headers as Record<string, string | string[]>);
+		}
+	}
+	throw new Error('Cannot get headers from request object');
+}
+
+export function isBrowserResponse(input: any): input is Response {
+	return 'Response' in globalThis && typeof input === 'object' && input instanceof Response;
+}
+export function isBrowserRequest(input: any): input is Request {
+	return 'Request' in globalThis && typeof input === 'object' && input instanceof Request;
+}
+export function isBrowserHeader(input: any): input is Headers {
+	return 'Headers' in globalThis && typeof input === 'object' && input instanceof Headers;
+}
+//#endregion
 
 /**
  * Convert number to Uint8Array, for ASN.1 length field

@@ -1,7 +1,7 @@
 
 // TODO
 
-import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, correctHeaders } from "../utils";
+import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, collectHeaders, isBrowserRequest, isBrowserResponse } from "../utils";
 import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike, HeadersValueLikeArrayable } from "../types";
 import * as sh from "structured-headers";
 import { SFVHeaderTypeDictionary, knownSfvHeaderTypeDictionary } from "./const";
@@ -63,14 +63,14 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 
 		if ('req' in source) {
 			this.response = source;
-			this.responseHeaders = this.getHeadersMap(source as any);
+			this.responseHeaders = collectHeaders(source as any);
 			this.request = source.req as any;
-			this.requestHeaders = this.getHeadersMap(this.request);
+			this.requestHeaders = collectHeaders(this.request);
 		} else {
 			this.response = null;
 			this.responseHeaders = null;
 			this.request = source as any;
-			this.requestHeaders = this.getHeadersMap(source);
+			this.requestHeaders = collectHeaders(source);
 		}
 
 		if (!this.request.url) {
@@ -96,25 +96,15 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 		this.sfvTypeDictionary = lcObjectKey(additionalSfvTypeDictionary);
 
 		this.scheme = this.request.url.startsWith('/') ? scheme : new URL(this.request.url).protocol.replace(':', '');
-		const rawHost = this.request.httpVersionMajor === 2 ? this.requestHeaders[':authority'] : this.requestHeaders['host'];
-		if (!rawHost) throw new Error('Host header is empty');
+
+		// ブラウザではthis.request.urlが常にhttpで始まるのでrawHostは使わないはず
+		const rawHost = ('httpVersionMajor' in this.request && this.request.httpVersionMajor === 2) ?
+			this.requestHeaders[':authority']
+			: this.requestHeaders['host'];
+		if (!isBrowserRequest(this.request) && !rawHost) throw new Error('Host header is empty');
 		const host = canonicalizeHeaderValue(rawHost);
 		this.targetUri = this.request.url.startsWith('/') ? (new URL(this.request.url, `${scheme}://${host}`)).href : this.request.url;
 		this.url = new URL(this.targetUri);
-	}
-
-	/**
-	 * Collect request or response headers
-	 */
-	public getHeadersMap(source: IncomingRequest | OutgoingResponse): HeadersLike {
-		if ('rawHeaders' in source && source.rawHeaders) {
-			return correctHeaders(source.rawHeaders.flat(1));
-		} else if ('getHeaders' in source && typeof source.getHeaders === 'function') {
-			return lcObjectKey(source.getHeaders());
-		} else if ('headers' in source && source.headers) {
-			return lcObjectKey(source.headers as Record<string, string | string[]>);
-		}
-		throw new Error('Cannot get headers from request object');
 	}
 
 	static inputSignatureParamsDictionary(input: SFVSignatureInputDictionaryForInput): SFVSignatureInputDictionary {
@@ -203,7 +193,11 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 			return value;
 		} else if (name === '@status') {
 			if (!this.response) throw new Error('response is empty (@status)');
-			return this.response.statusCode.toString();
+			if (isBrowserResponse(this.response)) {
+				return this.response.status.toString();
+			} else {
+				return this.response.statusCode.toString();
+			}
 		} else if (name.startsWith('@')) {
 			throw new Error(`Unknown derived component: ${name}`);
 		} else {

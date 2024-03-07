@@ -1,5 +1,5 @@
-import type { PrivateKey, RequestLike, SignatureHashAlgorithmUpperSnake } from '../types.js';
-import { type SignInfoDefaults, defaultSignInfoDefaults, encodeArrayBufferToBase64, getWebcrypto, normalizeHeaders, genAlgorithmForSignAndVerify } from '../utils.js';
+import type { IncomingRequest, PrivateKey, SignatureHashAlgorithmUpperSnake } from '../types.js';
+import { type SignInfoDefaults, defaultSignInfoDefaults, encodeArrayBufferToBase64, getWebcrypto, genAlgorithmForSignAndVerify, collectHeaders } from '../utils.js';
 import { importPrivateKey } from '../pem/pkcs8.js';
 import { keyHashAlgosForDraftEncofing } from './const.js';
 
@@ -39,7 +39,7 @@ export function getDraftAlgoString(keyAlgorithm: string, hashAlgorithm: Signatur
 }
 
 export function genDraftSigningString(
-	request: RequestLike,
+	source: IncomingRequest,
 	includeHeaders: string[],
 	additional?: {
 		keyId: string;
@@ -49,13 +49,20 @@ export function genDraftSigningString(
 		opaque?: string;
 	}
 ) {
-	const headers = normalizeHeaders(request.headers);
+	if (!source.method) {
+		throw new Error('Request method not found');
+	}
+	if (!source.url) {
+		throw new Error('Request URL not found');
+	}
+
+	const headers = collectHeaders(source);
 
 	const results: string[] = [];
 
 	for (const key of includeHeaders.map(x => x.toLowerCase())) {
 		if (key === '(request-target)') {
-			results.push(`(request-target): ${request.method.toLowerCase()} ${request.url.startsWith('/') ? request.url : new URL(request.url).pathname}`);
+			results.push(`(request-target): ${source.method.toLowerCase()} ${source.url.startsWith('/') ? source.url : new URL(source.url).pathname}`);
 		} else if (key === '(keyid)') {
 			results.push(`(keyid): ${additional?.keyId}`);
 		} else if (key === '(algorithm)') {
@@ -95,7 +102,7 @@ export function genDraftSignatureHeader(includeHeaders: string[], keyId: string,
  * @param opts
  * @returns result object
  */
-export async function signAsDraftToRequest(request: RequestLike, key: PrivateKey, includeHeaders: string[], opts: SignInfoDefaults = defaultSignInfoDefaults) {
+export async function signAsDraftToRequest(request: IncomingRequest, key: PrivateKey, includeHeaders: string[], opts: SignInfoDefaults = defaultSignInfoDefaults) {
 	// hashAlgorithm is old name
 	if ((opts as any).hashAlgorithm) {
 		opts.hash = (opts as any).hashAlgorithm;

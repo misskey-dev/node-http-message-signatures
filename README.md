@@ -116,7 +116,6 @@ fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => 
 	const parsedSignature = parseRequestSignature(request.raw);
 
 	if (parsedSignature && parsedSignature.version === 'draft') {
-
 		// Get public key by keyId
 		const publicKeyPem = publicKeyMap.get(parsedSignature.keyId)
 		if (!publicKeyPem) {
@@ -125,7 +124,7 @@ fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => 
 		}
 
 		// Verify Signature
-		const verifyResult =  await verifyDraftSignature(parsed!.value, keys.rsa4096.publicKey, errorLogger);
+		const verifyResult = await verifyDraftSignature(parsed!.value, publicKeyPem);
 		if (verifyResult !== true) {
 			reply.code(401);
 			return;
@@ -158,7 +157,7 @@ function targetSupportsRFC9421(url) {
 
 const includeHeaders = ['(request-target)', 'date', 'host', 'digest'];
 
-export async function send(url: string, body: string, keyId: string) {
+export async function send(url: string | URL, body: string, keyId: string) {
 	const privateKeyPem = privateKeyMap.get(keyId);
 	const u = new URL(url);
 
@@ -166,7 +165,6 @@ export async function send(url: string, body: string, keyId: string) {
 		headers: {
 			Date: (new Date()).toUTCString(),
 			Host: u.host,
-			Digest: digestHeader,
 		},
 		method: 'POST',
 		url: u.href,
@@ -177,7 +175,7 @@ export async function send(url: string, body: string, keyId: string) {
 		// TODO
 	} else {
 		// Draft
-		request.headers['Digest'] = await genRFC3230DigestHeader(body);
+		request.headers['Digest'] = await genRFC3230DigestHeader(body, 'SHA-256');
 
 		await signAsDraftToRequest(request, { keyId, privateKeyPem }, includeHeaders);
 

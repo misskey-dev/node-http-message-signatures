@@ -1,4 +1,4 @@
-import type { PrivateKey, RequestLike, SignatureHashAlgorithmUpperSnake } from '../types.js';
+import type { IncomingRequest, PrivateKey, SignatureHashAlgorithmUpperSnake } from '../types.js';
 import { type SignInfoDefaults } from '../utils.js';
 /**
  * Get the algorithm string for draft encoding
@@ -7,7 +7,7 @@ import { type SignInfoDefaults } from '../utils.js';
  * @returns string e.g. 'rsa-sha256'
  */
 export declare function getDraftAlgoString(keyAlgorithm: string, hashAlgorithm: SignatureHashAlgorithmUpperSnake): string;
-export declare function genDraftSigningString(request: RequestLike, includeHeaders: string[], additional?: {
+export declare function genDraftSigningString(source: IncomingRequest, includeHeaders: string[], additional?: {
     keyId: string;
     algorithm: string;
     created?: string;
@@ -24,7 +24,7 @@ export declare function genDraftSignatureHeader(includeHeaders: string[], keyId:
  * @param opts
  * @returns result object
  */
-export declare function signAsDraftToRequest(request: RequestLike, key: PrivateKey, includeHeaders: string[], opts?: SignInfoDefaults): Promise<{
+export declare function signAsDraftToRequest(request: IncomingRequest, key: PrivateKey, includeHeaders: string[], opts?: SignInfoDefaults): Promise<{
     signingString: string;
     signature: string;
     signatureHeader: string;

@@ -1,6 +1,6 @@
 import { parseDraftRequest } from './draft/parse.js';
 import type { ClockSkewSettings, IncomingRequest, ParsedSignature } from './types.js';
-import { normalizeHeaders, objectLcKeys } from './utils.js';
+import { canonicalizeHeaderValue, collectHeaders } from './utils.js';
 
 export type RequestParseOptions = {
 	/**
@@ -75,7 +75,7 @@ export function signatureHeaderIsDraft(signatureHeader: string) {
  * Check if request is based on RFC 9421
  */
 export function requestIsRFC9421(request: IncomingRequest) {
-	return objectLcKeys(request.headers).has('signature-input');
+	return 'signature-input' in collectHeaders(request);
 }
 
 /**
@@ -97,30 +97,27 @@ export function validateRequestAndGetSignatureHeader(
 	clock?: ClockSkewSettings,
 ): string {
 	if (!request.headers) throw new SignatureHeaderNotFoundError();
-	const headers = normalizeHeaders(request.headers);
+	const headers = collectHeaders(request);
 
 	if (headers['date']) {
-		if (Array.isArray(headers['date'])) throw new RequestHasMultipleDateHeadersError();
-		checkClockSkew(new Date(headers['date']), clock?.now || new Date(), clock?.delay, clock?.forward);
+		if (Array.isArray(headers['date']) && headers['date'].length > 1) throw new RequestHasMultipleDateHeadersError();
+		checkClockSkew(new Date([headers['date']].flat(1)[0]!), clock?.now || new Date(), clock?.delay, clock?.forward);
 	} else if (headers['x-date']) {
 		if (Array.isArray(headers['x-date'])) throw new RequestHasMultipleDateHeadersError();
-		checkClockSkew(new Date(headers['x-date']), clock?.now || new Date(), clock?.delay, clock?.forward);
+		checkClockSkew(new Date([headers['x-date']].flat(1)[0]), clock?.now || new Date(), clock?.delay, clock?.forward);
 	}
 
 	if (!request.method) throw new InvalidRequestError('Request method not found');
 	if (!request.url) throw new InvalidRequestError('Request URL not found');
 
-	const signatureHeader = headers['signature'];
-	if (signatureHeader) {
-		if (Array.isArray(signatureHeader)) throw new RequestHasMultipleSignatureHeadersError();
-		return signatureHeader;
-	}
+	const signatureHeader = headers['signature'] && canonicalizeHeaderValue(headers['signature']);
+	if (signatureHeader) return signatureHeader;
 
 	/**
 	 * Joyent spec uses `Authorization` header
 	 * https://github.com/TritonDataCenter/node-http-signature/blob/master/http_signing.md#default-parameterization
 	 */
-	const authorizationHeader = headers['authorization'];
+	const authorizationHeader = canonicalizeHeaderValue(headers['authorization']);
 	if (authorizationHeader) {
 		if (authorizationHeader.startsWith('Signature ')) return authorizationHeader.slice(10);
 	}

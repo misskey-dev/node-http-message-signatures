@@ -1,5 +1,5 @@
 import { IncomingRequest } from "src/types";
-import { objectLcKeys } from "src/utils";
+import { collectHeaders } from "src/utils";
 import { verifyRFC3230DigestHeader } from "./digest-rfc3230";
 import { BinaryLike } from "crypto";
 
@@ -9,7 +9,7 @@ export async function verifyDigestHeader(
 	failOnNoDigest = true,
 	errorLogger?: ((message: any) => any)
 ) {
-	const headerKeys = objectLcKeys(request.headers);
+	const headerKeys = new Set(Object.keys(collectHeaders(request)));
 	if (headerKeys.has('content-digest')) {
 		throw new Error('Not implemented yet');
 	} else if (headerKeys.has('digest')) {

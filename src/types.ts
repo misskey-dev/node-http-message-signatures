@@ -32,8 +32,8 @@ export type ResponseLike = {
 	trailers?: Record<string, string>;
 }
 
-export type IncomingRequest = RequestLike | IncomingMessage | Http2ServerRequest;
-export type OutgoingResponse = ResponseLike | ServerResponse | Http2ServerResponse;
+export type IncomingRequest = RequestLike | IncomingMessage | Http2ServerRequest | Request;
+export type OutgoingResponse = ResponseLike | ServerResponse | Http2ServerResponse | Response;
 
 export type ClockSkewSettings = {
 	/**
