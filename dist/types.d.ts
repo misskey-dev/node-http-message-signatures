@@ -4,13 +4,13 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import type { Http2ServerRequest, Http2ServerResponse } from "http2";
 import type { webcrypto } from "node:crypto";
-export type HeadersValueLike = string | number | undefined | (string | number | undefined)[];
+export type HeadersValueLike = string | number | null | undefined | (string | number | null | undefined)[];
 export type HeadersLike = Record<string, HeadersValueLike>;
 export type RequestLike = {
     url: string;
     method: string;
     headers: HeadersLike;
-    rawHeaders?: (string | number | undefined)[];
+    rawHeaders?: (string | number | null | undefined)[];
     getHeaders?: () => HeadersLike;
     body?: string;
     trailers?: Record<string, string>;
@@ -24,7 +24,7 @@ export type ResponseLike = {
     req: RequestLike;
     statusCode: number;
     headers: HeadersLike;
-    rawHeaders?: (string | number | undefined)[];
+    rawHeaders?: (string | number | null | undefined)[];
     getHeaders?: () => HeadersLike;
     body?: string;
     trailers?: Record<string, string>;

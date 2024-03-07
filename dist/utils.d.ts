@@ -5,7 +5,7 @@ import type { webcrypto } from 'node:crypto';
 export declare function getWebcrypto(): Promise<webcrypto.Crypto>;
 export declare const obsoleteLineFoldingRegEx: RegExp;
 /**
- * RFC 9421 2.1 (Remove any obsolete line folding...)
+ * RFC 9421 2.1 (3. Remove any obsolete line folding...) for HTTP/1.1
  */
 export declare function removeObsoleteLineFolding(str: string): string;
 /**
@@ -33,15 +33,14 @@ export declare function getValueByLc<T extends Record<string, any>>(src: T, key:
  *  Get the Set of keys of the object, lowercased
  */
 export declare function objectLcKeys<T extends HeadersLike>(src: T): Set<string>;
-export declare function toStringOrToLc(src: string | number | undefined): string;
+export declare function toStringOrToLc(src: string | number | undefined | null): string;
 /**
  *	Convert rawHeaders to object
- *
- *	https://nodejs.org/api/http2.html#requestrawheaders
+ *	rawHeaders: https://nodejs.org/api/http2.html#requestrawheaders
  */
-export declare function correctHeaders(src: (string | number | undefined)[]): Record<string, (string | number)[]>;
+export declare function correctHeaders(src: (string | number | undefined | null)[]): Record<string, (string | number)[]>;
 /**
- * convert number to Uint8Array, for ASN.1 length field
+ * Convert number to Uint8Array, for ASN.1 length field
  */
 export declare function numberToUint8Array(num: number | bigint): Uint8Array;
 /**

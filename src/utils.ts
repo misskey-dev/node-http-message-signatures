@@ -23,7 +23,7 @@ export function canonicalizeHeaderValue(value: HeadersValueLike): string {
 	if (typeof value === 'string') return removeObsoleteLineFolding(value).trim();
 	if (Array.isArray(value)) {
 		return value.map(v => {
-			if (v === undefined) return '';
+			if (v == null) return '';
 			if (typeof v === 'number') return v.toString();
 			if (typeof v === 'string') return removeObsoleteLineFolding(v).trim();
 			throw new Error(`Invalid header value type ${v}`);
@@ -92,7 +92,7 @@ export function objectLcKeys<T extends HeadersLike>(src: T): Set<string> {
 	}, new Set<string>() as any);
 }
 
-export function toStringOrToLc(src: string | number | undefined): string {
+export function toStringOrToLc(src: string | number | undefined | null): string {
 	if (typeof src === 'number') return src.toString();
 	if (typeof src === 'string') return src.toLowerCase();
 	return '';
@@ -102,7 +102,7 @@ export function toStringOrToLc(src: string | number | undefined): string {
  *	Convert rawHeaders to object
  *	rawHeaders: https://nodejs.org/api/http2.html#requestrawheaders
  */
-export function correctHeaders(src: (string | number | undefined)[]): Record<string, (string | number)[]> {
+export function correctHeaders(src: (string | number | undefined | null)[]): Record<string, (string | number)[]> {
 	return src.reduce((dst, prop, i) => {
 		if (i % 2 === 0) {
 			if (typeof prop !== 'string') {
@@ -111,7 +111,7 @@ export function correctHeaders(src: (string | number | undefined)[]): Record<str
 			if (prop in dst) return dst;
 			dst[prop.toLowerCase()] = [];
 		} else {
-			dst[toStringOrToLc(src[i - 1])].push(prop === undefined ? '' : prop.toString());
+			dst[toStringOrToLc(src[i - 1])].push(prop == null ? '' : prop.toString());
 		}
 		return dst;
 	}, {} as Record<string, (string | number)[]>);

@@ -286,7 +286,7 @@ async function parseAndImportPublicKey(source, keyUsages = ["verify"], providedA
 async function getWebcrypto() {
   return globalThis.crypto ?? (await import("node:crypto")).webcrypto;
 }
-var obsoleteLineFoldingRegEx = /[^\S\n]*\r?\n[^\S\n\r]+/g;
+var obsoleteLineFoldingRegEx = /[^\S\r\n]*\r?\n[^\S\r\n]+/g;
 function removeObsoleteLineFolding(str) {
   return str.replaceAll(obsoleteLineFoldingRegEx, " ");
 }
@@ -299,7 +299,7 @@ function canonicalizeHeaderValue(value) {
     return removeObsoleteLineFolding(value).trim();
   if (Array.isArray(value)) {
     return value.map((v) => {
-      if (v === void 0)
+      if (v == null)
         return "";
       if (typeof v === "number")
         return v.toString();
@@ -362,9 +362,14 @@ function toStringOrToLc(src) {
 function correctHeaders(src) {
   return src.reduce((dst, prop, i) => {
     if (i % 2 === 0) {
-      dst[toStringOrToLc(prop)] = [];
+      if (typeof prop !== "string") {
+        throw new Error(`Invalid header key type '${typeof prop}' of ${prop}`);
+      }
+      if (prop in dst)
+        return dst;
+      dst[prop.toLowerCase()] = [];
     } else {
-      dst[toStringOrToLc(src[i - 1])].push(prop === void 0 ? "" : prop.toString());
+      dst[toStringOrToLc(src[i - 1])].push(prop == null ? "" : prop.toString());
     }
     return dst;
   }, {});
