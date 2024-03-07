@@ -16,6 +16,7 @@ export * from './draft/parse.js';
 export * from './draft/sign.js';
 export * from './draft/verify.js';
 
+//export * from './rfc9421/const.js';
 //export * from './rfc9421/parse.js';
 //export * from './rfc9421/sign.js';
 //export * from './rfc9421/verify.js';

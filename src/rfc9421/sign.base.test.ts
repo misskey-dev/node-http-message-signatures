@@ -117,6 +117,27 @@ describe(RFC9421SignatureBaseFactory, () => {
 			});
 		});
 
+		test('request with raw headers (entries)', () => {
+			const request = {
+				...requestBase,
+				rawHeaders: [
+					...Object.entries(requestBase.headers),
+					['x-test', 'value'],
+					['x-test', 'value2'],
+					['X-Test', null],
+				].flat(2),
+			} satisfies RequestLike;
+			const factory = new RFC9421SignatureBaseFactory(
+				request,
+				tinySignatureInput,
+			);
+			expect(factory.requestHeaders).toEqual({
+				date: ['Tue, 07 Jun 2014 20:51:35 GMT'],
+				host: ['example.com'],
+				'x-test': ['value', 'value2', ''],
+			});
+		});
+
 		test('response basic', () => {
 			const factory = new RFC9421SignatureBaseFactory(
 				responseBase,

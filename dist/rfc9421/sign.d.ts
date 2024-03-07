@@ -1,18 +1,6 @@
 /// <reference types="node" />
 import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike } from "../types";
-/**
- * Structured Field Value Type Dictionary
- * https://datatracker.ietf.org/doc/html/rfc8941
- *
- * key: field (header) name
- * value: item, list, dict
- */
-export type SFVHeaderTypeDictionary = Record<string, 'item' | 'list' | 'dict'>;
-export declare const sfvHeaderTypeDictionaryIKnow: {
-    signature: "dict";
-    'signature-input': "dict";
-    'content-digest': "dict";
-};
+import { SFVHeaderTypeDictionary } from "./const";
 export declare const requestTargetDerivedComponents: string[];
 export declare const responseTargetDerivedComponents: string[];
 export type Kot<T> = keyof T extends 'req' ? T : null;

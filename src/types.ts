@@ -11,7 +11,7 @@ export type RequestLike = {
 	method: string;
 	headers: HeadersLike
 	// https://nodejs.org/api/http2.html#requestrawheaders
-	rawHeaders?: HeadersValueLike[];
+	rawHeaders?: HeadersValueLike[] | [string, HeadersValueLike][];
 	getHeaders?: () => HeadersLike;
 	body?: string;
 	trailers?: Record<string, string>;

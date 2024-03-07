@@ -108,7 +108,7 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 	 */
 	public getHeadersMap(source: IncomingRequest | OutgoingResponse): HeadersLike {
 		if ('rawHeaders' in source && source.rawHeaders) {
-			return correctHeaders(source.rawHeaders);
+			return correctHeaders(source.rawHeaders.flat(1));
 		} else if ('getHeaders' in source && typeof source.getHeaders === 'function') {
 			return lcObjectKey(source.getHeaders());
 		} else if ('headers' in source && source.headers) {

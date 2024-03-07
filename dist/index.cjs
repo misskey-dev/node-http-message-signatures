@@ -475,7 +475,7 @@ function correctHeaders(src) {
       if (typeof prop !== "string") {
         throw new Error(`Invalid header key type '${typeof prop}' of ${prop}`);
       }
-      if (prop in dst)
+      if (prop.toLowerCase() in dst)
         return dst;
       dst[prop.toLowerCase()] = [];
     } else {

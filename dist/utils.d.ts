@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike } from './types.js';
+import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike, HeadersValueLikeArrayable } from './types.js';
 import { ParsedAlgorithmIdentifier } from './pem/spki.js';
 import type { webcrypto } from 'node:crypto';
 export declare function getWebcrypto(): Promise<webcrypto.Crypto>;
@@ -11,7 +11,7 @@ export declare function removeObsoleteLineFolding(str: string): string;
 /**
  * RFC 9421 2.1 (If the correctly combined value is not directly available for a given field by an implementation, ...)
  */
-export declare function canonicalizeHeaderValue(value: HeadersValueLike): string;
+export declare function canonicalizeHeaderValue(value: HeadersValueLikeArrayable): string;
 /**
  * Convert object keys to lowercase
  * (Headers in Fetch API joins multiple headers with ',', but it must be ', ' in RFC 9421)
@@ -38,7 +38,7 @@ export declare function toStringOrToLc(src: string | number | undefined | null):
  *	Convert rawHeaders to object
  *	rawHeaders: https://nodejs.org/api/http2.html#requestrawheaders
  */
-export declare function correctHeaders(src: (string | number | undefined | null)[]): Record<string, (string | number)[]>;
+export declare function correctHeaders(src: HeadersValueLike[]): Record<string, (string | number)[]>;
 /**
  * Convert number to Uint8Array, for ASN.1 length field
  */
