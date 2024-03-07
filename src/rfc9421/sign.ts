@@ -4,21 +4,7 @@
 import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, correctHeaders } from "../utils";
 import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike, HeadersValueLike } from "../types";
 import * as sh from "structured-headers";
-
-/**
- * Structured Field Value Type Dictionary
- * https://datatracker.ietf.org/doc/html/rfc8941
- *
- * key: field (header) name
- * value: item, list, dict
- */
-export type SFVHeaderTypeDictionary = Record<string, 'item' | 'list' | 'dict'>
-
-export const sfvHeaderTypeDictionaryIKnow = {
-	'signature': 'dict',
-	'signature-input': 'dict',
-	'content-digest': 'dict',
-} satisfies SFVHeaderTypeDictionary;
+import { SFVHeaderTypeDictionary, knownSfvHeaderTypeDictionary } from "./const";
 
 // https://datatracker.ietf.org/doc/html/rfc9421#name-initial-contents-3
 export const requestTargetDerivedComponents = [
@@ -73,7 +59,7 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 		 */
 		responseSignatureParams?: SFVSignatureInputDictionaryForInput | string,
 	) {
-		this.sfvTypeDictionary = lcObjectKey({ ...sfvHeaderTypeDictionaryIKnow, ...additionalSfvTypeDictionary });
+		this.sfvTypeDictionary = lcObjectKey({ ...knownSfvHeaderTypeDictionary, ...additionalSfvTypeDictionary });
 
 		if ('req' in source) {
 			this.response = source;
