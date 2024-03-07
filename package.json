@@ -59,6 +59,7 @@
     "structured-headers": "^1.0.1"
   },
   "devDependencies": {
+    "@fastify/compress": "^7.0.0",
     "@jest/globals": "^29.7.0",
     "@misskey-dev/eslint-plugin": "^1.0.0",
     "@peertube/http-signature": "^1.7.0",
