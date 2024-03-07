@@ -1,8 +1,8 @@
 
 // TODO
 
-import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getLc, lcObjectKey, getMap } from "../utils";
-import { IncomingRequest, MapLike, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput } from "../types";
+import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getLc, lcObjectKey, getMap, correctHeaders } from "../utils";
+import { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput } from "../types";
 import * as sh from "structured-headers";
 
 /**
@@ -35,14 +35,17 @@ export const responseTargetDerivedComponents = [
 	'@status',
 ];
 
+export type Kot<T> = keyof T extends 'req' ? T : null;
+
 /**
  * Class for creating signature base,
  * construct with a request or a response
  */
-export class RFC9421SignatureBaseFactory {
+export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingResponse> {
 	public sfvTypeDictionary: SFVHeaderTypeDictionary;
 
 	public response: OutgoingResponse | null;
+	public responseHeaders: Record<string, string | number | string[]> | null;
 	public isRequest() {
 		return this.response === null;
 	}
@@ -51,14 +54,14 @@ export class RFC9421SignatureBaseFactory {
 	}
 
 	public request: IncomingRequest;
-	public requestHeaders: IncomingRequest['headers'];
+	public requestHeaders: Record<string, string | number | string[]>;
 	public scheme: string;
 	public targetUri: string;
 	public url: URL;
 	public requestSignatureInput: SFVSignatureInputDictionary | undefined;
 	public responseSignatureInput: SFVSignatureInputDictionary | undefined;
 	constructor(
-		source: IncomingRequest | OutgoingResponse,
+		source: T,
 		/**
 		 * Must be signature params of the request
 		 */
@@ -74,10 +77,14 @@ export class RFC9421SignatureBaseFactory {
 
 		if ('req' in source) {
 			this.response = source;
-			this.request = source.req;
+			this.responseHeaders = this.getHeadersMap(source as any);
+			this.request = source.req as any;
+			this.requestHeaders = this.getHeadersMap(this.request);
 		} else {
 			this.response = null;
-			this.request = source;
+			this.responseHeaders = null;
+			this.request = source as any;
+			this.requestHeaders = this.getHeadersMap(source);
 		}
 
 		if (!this.request.url) {
@@ -100,8 +107,6 @@ export class RFC9421SignatureBaseFactory {
 			throw new Error('responseSignatureParams is not provided');
 		}
 
-		this.requestHeaders = lcObjectKey(('headersDistinct' in this.request && this.request.headersDistinct) ? this.request.headersDistinct : this.request.headers);
-
 		this.sfvTypeDictionary = lcObjectKey(additionalSfvTypeDictionary);
 
 		this.scheme = this.request.url.startsWith('/') ? scheme : new URL(this.request.url).protocol.replace(':', '');
@@ -110,6 +115,20 @@ export class RFC9421SignatureBaseFactory {
 		const host = canonicalizeHeaderValue(rawHost);
 		this.targetUri = this.request.url.startsWith('/') ? (new URL(this.request.url, `${scheme}://${host}`)).href : this.request.url;
 		this.url = new URL(this.targetUri);
+	}
+
+	/**
+	 * Collect request or response headers
+	 */
+	public getHeadersMap(source: IncomingRequest | OutgoingResponse): Record<string, string | string[]> {
+		if ('rawHeaders' in source && source.rawHeaders) {
+			return correctHeaders(source.rawHeaders);
+		} else if ('getHeaders' in source && typeof source.getHeaders === 'function') {
+			return lcObjectKey(source.getHeaders() as Record<string, string | string[]>);
+		} else if ('headers' in source && source.headers) {
+			return lcObjectKey(source.headers as Record<string, string | string[]>);
+		}
+		throw new Error('Cannot get headers from request object');
 	}
 
 	static inputSignatureParamsDictionary(input: SFVSignatureInputDictionaryForInput): SFVSignatureInputDictionary {
@@ -128,11 +147,11 @@ export class RFC9421SignatureBaseFactory {
 
 	public get(
 		name: '@query-param',
-		paramsLike?: MapLike<'name', string>,
+		paramsLike?: MapLikeObj<'name', string>,
 	): string
 	public get(
 		name: string,
-		paramsLike?: MapLike<'req' | 'key', string> | MapLike<'sf' | 'bs' | 'tr', boolean>,
+		paramsLike?: MapLikeObj<'req' | 'key', string> | MapLikeObj<'sf' | 'bs' | 'tr', boolean>,
 	): string
 	public get(
 		name: string,
@@ -223,25 +242,14 @@ export class RFC9421SignatureBaseFactory {
 						return this.requestHeaders[name];
 					}
 				} else {
-					if (!this.response) throw new Error('response is not provided');
-					const getHeaderValue = (name: string) => {
-						if (!this.response) throw new Error('response is not provided');
-						if ('getHeaders' in this.response && typeof this.response.getHeader === 'function') {
-							return this.response.getHeaders()[name];
-						} else if ('getHeader' in this.response && typeof this.response.getHeader === 'function') {
-							return this.response.getHeader(name);
-						} else if ('headers' in this.response && this.response.headers) {
-							return getLc(this.response.headers, name);
-						}
-						throw new Error('cannot get header value from response object');
-					};
+					if (!this.response || !this.responseHeaders) throw new Error('response is not provided');
 					if (isTr) {
 						if ('trailers' in this.response && this.response.trailers) {
 							return getLc(this.response.trailers, name);
 						}
 						throw new Error(`Trailers not found in response object (${componentIdentifier})`);
 					} else {
-						return getHeaderValue(name);
+						return this.responseHeaders[name];
 					}
 				}
 			})();

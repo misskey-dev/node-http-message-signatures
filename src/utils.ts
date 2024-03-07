@@ -1,4 +1,4 @@
-import type { MapLike, SignInfo, SignatureHashAlgorithmUpperSnake } from './types.js';
+import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake } from './types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from './pem/spki.js';
 import type { webcrypto } from 'node:crypto';
 import type { IncomingHttpHeaders } from 'node:http';
@@ -84,6 +84,22 @@ export function objectLcKeys<T extends IncomingHttpHeaders>(src: T): Set<string>
 		dst.add(key.toLowerCase());
 		return dst;
 	}, new Set<string>() as any);
+}
+
+/**
+ *	Convert rawHeaders to object
+ *
+ *	https://nodejs.org/api/http2.html#requestrawheaders
+ */
+export function correctHeaders(src: string[]): Record<string, string[]> {
+	return src.reduce((dst, prop, i) => {
+		if (i % 2 === 0) {
+			dst[prop.toLowerCase()] = [];
+		} else {
+			dst[src[i - 1].toLowerCase()].push(prop);
+		}
+		return dst;
+	}, {} as Record<string, string[]>);
 }
 
 /**
@@ -189,7 +205,7 @@ export function splitPer64Chars(str: string): string[] {
 	return result;
 }
 
-export function getMap<T extends MapLike<K, V>, K, V>(
+export function getMap<T extends MapLikeObj<K, V>, K, V>(
 	obj: T,
 ): Map<K, V> {
 	if (obj instanceof Map) return obj;
