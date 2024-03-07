@@ -37,6 +37,8 @@ export const responseTargetDerivedComponents = [
 
 export type Kot<T> = keyof T extends 'req' ? T : null;
 
+type SBFHeaders = Record<string, string | number | string[] | undefined>;
+
 /**
  * Class for creating signature base,
  * construct with a request or a response
@@ -45,7 +47,7 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 	public sfvTypeDictionary: SFVHeaderTypeDictionary;
 
 	public response: OutgoingResponse | null;
-	public responseHeaders: Record<string, string | number | string[]> | null;
+	public responseHeaders: SBFHeaders | null;
 	public isRequest() {
 		return this.response === null;
 	}
@@ -54,7 +56,7 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 	}
 
 	public request: IncomingRequest;
-	public requestHeaders: Record<string, string | number | string[]>;
+	public requestHeaders: SBFHeaders;
 	public scheme: string;
 	public targetUri: string;
 	public url: URL;
@@ -120,11 +122,11 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 	/**
 	 * Collect request or response headers
 	 */
-	public getHeadersMap(source: IncomingRequest | OutgoingResponse): Record<string, string | string[]> {
+	public getHeadersMap(source: IncomingRequest | OutgoingResponse): Record<string, string | number | string[] | undefined> {
 		if ('rawHeaders' in source && source.rawHeaders) {
 			return correctHeaders(source.rawHeaders);
 		} else if ('getHeaders' in source && typeof source.getHeaders === 'function') {
-			return lcObjectKey(source.getHeaders() as Record<string, string | string[]>);
+			return lcObjectKey(source.getHeaders());
 		} else if ('headers' in source && source.headers) {
 			return lcObjectKey(source.headers as Record<string, string | string[]>);
 		}
