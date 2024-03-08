@@ -48,3 +48,39 @@ const b64Arr = [72, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100];
 	}
 	test.end();
 }
+
+{
+	function equal(a, b) {
+		if (a.length !== b.length) return false;
+		for (let i = 0; i < a.length; i++) {
+			if (a[i] !== b[i]) return false;
+		}
+		return true;
+	}
+	const arrA = new Uint8Array(b64Arr);
+	const arrB = new Uint8Array(b64Arr);
+	if (arrA === arrB) {
+		throw new Error('comparing same object');
+	}
+	test.start(`uint8array equality for of`);
+	for (let i = 0; i < test.TRYES; i++) {
+		if (!equal(arrA, arrB)) throw new Error('not equal');
+	}
+	test.end();
+}
+{
+	function equal(a, b) {
+		if (a.length !== b.length) return false;
+		return a.every((v, i) => v === b[i]);
+	}
+	const arrA = new Uint8Array(b64Arr);
+	const arrB = new Uint8Array(b64Arr);
+	if (arrA === arrB) {
+		throw new Error('comparing same object');
+	}
+	test.start(`uint8array equality arr.every`);
+	for (let i = 0; i < test.TRYES; i++) {
+		if (!equal(arrA, arrB)) throw new Error('not equal');
+	}
+	test.end();
+}

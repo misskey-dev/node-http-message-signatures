@@ -167,7 +167,10 @@ export function encodeArrayBufferToBase64(buffer: ArrayBuffer): string {
 // If equal, return true
 export function compareUint8Array(a: Uint8Array, b: Uint8Array): boolean {
 	if (a.length !== b.length) return false;
-	return a.every((v, i) => v === b[i]);
+	for (let i = 0; i < a.length; i++) {
+		if (a[i] !== b[i]) return false;
+	}
+	return true;
 }
 
 export class KeyValidationError extends Error {
