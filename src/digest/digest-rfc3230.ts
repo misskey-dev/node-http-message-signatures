@@ -1,9 +1,10 @@
-import { collectHeaders, getHeaderValue } from '../utils';
+import { collectHeaders, compareUint8Array, encodeArrayBufferToBase64NonRFC4648, getHeaderValue } from '../utils';
 import { DigestSource, createBase64Digest } from './utils';
 import { DigestHashAlgorithm, IncomingRequest } from '../types';
+import { base64 } from 'rfc4648';
 
 export async function genRFC3230DigestHeader(body: DigestSource, hashAlgorithm: DigestHashAlgorithm) {
-	return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm)}`;
+	return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64NonRFC4648)}`;
 }
 
 export const digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
@@ -29,11 +30,11 @@ export async function verifyRFC3230DigestHeader(
 		return false;
 	}
 
-	const value = match[2];
-	if (!value) {
+	if (!match[2]) {
 		if (errorLogger) errorLogger('Invalid Digest header format');
 		return false;
 	}
+	const value = base64.parse(match[2]);
 
 	const algo = match[1] as DigestHashAlgorithm;
 	if (!algo) {
@@ -41,7 +42,7 @@ export async function verifyRFC3230DigestHeader(
 		return false;
 	}
 
-	let hash: string;
+	let hash: ArrayBuffer;
 	try {
 		hash = await createBase64Digest(rawBody, algo);
 	} catch (e: any) {
@@ -52,7 +53,7 @@ export async function verifyRFC3230DigestHeader(
 		throw e;
 	}
 
-	if (hash !== value) {
+	if (!compareUint8Array(new Uint8Array(hash), value)) {
 		if (errorLogger) errorLogger(`Digest header hash mismatch`);
 		return false;
 	}

@@ -1,7 +1,8 @@
 import { ParsedDraftSignature } from "../types";
 import { parseAndImportPublicKey } from "../pem/spki";
 import { parseSignInfo } from "../shared/verify";
-import { decodeBase64ToUint8Array, getWebcrypto } from "../utils";
+import { getWebcrypto } from "../utils";
+import { base64 } from "rfc4648";
 
 /**
  * @deprecated Use `parseSignInfo`
@@ -21,7 +22,7 @@ export async function verifyDraftSignature(
 ): Promise<boolean> {
 	try {
 		const { publicKey, algorithm } = await parseAndImportPublicKey(key, ['verify'], parsed.algorithm);
-		const verify = await (await getWebcrypto()).subtle.verify(algorithm, publicKey, decodeBase64ToUint8Array(parsed.params.signature), (new TextEncoder()).encode(parsed.signingString));
+		const verify = await (await getWebcrypto()).subtle.verify(algorithm, publicKey, base64.parse(parsed.params.signature), (new TextEncoder()).encode(parsed.signingString));
 		if (verify !== true) throw new Error(`verification simply failed, result: ${verify}`);
 		return verify;
 	} catch (e) {

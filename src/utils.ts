@@ -158,17 +158,16 @@ export function genASN1Length(length: number | bigint): Uint8Array {
 /**
  * ArrayBuffer to base64
  */
-export function encodeArrayBufferToBase64(buffer: ArrayBuffer): string {
+export function encodeArrayBufferToBase64NonRFC4648(buffer: ArrayBuffer): string {
 	const uint8Array = new Uint8Array(buffer);
 	const binary = String.fromCharCode(...uint8Array);
 	return btoa(binary);
 }
 
-/**
- * base64 to Uint8Array
- */
-export function decodeBase64ToUint8Array(base64: string): Uint8Array {
-	return Uint8Array.from(atob(base64), s => s.charCodeAt(0));
+// If equal, return true
+export function compareUint8Array(a: Uint8Array, b: Uint8Array): boolean {
+	if (a.length !== b.length) return false;
+	return a.every((v, i) => v === b[i]);
 }
 
 export class KeyValidationError extends Error {

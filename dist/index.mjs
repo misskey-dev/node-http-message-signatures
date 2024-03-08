@@ -1,3 +1,600 @@
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __commonJS = (cb, mod) => function __require() {
+  return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// node_modules/.pnpm/structured-headers@1.0.1/node_modules/structured-headers/dist/types.js
+var require_types = __commonJS({
+  "node_modules/.pnpm/structured-headers@1.0.1/node_modules/structured-headers/dist/types.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.ByteSequence = void 0;
+    var ByteSequence2 = class {
+      constructor(base64Value) {
+        this.base64Value = base64Value;
+      }
+      toBase64() {
+        return this.base64Value;
+      }
+    };
+    exports.ByteSequence = ByteSequence2;
+  }
+});
+
+// node_modules/.pnpm/structured-headers@1.0.1/node_modules/structured-headers/dist/util.js
+var require_util = __commonJS({
+  "node_modules/.pnpm/structured-headers@1.0.1/node_modules/structured-headers/dist/util.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.isByteSequence = exports.isInnerList = exports.isValidKeyStr = exports.isValidTokenStr = exports.isAscii = void 0;
+    var asciiRe = /^[\x20-\x7E]*$/;
+    var tokenRe = /^[a-zA-Z*][:/!#$%&'*+\-.^_`|~A-Za-z0-9]*$/;
+    var keyRe = /^[a-z*][*\-_.a-z0-9]*$/;
+    function isAscii(str) {
+      return asciiRe.test(str);
+    }
+    exports.isAscii = isAscii;
+    function isValidTokenStr(str) {
+      return tokenRe.test(str);
+    }
+    exports.isValidTokenStr = isValidTokenStr;
+    function isValidKeyStr(str) {
+      return keyRe.test(str);
+    }
+    exports.isValidKeyStr = isValidKeyStr;
+    function isInnerList(input) {
+      return Array.isArray(input[0]);
+    }
+    exports.isInnerList = isInnerList;
+    function isByteSequence(input) {
+      return typeof input === "object" && "base64Value" in input;
+    }
+    exports.isByteSequence = isByteSequence;
+  }
+});
+
+// node_modules/.pnpm/structured-headers@1.0.1/node_modules/structured-headers/dist/token.js
+var require_token = __commonJS({
+  "node_modules/.pnpm/structured-headers@1.0.1/node_modules/structured-headers/dist/token.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Token = void 0;
+    var util_1 = require_util();
+    var Token = class {
+      constructor(value) {
+        if (!(0, util_1.isValidTokenStr)(value)) {
+          throw new TypeError("Invalid character in Token string. Tokens must start with *, A-Z and the rest of the string may only contain a-z, A-Z, 0-9, :/!#$%&'*+-.^_`|~");
+        }
+        this.value = value;
+      }
+      toString() {
+        return this.value;
+      }
+    };
+    exports.Token = Token;
+  }
+});
+
+// node_modules/.pnpm/structured-headers@1.0.1/node_modules/structured-headers/dist/serializer.js
+var require_serializer = __commonJS({
+  "node_modules/.pnpm/structured-headers@1.0.1/node_modules/structured-headers/dist/serializer.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.serializeKey = exports.serializeParameters = exports.serializeToken = exports.serializeByteSequence = exports.serializeBoolean = exports.serializeString = exports.serializeDecimal = exports.serializeInteger = exports.serializeBareItem = exports.serializeInnerList = exports.serializeItem = exports.serializeDictionary = exports.serializeList = exports.SerializeError = void 0;
+    var types_1 = require_types();
+    var token_1 = require_token();
+    var util_1 = require_util();
+    var SerializeError = class extends Error {
+    };
+    exports.SerializeError = SerializeError;
+    function serializeList2(input) {
+      return input.map((value) => {
+        if ((0, util_1.isInnerList)(value)) {
+          return serializeInnerList2(value);
+        } else {
+          return serializeItem2(value);
+        }
+      }).join(", ");
+    }
+    exports.serializeList = serializeList2;
+    function serializeDictionary2(input) {
+      return Array.from(input.entries()).map(([key, value]) => {
+        let out = serializeKey(key);
+        if (value[0] === true) {
+          out += serializeParameters(value[1]);
+        } else {
+          out += "=";
+          if ((0, util_1.isInnerList)(value)) {
+            out += serializeInnerList2(value);
+          } else {
+            out += serializeItem2(value);
+          }
+        }
+        return out;
+      }).join(", ");
+    }
+    exports.serializeDictionary = serializeDictionary2;
+    function serializeItem2(input) {
+      return serializeBareItem(input[0]) + serializeParameters(input[1]);
+    }
+    exports.serializeItem = serializeItem2;
+    function serializeInnerList2(input) {
+      return `(${input[0].map((value) => serializeItem2(value)).join(" ")})${serializeParameters(input[1])}`;
+    }
+    exports.serializeInnerList = serializeInnerList2;
+    function serializeBareItem(input) {
+      if (typeof input === "number") {
+        if (Number.isInteger(input)) {
+          return serializeInteger(input);
+        }
+        return serializeDecimal(input);
+      }
+      if (typeof input === "string") {
+        return serializeString(input);
+      }
+      if (input instanceof token_1.Token) {
+        return serializeToken(input);
+      }
+      if (input instanceof types_1.ByteSequence) {
+        return serializeByteSequence(input);
+      }
+      if (typeof input === "boolean") {
+        return serializeBoolean(input);
+      }
+      throw new SerializeError(`Cannot serialize values of type ${typeof input}`);
+    }
+    exports.serializeBareItem = serializeBareItem;
+    function serializeInteger(input) {
+      if (input < -999999999999999 || input > 999999999999999) {
+        throw new SerializeError("Structured headers can only encode integers in the range range of -999,999,999,999,999 to 999,999,999,999,999 inclusive");
+      }
+      return input.toString();
+    }
+    exports.serializeInteger = serializeInteger;
+    function serializeDecimal(input) {
+      const out = input.toFixed(3).replace(/0+$/, "");
+      const signifantDigits = out.split(".")[0].replace("-", "").length;
+      if (signifantDigits > 12) {
+        throw new SerializeError("Fractional numbers are not allowed to have more than 12 significant digits before the decimal point");
+      }
+      return out;
+    }
+    exports.serializeDecimal = serializeDecimal;
+    function serializeString(input) {
+      if (!(0, util_1.isAscii)(input)) {
+        throw new SerializeError("Only ASCII strings may be serialized");
+      }
+      return `"${input.replace(/("|\\)/g, (v) => "\\" + v)}"`;
+    }
+    exports.serializeString = serializeString;
+    function serializeBoolean(input) {
+      return input ? "?1" : "?0";
+    }
+    exports.serializeBoolean = serializeBoolean;
+    function serializeByteSequence(input) {
+      return `:${input.toBase64()}:`;
+    }
+    exports.serializeByteSequence = serializeByteSequence;
+    function serializeToken(input) {
+      return input.toString();
+    }
+    exports.serializeToken = serializeToken;
+    function serializeParameters(input) {
+      return Array.from(input).map(([key, value]) => {
+        let out = ";" + serializeKey(key);
+        if (value !== true) {
+          out += "=" + serializeBareItem(value);
+        }
+        return out;
+      }).join("");
+    }
+    exports.serializeParameters = serializeParameters;
+    function serializeKey(input) {
+      if (!(0, util_1.isValidKeyStr)(input)) {
+        throw new SerializeError("Keys in dictionaries must only contain lowercase letter, numbers, _-*. and must start with a letter or *");
+      }
+      return input;
+    }
+    exports.serializeKey = serializeKey;
+  }
+});
+
+// node_modules/.pnpm/structured-headers@1.0.1/node_modules/structured-headers/dist/parser.js
+var require_parser = __commonJS({
+  "node_modules/.pnpm/structured-headers@1.0.1/node_modules/structured-headers/dist/parser.js"(exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.ParseError = exports.parseItem = exports.parseList = exports.parseDictionary = void 0;
+    var types_1 = require_types();
+    var token_1 = require_token();
+    var util_1 = require_util();
+    function parseDictionary2(input) {
+      const parser = new Parser(input);
+      return parser.parseDictionary();
+    }
+    exports.parseDictionary = parseDictionary2;
+    function parseList2(input) {
+      const parser = new Parser(input);
+      return parser.parseList();
+    }
+    exports.parseList = parseList2;
+    function parseItem2(input) {
+      const parser = new Parser(input);
+      return parser.parseItem();
+    }
+    exports.parseItem = parseItem2;
+    var ParseError = class extends Error {
+      constructor(position, message) {
+        super(`Parse error: ${message} at offset ${position}`);
+      }
+    };
+    exports.ParseError = ParseError;
+    var Parser = class {
+      constructor(input) {
+        this.input = input;
+        this.pos = 0;
+      }
+      parseDictionary() {
+        this.skipWS();
+        const dictionary = /* @__PURE__ */ new Map();
+        while (!this.eof()) {
+          const thisKey = this.parseKey();
+          let member;
+          if (this.lookChar() === "=") {
+            this.pos++;
+            member = this.parseItemOrInnerList();
+          } else {
+            member = [true, this.parseParameters()];
+          }
+          dictionary.set(thisKey, member);
+          this.skipOWS();
+          if (this.eof()) {
+            return dictionary;
+          }
+          this.expectChar(",");
+          this.pos++;
+          this.skipOWS();
+          if (this.eof()) {
+            throw new ParseError(this.pos, "Dictionary contained a trailing comma");
+          }
+        }
+        return dictionary;
+      }
+      parseList() {
+        this.skipWS();
+        const members = [];
+        while (!this.eof()) {
+          members.push(this.parseItemOrInnerList());
+          this.skipOWS();
+          if (this.eof()) {
+            return members;
+          }
+          this.expectChar(",");
+          this.pos++;
+          this.skipOWS();
+          if (this.eof()) {
+            throw new ParseError(this.pos, "A list may not end with a trailing comma");
+          }
+        }
+        return members;
+      }
+      parseItem(standaloneItem = true) {
+        if (standaloneItem)
+          this.skipWS();
+        const result = [
+          this.parseBareItem(),
+          this.parseParameters()
+        ];
+        if (standaloneItem)
+          this.checkTrail();
+        return result;
+      }
+      parseItemOrInnerList() {
+        if (this.lookChar() === "(") {
+          return this.parseInnerList();
+        } else {
+          return this.parseItem(false);
+        }
+      }
+      parseInnerList() {
+        this.expectChar("(");
+        this.pos++;
+        const innerList = [];
+        while (!this.eof()) {
+          this.skipWS();
+          if (this.lookChar() === ")") {
+            this.pos++;
+            return [
+              innerList,
+              this.parseParameters()
+            ];
+          }
+          innerList.push(this.parseItem(false));
+          const nextChar = this.lookChar();
+          if (nextChar !== " " && nextChar !== ")") {
+            throw new ParseError(this.pos, "Expected a whitespace or ) after every item in an inner list");
+          }
+        }
+        throw new ParseError(this.pos, "Could not find end of inner list");
+      }
+      parseBareItem() {
+        const char = this.lookChar();
+        if (char === void 0) {
+          throw new ParseError(this.pos, "Unexpected end of string");
+        }
+        if (char.match(/^[-0-9]/)) {
+          return this.parseIntegerOrDecimal();
+        }
+        if (char === '"') {
+          return this.parseString();
+        }
+        if (char.match(/^[A-Za-z*]/)) {
+          return this.parseToken();
+        }
+        if (char === ":") {
+          return this.parseByteSequence();
+        }
+        if (char === "?") {
+          return this.parseBoolean();
+        }
+        throw new ParseError(this.pos, "Unexpected input");
+      }
+      parseParameters() {
+        const parameters = /* @__PURE__ */ new Map();
+        while (!this.eof()) {
+          const char = this.lookChar();
+          if (char !== ";") {
+            break;
+          }
+          this.pos++;
+          this.skipWS();
+          const key = this.parseKey();
+          let value = true;
+          if (this.lookChar() === "=") {
+            this.pos++;
+            value = this.parseBareItem();
+          }
+          parameters.set(key, value);
+        }
+        return parameters;
+      }
+      parseIntegerOrDecimal() {
+        let type = "integer";
+        let sign = 1;
+        let inputNumber = "";
+        if (this.lookChar() === "-") {
+          sign = -1;
+          this.pos++;
+        }
+        if (!isDigit(this.lookChar())) {
+          throw new ParseError(this.pos, "Expected a digit (0-9)");
+        }
+        while (!this.eof()) {
+          const char = this.getChar();
+          if (isDigit(char)) {
+            inputNumber += char;
+          } else if (type === "integer" && char === ".") {
+            if (inputNumber.length > 12) {
+              throw new ParseError(this.pos, "Exceeded maximum decimal length");
+            }
+            inputNumber += ".";
+            type = "decimal";
+          } else {
+            this.pos--;
+            break;
+          }
+          if (type === "integer" && inputNumber.length > 15) {
+            throw new ParseError(this.pos, "Exceeded maximum integer length");
+          }
+          if (type === "decimal" && inputNumber.length > 16) {
+            throw new ParseError(this.pos, "Exceeded maximum decimal length");
+          }
+        }
+        if (type === "integer") {
+          return parseInt(inputNumber, 10) * sign;
+        } else {
+          if (inputNumber.endsWith(".")) {
+            throw new ParseError(this.pos, "Decimal cannot end on a period");
+          }
+          if (inputNumber.split(".")[1].length > 3) {
+            throw new ParseError(this.pos, "Number of digits after the decimal point cannot exceed 3");
+          }
+          return parseFloat(inputNumber) * sign;
+        }
+      }
+      parseString() {
+        let outputString = "";
+        this.expectChar('"');
+        this.pos++;
+        while (!this.eof()) {
+          const char = this.getChar();
+          if (char === "\\") {
+            if (this.eof()) {
+              throw new ParseError(this.pos, "Unexpected end of input");
+            }
+            const nextChar = this.getChar();
+            if (nextChar !== "\\" && nextChar !== '"') {
+              throw new ParseError(this.pos, "A backslash must be followed by another backslash or double quote");
+            }
+            outputString += nextChar;
+          } else if (char === '"') {
+            return outputString;
+          } else if (!(0, util_1.isAscii)(char)) {
+            throw new ParseError(this.pos, "Strings must be in the ASCII range");
+          } else {
+            outputString += char;
+          }
+        }
+        throw new ParseError(this.pos, "Unexpected end of input");
+      }
+      parseToken() {
+        let outputString = "";
+        while (!this.eof()) {
+          const char = this.lookChar();
+          if (char === void 0 || !/^[:/!#$%&'*+\-.^_`|~A-Za-z0-9]$/.test(char)) {
+            return new token_1.Token(outputString);
+          }
+          outputString += this.getChar();
+        }
+        return new token_1.Token(outputString);
+      }
+      parseByteSequence() {
+        this.expectChar(":");
+        this.pos++;
+        const endPos = this.input.indexOf(":", this.pos);
+        if (endPos === -1) {
+          throw new ParseError(this.pos, 'Could not find a closing ":" character to mark end of Byte Sequence');
+        }
+        const b64Content = this.input.substring(this.pos, endPos);
+        this.pos += b64Content.length + 1;
+        if (!/^[A-Za-z0-9+/=]*$/.test(b64Content)) {
+          throw new ParseError(this.pos, "ByteSequence does not contain a valid base64 string");
+        }
+        return new types_1.ByteSequence(b64Content);
+      }
+      parseBoolean() {
+        this.expectChar("?");
+        this.pos++;
+        const char = this.getChar();
+        if (char === "1") {
+          return true;
+        }
+        if (char === "0") {
+          return false;
+        }
+        throw new ParseError(this.pos, 'Unexpected character. Expected a "1" or a "0"');
+      }
+      parseKey() {
+        var _a;
+        if (!((_a = this.lookChar()) === null || _a === void 0 ? void 0 : _a.match(/^[a-z*]/))) {
+          throw new ParseError(this.pos, "A key must begin with an asterisk or letter (a-z)");
+        }
+        let outputString = "";
+        while (!this.eof()) {
+          const char = this.lookChar();
+          if (char === void 0 || !/^[a-z0-9_\-.*]$/.test(char)) {
+            return outputString;
+          }
+          outputString += this.getChar();
+        }
+        return outputString;
+      }
+      /**
+       * Looks at the next character without advancing the cursor.
+       *
+       * Returns undefined if we were at the end of the string.
+       */
+      lookChar() {
+        return this.input[this.pos];
+      }
+      /**
+       * Checks if the next character is 'char', and fail otherwise.
+       */
+      expectChar(char) {
+        if (this.lookChar() !== char) {
+          throw new ParseError(this.pos, `Expected ${char}`);
+        }
+      }
+      getChar() {
+        return this.input[this.pos++];
+      }
+      eof() {
+        return this.pos >= this.input.length;
+      }
+      // Advances the pointer to skip all whitespace.
+      skipOWS() {
+        while (true) {
+          const c = this.input.substr(this.pos, 1);
+          if (c === " " || c === "	") {
+            this.pos++;
+          } else {
+            break;
+          }
+        }
+      }
+      // Advances the pointer to skip all spaces
+      skipWS() {
+        while (this.lookChar() === " ") {
+          this.pos++;
+        }
+      }
+      // At the end of parsing, we need to make sure there are no bytes after the
+      // header except whitespace.
+      checkTrail() {
+        this.skipWS();
+        if (!this.eof()) {
+          throw new ParseError(this.pos, "Unexpected characters at end of input");
+        }
+      }
+    };
+    exports.default = Parser;
+    var isDigitRegex = /^[0-9]$/;
+    function isDigit(char) {
+      if (char === void 0)
+        return false;
+      return isDigitRegex.test(char);
+    }
+  }
+});
+
+// node_modules/.pnpm/structured-headers@1.0.1/node_modules/structured-headers/dist/index.js
+var require_dist = __commonJS({
+  "node_modules/.pnpm/structured-headers@1.0.1/node_modules/structured-headers/dist/index.js"(exports) {
+    "use strict";
+    var __createBinding = exports && exports.__createBinding || (Object.create ? function(o, m, k, k2) {
+      if (k2 === void 0)
+        k2 = k;
+      var desc = Object.getOwnPropertyDescriptor(m, k);
+      if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+        desc = { enumerable: true, get: function() {
+          return m[k];
+        } };
+      }
+      Object.defineProperty(o, k2, desc);
+    } : function(o, m, k, k2) {
+      if (k2 === void 0)
+        k2 = k;
+      o[k2] = m[k];
+    });
+    var __exportStar = exports && exports.__exportStar || function(m, exports2) {
+      for (var p in m)
+        if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports2, p))
+          __createBinding(exports2, m, p);
+    };
+    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.Token = void 0;
+    __exportStar(require_serializer(), exports);
+    __exportStar(require_parser(), exports);
+    __exportStar(require_types(), exports);
+    __exportStar(require_util(), exports);
+    var token_1 = require_token();
+    Object.defineProperty(exports, "Token", { enumerable: true, get: function() {
+      return token_1.Token;
+    } });
+  }
+});
+
 // src/pem/spki.ts
 import ASN12 from "@lapo/asn1js";
 import Hex from "@lapo/asn1js/hex.js";
@@ -401,13 +998,15 @@ function genASN1Length(length) {
   const lengthUint8Array = numberToUint8Array(length);
   return new Uint8Array([128 + lengthUint8Array.length, ...lengthUint8Array]);
 }
-function encodeArrayBufferToBase64(buffer) {
+function encodeArrayBufferToBase64NonRFC4648(buffer) {
   const uint8Array = new Uint8Array(buffer);
   const binary = String.fromCharCode(...uint8Array);
   return btoa(binary);
 }
-function decodeBase64ToUint8Array(base64) {
-  return Uint8Array.from(atob(base64), (s) => s.charCodeAt(0));
+function compareUint8Array(a, b) {
+  if (a.length !== b.length)
+    return false;
+  return a.every((v, i) => v === b[i]);
 }
 var KeyValidationError = class extends Error {
   constructor(message) {
@@ -563,7 +1162,7 @@ function genDraftSigningString(source, includeHeaders, additional) {
 }
 async function genDraftSignature(privateKey, signingString, defaults = defaultSignInfoDefaults) {
   const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, new TextEncoder().encode(signingString));
-  return encodeArrayBufferToBase64(signatureAB);
+  return encodeArrayBufferToBase64NonRFC4648(signatureAB);
 }
 function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
   return `keyId="${keyId}",algorithm="${algorithm}",headers="${includeHeaders.join(" ")}",signature="${signature}"`;
@@ -827,11 +1426,11 @@ function parseRequestSignature(request, options) {
 // src/keypair.ts
 async function exportPublicKeyPem(key) {
   const ab = await (await getWebcrypto()).subtle.exportKey("spki", key);
-  return "-----BEGIN PUBLIC KEY-----\n" + splitPer64Chars(encodeArrayBufferToBase64(ab)).join("\n") + "\n-----END PUBLIC KEY-----\n";
+  return "-----BEGIN PUBLIC KEY-----\n" + splitPer64Chars(encodeArrayBufferToBase64NonRFC4648(ab)).join("\n") + "\n-----END PUBLIC KEY-----\n";
 }
 async function exportPrivateKeyPem(key) {
   const ab = await (await getWebcrypto()).subtle.exportKey("pkcs8", key);
-  return "-----BEGIN PRIVATE KEY-----\n" + splitPer64Chars(encodeArrayBufferToBase64(ab)).join("\n") + "\n-----END PRIVATE KEY-----\n";
+  return "-----BEGIN PRIVATE KEY-----\n" + splitPer64Chars(encodeArrayBufferToBase64NonRFC4648(ab)).join("\n") + "\n-----END PRIVATE KEY-----\n";
 }
 async function genRsaKeyPair(modulusLength = 4096, keyUsage = ["sign", "verify"]) {
   const keyPair = await (await getWebcrypto()).subtle.generateKey(
@@ -892,24 +1491,19 @@ async function genEd448KeyPair(keyUsage) {
 
 // src/digest/utils.ts
 async function createBase64Digest(body, hash = "SHA-256") {
-  if (Array.isArray(hash)) {
-    return new Map(await Promise.all(hash.map((h) => {
-      return (async () => [h, await createBase64Digest(body, h)])();
-    })));
-  }
   if (hash === "SHA") {
     hash = "SHA-1";
   }
   if (typeof body === "string") {
     body = new TextEncoder().encode(body);
   }
-  const hashAb = await (await getWebcrypto()).subtle.digest(hash, body);
-  return encodeArrayBufferToBase64(hashAb);
+  return await (await getWebcrypto()).subtle.digest(hash, body);
 }
 
 // src/digest/digest-rfc3230.ts
+import { base64 } from "rfc4648";
 async function genRFC3230DigestHeader(body, hashAlgorithm) {
-  return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm)}`;
+  return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64NonRFC4648)}`;
 }
 var digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
 async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
@@ -928,12 +1522,12 @@ async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true
       errorLogger("Invalid Digest header format");
     return false;
   }
-  const value = match[2];
-  if (!value) {
+  if (!match[2]) {
     if (errorLogger)
       errorLogger("Invalid Digest header format");
     return false;
   }
+  const value = base64.parse(match[2]);
   const algo = match[1];
   if (!algo) {
     if (errorLogger)
@@ -951,7 +1545,7 @@ async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true
     }
     throw e;
   }
-  if (hash !== value) {
+  if (!compareUint8Array(new Uint8Array(hash), value)) {
     if (errorLogger)
       errorLogger(`Digest header hash mismatch`);
     return false;
@@ -976,11 +1570,12 @@ async function verifyDigestHeader(request, rawBody, failOnNoDigest = true, error
 }
 
 // src/draft/verify.ts
+import { base64 as base642 } from "rfc4648";
 var genSignInfoDraft = parseSignInfo;
 async function verifyDraftSignature(parsed, key, errorLogger) {
   try {
     const { publicKey, algorithm } = await parseAndImportPublicKey(key, ["verify"], parsed.algorithm);
-    const verify = await (await getWebcrypto()).subtle.verify(algorithm, publicKey, decodeBase64ToUint8Array(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
+    const verify = await (await getWebcrypto()).subtle.verify(algorithm, publicKey, base642.parse(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
     if (verify !== true)
       throw new Error(`verification simply failed, result: ${verify}`);
     return verify;
@@ -990,6 +1585,273 @@ async function verifyDraftSignature(parsed, key, errorLogger) {
     return false;
   }
 }
+
+// src/rfc9421/const.ts
+var knownSfvHeaderTypeDictionary = {
+  /**
+   * RFC 9421 HTTP Message Signatures
+   * https://datatracker.ietf.org/doc/html/rfc9421#name-initial-contents-3
+   */
+  // https://datatracker.ietf.org/doc/html/rfc9421#signature-header
+  "signature": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc9421#signature-input-header
+  "signature-input": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc9421#accept-signature-header
+  "accept-signature": "dict",
+  /**
+   * RFC 9530 Digest Fields
+   * https://datatracker.ietf.org/doc/html/rfc9530#name-http-field-name-registratio
+   */
+  // https://datatracker.ietf.org/doc/html/rfc9530#name-the-content-digest-field
+  "content-digest": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc9530#name-the-repr-digest-field
+  "repr-digest": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc9530#name-integrity-preference-fields
+  "want-content-digest": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc9530#want-fields
+  "want-repr-digest": "dict"
+};
+
+// src/rfc9421/sign.ts
+var sh = __toESM(require_dist(), 1);
+var requestTargetDerivedComponents = [
+  "@method",
+  "@authority",
+  "@scheme",
+  "@target-uri",
+  "@request-target",
+  "@path",
+  "@query"
+];
+var responseTargetDerivedComponents = [
+  "@status"
+];
+var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
+  isRequest() {
+    return this.response === null;
+  }
+  isResponse() {
+    return this.response !== null;
+  }
+  constructor(source, requestSignatureParams, scheme = "https", additionalSfvTypeDictionary = {}, responseSignatureParams) {
+    this.sfvTypeDictionary = lcObjectKey({ ...knownSfvHeaderTypeDictionary, ...additionalSfvTypeDictionary });
+    if ("req" in source) {
+      this.response = source;
+      this.responseHeaders = collectHeaders(source);
+      this.request = source.req;
+      this.requestHeaders = collectHeaders(this.request);
+    } else {
+      this.response = null;
+      this.responseHeaders = null;
+      this.request = source;
+      this.requestHeaders = collectHeaders(source);
+    }
+    if (!this.request.url) {
+      throw new Error("Request URL is empty");
+    }
+    if (!this.request.method) {
+      throw new Error("Request method is empty");
+    }
+    this.requestSignatureInput = typeof requestSignatureParams === "string" ? sh.parseDictionary(requestSignatureParams) : requestSignatureParams && _RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(requestSignatureParams);
+    if (this.isRequest() && !this.requestSignatureInput) {
+      throw new Error("requestSignatureParams is not provided");
+    }
+    this.responseSignatureInput = typeof responseSignatureParams === "string" ? sh.parseDictionary(responseSignatureParams) : responseSignatureParams && _RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(responseSignatureParams);
+    if (this.isResponse() && !this.responseSignatureInput) {
+      throw new Error("responseSignatureParams is not provided");
+    }
+    this.sfvTypeDictionary = lcObjectKey(additionalSfvTypeDictionary);
+    this.scheme = this.request.url.startsWith("/") ? scheme : new URL(this.request.url).protocol.replace(":", "");
+    const rawHost = "httpVersionMajor" in this.request && this.request.httpVersionMajor === 2 ? this.requestHeaders[":authority"] : this.requestHeaders["host"];
+    if (!isBrowserRequest(this.request) && !rawHost)
+      throw new Error("Host header is empty");
+    const host = canonicalizeHeaderValue(rawHost);
+    this.targetUri = this.request.url.startsWith("/") ? new URL(this.request.url, `${scheme}://${host}`).href : this.request.url;
+    this.url = new URL(this.targetUri);
+  }
+  static inputSignatureParamsDictionary(input) {
+    const output = getMap(input);
+    for (const [label, item] of output) {
+      if (Array.isArray(item)) {
+        const [components, params] = item;
+        for (let i = 0; i < components.length; i++) {
+          components[i][1] = getMap(components[i][1]);
+        }
+        output.set(label, [components, getMap(params)]);
+      }
+    }
+    return output;
+  }
+  get(name, paramsLike = /* @__PURE__ */ new Map()) {
+    const params = getMap(paramsLike);
+    const componentIdentifier = sh.serializeItem([name, params]);
+    if (!name) {
+      throw new Error(`Type is empty: ${componentIdentifier}`);
+    }
+    if (name.startsWith('"')) {
+      if (name.endsWith('"')) {
+        name = name.slice(1, -1);
+      } else {
+        throw new Error(`Invalid component type string: ${componentIdentifier}`);
+      }
+    }
+    if (this.isResponse() && params.get("req") !== true && requestTargetDerivedComponents.includes(name)) {
+      throw new Error(`component is not available in response (must use with ;req, or provided object is unintentionally treated as response (existing req prop.)): ${name}`);
+    }
+    if (this.isRequest() && responseTargetDerivedComponents.includes(name)) {
+      throw new Error(`component is not available in request (provided object is unintentionally treated as request (including req prop.)): ${name}`);
+    }
+    if (this.isRequest() && params.get("req") === true) {
+      throw new Error("req param is not available in request (provided object is treated as request, please set req param with Request)");
+    }
+    const isReq = this.isRequest() || params.get("req") === true;
+    if (name === "@signature-params") {
+      throw new Error(`@signature-params is not available in get method: ${componentIdentifier}`);
+    } else if (name === "@method") {
+      if (!this.request.method) {
+        throw new Error("Request method is empty");
+      }
+      return this.request.method.toUpperCase();
+    } else if (name === "@authority") {
+      return this.url.host;
+    } else if (name === "@scheme") {
+      return this.scheme.toLocaleLowerCase();
+    } else if (name === "@target-uri") {
+      return this.targetUri;
+    } else if (name === "@request-target") {
+      if (!this.request.method) {
+        throw new Error("Request method is empty");
+      }
+      return `${this.request.method.toLowerCase()} ${this.url.pathname}`;
+    } else if (name === "@path") {
+      return this.url.pathname;
+    } else if (name === "@query") {
+      return this.url.search;
+    } else if (name === "@query-param") {
+      const key = params.get("name");
+      if (key === void 0) {
+        throw new Error("Query parameter name not found or invalid");
+      }
+      const value = this.url.searchParams.get(key.toString());
+      if (value === null) {
+        throw new Error(`Query parameter not found: ${key} (${componentIdentifier})`);
+      }
+      return value;
+    } else if (name === "@status") {
+      if (!this.response)
+        throw new Error("response is empty (@status)");
+      if (isBrowserResponse(this.response)) {
+        return this.response.status.toString();
+      } else {
+        return this.response.statusCode.toString();
+      }
+    } else if (name.startsWith("@")) {
+      throw new Error(`Unknown derived component: ${name}`);
+    } else {
+      const key = params.get("key");
+      const isSf = params.get("sf") === true;
+      const isBs = params.get("bs") === true;
+      const isTr = params.get("tr") === true;
+      if ([key, isSf, isBs].filter((x) => x).length > 1) {
+        throw new Error(`Invalid component: ${componentIdentifier} (multiple params are specified)`);
+      }
+      const rawValue = (() => {
+        if (isReq) {
+          if (isTr) {
+            if ("trailers" in this.request && this.request.trailers) {
+              return getValueByLc(this.request.trailers, name);
+            }
+            throw new Error(`Trailers not found in request object (${componentIdentifier})`);
+          } else {
+            return this.requestHeaders[name];
+          }
+        } else {
+          if (!this.response || !this.responseHeaders)
+            throw new Error("response is not provided");
+          if (isTr) {
+            if ("trailers" in this.response && this.response.trailers) {
+              return getValueByLc(this.response.trailers, name);
+            }
+            throw new Error(`Trailers not found in response object (${componentIdentifier})`);
+          } else {
+            return this.responseHeaders[name];
+          }
+        }
+      })();
+      if (rawValue === void 0) {
+        throw new Error(`Header not found: ${componentIdentifier}`);
+      }
+      if (isSf) {
+        if (!(name in this.sfvTypeDictionary)) {
+          throw new Error(`Type not found in SFV type dictionary: ${name}`);
+        }
+        const canonicalized = canonicalizeHeaderValue(rawValue);
+        if (this.sfvTypeDictionary[name] === "dict") {
+          return sh.serializeDictionary(sh.parseDictionary(canonicalized));
+        } else if (this.sfvTypeDictionary[name] === "list") {
+          return sh.serializeList(sh.parseList(canonicalized));
+        } else if (this.sfvTypeDictionary[name] === "item") {
+          return sh.serializeItem(sh.parseItem(canonicalized));
+        }
+      }
+      if (key) {
+        if (!(name in this.sfvTypeDictionary)) {
+          throw new Error(`key specified but type unknown (Type not found in SFV type dictionary): ${componentIdentifier}`);
+        }
+        if (typeof rawValue !== "string") {
+          throw new Error(`Key specified but value is not a string: ${componentIdentifier}`);
+        }
+        if (this.sfvTypeDictionary[name] === "dict") {
+          const dictionary = sh.parseDictionary(rawValue);
+          const value = dictionary.get(key);
+          if (value === void 0) {
+            throw new Error(`Key not found in dictionary: ${key} (${componentIdentifier})`);
+          }
+          if (Array.isArray(value[0])) {
+            return sh.serializeList([value]);
+          } else {
+            return sh.serializeItem(value);
+          }
+        } else {
+          throw new Error(`"${name}" is not dict: ${this.sfvTypeDictionary[name]} (${componentIdentifier})`);
+        }
+      }
+      if (isBs) {
+        const sequences = (Array.isArray(rawValue) ? rawValue : [rawValue]).map((x) => canonicalizeHeaderValue(x)).map((x) => new TextEncoder().encode(x)).map((x) => encodeArrayBufferToBase64NonRFC4648(x.buffer)).map((x) => new sh.ByteSequence(x)).map((x) => [x, /* @__PURE__ */ new Map()]);
+        return sh.serializeList(sequences);
+      }
+      return canonicalizeHeaderValue(rawValue);
+    }
+  }
+  generate(label) {
+    const item = this.isRequest() ? this.requestSignatureInput?.get(label) : this.responseSignatureInput?.get(label);
+    if (!item) {
+      throw new Error(`label not found: ${label}`);
+    }
+    if (!Array.isArray(item[0])) {
+      throw new Error(`item is not InnerList: ${sh.serializeDictionary(/* @__PURE__ */ new Map([[label, item]]))}`);
+    }
+    const results = /* @__PURE__ */ new Map();
+    for (const component of item[0]) {
+      let name = component[0];
+      if (name.startsWith('"')) {
+        if (name.endsWith('"')) {
+          name = name.slice(1, -1);
+        } else {
+          throw new Error(`Invalid component identifier name: ${name}`);
+        }
+      }
+      component[0] = name;
+      const componentIdentifier = sh.serializeItem(component);
+      if (results.has(componentIdentifier)) {
+        throw new Error(`Duplicate key: ${name}`);
+      }
+      results.set(componentIdentifier, this.get(name, component[1]));
+    }
+    results.set('"@signature-params"', sh.serializeInnerList(item));
+    return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join("\n");
+  }
+};
 export {
   ClockSkewInvalidError,
   DraftSignatureHeaderClockInvalidError,
@@ -1000,6 +1862,7 @@ export {
   KeyValidationError,
   Pkcs1ParseError,
   Pkcs8ParseError,
+  RFC9421SignatureBaseFactory,
   RequestHasMultipleDateHeadersError,
   RequestHasMultipleSignatureHeadersError,
   SignatureHeaderNotFoundError,
@@ -1009,12 +1872,12 @@ export {
   canonicalizeHeaderValue,
   checkClockSkew,
   collectHeaders,
+  compareUint8Array,
   correctHeadersFromFlatArray,
-  decodeBase64ToUint8Array,
   decodePem,
   defaultSignInfoDefaults,
   digestHeaderRegEx,
-  encodeArrayBufferToBase64,
+  encodeArrayBufferToBase64NonRFC4648,
   exportPrivateKeyPem,
   exportPublicKeyPem,
   genASN1Length,
@@ -1044,6 +1907,7 @@ export {
   isBrowserResponse,
   keyHashAlgosForDraftDecoding,
   keyHashAlgosForDraftEncofing,
+  knownSfvHeaderTypeDictionary,
   lcObjectKey,
   numberToUint8Array,
   obsoleteLineFoldingRegEx,
@@ -1058,6 +1922,8 @@ export {
   parseSpki,
   removeObsoleteLineFolding,
   requestIsRFC9421,
+  requestTargetDerivedComponents,
+  responseTargetDerivedComponents,
   rsaASN1AlgorithmIdentifier,
   signAsDraftToRequest,
   signatureHeaderIsDraft,

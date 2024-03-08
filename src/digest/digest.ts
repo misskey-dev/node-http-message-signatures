@@ -1,11 +1,11 @@
-import { IncomingRequest } from "src/types";
-import { collectHeaders } from "src/utils";
+import { IncomingRequest } from "../types";
+import { collectHeaders } from "../utils";
 import { verifyRFC3230DigestHeader } from "./digest-rfc3230";
-import { BinaryLike } from "crypto";
+import { DigestSource } from "./utils";
 
 export async function verifyDigestHeader(
 	request: IncomingRequest,
-	rawBody: BinaryLike,
+	rawBody: DigestSource,
 	failOnNoDigest = true,
 	errorLogger?: ((message: any) => any)
 ) {

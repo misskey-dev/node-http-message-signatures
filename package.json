@@ -56,6 +56,7 @@
   ],
   "dependencies": {
     "@lapo/asn1js": "^1.2.4",
+    "rfc4648": "^1.5.3",
     "structured-headers": "^1.0.1"
   },
   "devDependencies": {

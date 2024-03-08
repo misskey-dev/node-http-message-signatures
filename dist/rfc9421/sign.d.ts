@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike } from "../types";
 import { SFVHeaderTypeDictionary } from "./const";
 export declare const requestTargetDerivedComponents: string[];
@@ -30,10 +29,6 @@ export declare class RFC9421SignatureBaseFactory<T extends IncomingRequest | Out
      * Set if provided object is response
      */
     responseSignatureParams?: SFVSignatureInputDictionaryForInput | string);
-    /**
-     * Collect request or response headers
-     */
-    getHeadersMap(source: IncomingRequest | OutgoingResponse): HeadersLike;
     static inputSignatureParamsDictionary(input: SFVSignatureInputDictionaryForInput): SFVSignatureInputDictionary;
     get(name: '@query-param', paramsLike?: MapLikeObj<'name', string>): string;
     get(name: string, paramsLike?: MapLikeObj<'req' | 'key', string> | MapLikeObj<'sf' | 'bs' | 'tr', boolean>): string;

@@ -14,7 +14,8 @@ const buildOptionsBase = {
 	outbase: `${__dirname}/src`,
 	outdir: `${__dirname}/dist`,
 	external: [
-		'@lapo/asn1js'
+		'@lapo/asn1js',
+		'rfc4648',
 	],
 	loader: {
 		'.ts': 'ts'

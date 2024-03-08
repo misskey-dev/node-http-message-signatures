@@ -2,6 +2,7 @@ import { collectHeaders, getHeaderValue } from '../utils';
 import { DigestSource, createBase64Digest } from './utils';
 import type { DigestHashAlgorithm, IncomingRequest } from '../types';
 import * as sh from 'structured-headers';
+import { base64 } from 'rfc4648';
 
 export class RFC9530GenerateDigestHeaderError extends Error {
 	constructor(message: string) { super(message); }
@@ -20,19 +21,74 @@ export const RFC9530HashAlgorithmRegistry = {
 	'crc32c': 'Deprecated',
 } satisfies Record<string, RFC9530HashAlgorithmStatus>;
 export type RFC9530HashAlgorithm = keyof typeof RFC9530HashAlgorithmRegistry;
+export const supportedHashAlgorithmsWithRFC9530AndWebCrypto = ['sha-256', 'sha-512'] satisfies RFC9530HashAlgorithm[];
 /**
  * Want-*-Digest parsed by structured-headers.parseDictionary
  * https://datatracker.ietf.org/doc/html/rfc9530#name-integrity-preference-fields
  */
 export type RFC9530Prefernece = Map<string, [number, Map<any, any>]>;
-export type RFC9530ResultObject = [string, sh.ByteSequence][];
 
-async function genSingle(body: DigestSource, hashAlgorithm: string): Promise<RFC9530ResultObject> {
+function isRFC9530Prefernece(obj: any): obj is RFC9530Prefernece {
+	if (!(obj instanceof Map)) return false;
+	if (obj.size === 0) return false;
+	const zeroth = obj.values().next().value;
+	if (!(zeroth instanceof Array)) return false;
+	if (zeroth.length !== 2) return false;
+	if (typeof zeroth[0] !== 'number') return false;
+	if (!(zeroth[1] instanceof Map)) return false;
+	return true;
+}
+
+/**
+ * @param prefernece Prefernece map (Want-*-Digest field parsed by structured-headers.parseDictionary)
+ * @param meAcceptable The hash algorithms that You can accept or use
+ * @returns
+ */
+export function chooseRFC9530HashAlgorithmByPreference(
+	prefernece: RFC9530Prefernece,
+	meAcceptable: RFC9530HashAlgorithm[] = supportedHashAlgorithmsWithRFC9530AndWebCrypto,
+): RFC9530HashAlgorithm | null {
+	const meAcceptableLower = new Set(meAcceptable.map((v) => v.toLowerCase()));
+	const arr = Array.from(
+		prefernece.entries(),
+		([k, [v]]) => ([k.toLowerCase() as RFC9530HashAlgorithm, v] as const) // 一応lowercaseにしておく
+	);
+	const res = arr.reduce(([kp, vp], [kc, vc]) => {
+		if (!meAcceptableLower.has(kc) || vc === 0) return [kp, vp] as const;
+		if (kc == null) return [kp, vp] as const;
+		if (vc > vp) {
+			return [kc, vc] as const;
+		}
+		return [kp, vp] as const;
+	}, [null, 0] as readonly [RFC9530HashAlgorithm | null, number]);
+	return res[0];
+}
+
+export type RFC9530ResultObject = [string, [sh.ByteSequence, Map<any, any>]][];
+
+/**
+ * Generate single Digest header
+ * @param body The body to be hashed
+ * @param hashAlgorithm
+ *	Supported common to RFC 9530 Registered and SubtleCrypto.digest = Only 'SHA-256' and 'SHA-512'
+ * @returns `[[algorithm, [ByteSequence, Map(0)]]]`
+ *	To convert to string, use serializeDictionary from structured-headers
+ */
+export async function genSingleRFC9530DigestHeader(body: DigestSource, hashAlgorithm: string): Promise<RFC9530ResultObject> {
 	if (!['SHA-256', 'SHA-512'].includes(hashAlgorithm.toUpperCase())) {
 		throw new RFC9530GenerateDigestHeaderError('Unsupported hash algorithm');
 	}
 	return [
-		[hashAlgorithm.toLowerCase(), new sh.ByteSequence(await createBase64Digest(body, hashAlgorithm.toUpperCase() as 'SHA-256' | 'SHA-512'))],
+		[
+			hashAlgorithm.toLowerCase(),
+			[
+				new sh.ByteSequence(
+					await createBase64Digest(body, hashAlgorithm.toUpperCase() as any)
+						.then(data => base64.stringify(new Uint8Array(data)))
+				),
+				new Map()
+			],
+		],
 	];
 }
 
@@ -40,55 +96,41 @@ async function genSingle(body: DigestSource, hashAlgorithm: string): Promise<RFC
  * Generate Digest header
  * @param body The body to be hashed
  * @param hashAlgorithms
- * 	RFC 9530 Registered & SubtleCrypto.digest Supported = Only supports 'SHA-256' and 'SHA-512'
- * 	RFC9530Prefernece: Keys must be lowercase
- * @param options
- * @returns `[algorithm, ByteSequence][]`
+ *	Supported common to RFC 9530 Registered and SubtleCrypto.digest = Only 'SHA-256' and 'SHA-512'
+ * @param process
+ *	'concurrent' to use Promise.all, 'sequential' to use for..of
+ *	@default 'concurrent'
+ * @returns `[algorithm, [ByteSequence, Map(0)]][]`
  *	To convert to string, use serializeDictionary from structured-headers
  */
 export async function genRFC9530DigestHeader(
 	body: DigestSource,
-	hashAlgorithms: string | RFC9530Prefernece | Iterable<'SHA-256' | 'SHA-512'> = ['SHA-256'],
-	/**
-	 * 'concurrent' to use Promise.all, 'sequential' to use for..of
-	 * @default 'concurrent'
-	 */
+	hashAlgorithms: string | RFC9530Prefernece | Iterable<string> = ['SHA-256'],
 	process: 'concurrent' | 'sequential' = 'concurrent',
 ): Promise<RFC9530ResultObject> {
 	if (typeof hashAlgorithms === 'string') {
-		return await genSingle(body, hashAlgorithms);
+		return await genSingleRFC9530DigestHeader(body, hashAlgorithms);
 	}
 
-	if (hashAlgorithms instanceof Map) {
-		if (hashAlgorithms.size === 0) {
-			throw new RFC9530GenerateDigestHeaderError('Empty hashAlgorithms');
+	if (isRFC9530Prefernece(hashAlgorithms)) {
+		// Prefernece
+		const chosen = chooseRFC9530HashAlgorithmByPreference(hashAlgorithms);
+		if (chosen == null) {
+			throw new RFC9530GenerateDigestHeaderError('Provided hashAlgorithms does not contain SHA-256 or SHA-512');
 		}
-		if (Array.isArray(hashAlgorithms.values()[0])) {
-			// Prefernece
-			// sha-256かsha-512しか対応していないため、凝った実装はしない
-			const sha256 = hashAlgorithms.get('sha-256')?.[0];
-			const sha512 = hashAlgorithms.get('sha-512')?.[0];
-			if (sha256 == null && sha512 == null) {
-				throw new RFC9530GenerateDigestHeaderError('Provided hashAlgorithms does not contain SHA-256 or SHA-512');
-			}
-			if ((sha256 ?? 0) <= (sha512 ?? 0)) {
-				return await genSingle(body, 'SHA-256');
-			} else {
-				return await genSingle(body, 'SHA-256');
-			}
-		}
+		return await genSingleRFC9530DigestHeader(body, chosen);
 	}
 
 	if (process === 'concurrent') {
 		return await Promise.all(Array.from(
 			hashAlgorithms as Iterable<'SHA-256' | 'SHA-512'>,
-			(algo) => genSingle(body, algo).then(([v]) => v),
+			(algo) => genSingleRFC9530DigestHeader(body, algo).then(([v]) => v),
 		));
 	}
 
 	const result = [] as RFC9530ResultObject;
 	for (const algo of hashAlgorithms) {
-		await genSingle(body, algo).then(([v]) => result.push(v));
+		await genSingleRFC9530DigestHeader(body, algo).then(([v]) => result.push(v));
 	}
 	return result;
 }
