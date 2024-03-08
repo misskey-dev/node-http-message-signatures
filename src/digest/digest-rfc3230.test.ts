@@ -36,7 +36,15 @@ describe('rfc3230', () => {
 					'digest': `SHA=${encodeArrayBufferToBase64(await createBase64Digest('foo', 'SHA-1'))}`,
 				},
 			} as any;
-			expect(await verifyRFC3230DigestHeader(request, 'foo')).toBe(true);
+			expect(await verifyRFC3230DigestHeader(request, 'foo', { algorithms: ['SHA-1'] })).toBe(true);
+		});
+		test('normal SHA-1 fail', async () => {
+			const request = {
+				headers: {
+					'digest': `SHA=${encodeArrayBufferToBase64(await createBase64Digest('foo', 'SHA-1'))}`,
+				},
+			} as any;
+			expect(await verifyRFC3230DigestHeader(request, 'foo', { algorithms: ['SHA-256'] })).toBe(false);
 		});
 		test('normal SHA-256', async () => {
 			const request = {

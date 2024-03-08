@@ -10,7 +10,6 @@ export async function genRFC3230DigestHeader(body: DigestSource, hashAlgorithm: 
 export const digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
 
 /**
- *
  * @param request Incoming request
  * @param rawBody Raw body
  * @param failOnNoDigest If false, return true when no Digest header is found (default: true)
@@ -20,9 +19,24 @@ export const digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
 export async function verifyRFC3230DigestHeader(
 	request: IncomingRequest,
 	rawBody: DigestSource,
-	failOnNoDigest = true,
+	opts: boolean | {
+		/**
+		 * If false, return true when no Digest header is found
+		 * @default true
+		 */
+		failOnNoDigest?: boolean,
+		/**
+		 * Specify hash algorithms you accept (Web Crypto API algorithm names)
+		 */
+		algorithms: DigestHashAlgorithm[],
+	} = {
+		failOnNoDigest: true,
+		algorithms: ['SHA-256', 'SHA-512'],
+	},
 	errorLogger?: ((message: any) => any)
 ) {
+	const failOnNoDigest = typeof opts === 'boolean' ? opts : opts.failOnNoDigest;
+	const algorithms = typeof opts === 'boolean' ? ['SHA-256', 'SHA-512'] : opts.algorithms;
 	const digestHeader = getHeaderValue(collectHeaders(request), 'digest');
 	if (!digestHeader) {
 		if (failOnNoDigest) {
@@ -47,6 +61,10 @@ export async function verifyRFC3230DigestHeader(
 	const algo = match[1] as DigestHashAlgorithm;
 	if (!algo) {
 		if (errorLogger) errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
+		return false;
+	}
+	if (!algorithms.includes(algo) && !(algo === 'SHA' && algorithms.includes('SHA-1'))) {
+		if (errorLogger) errorLogger(`Unsupported hash algorithm detected in opts.algorithms: ${algo} (supported: ${algorithms.join(', ')})`);
 		return false;
 	}
 

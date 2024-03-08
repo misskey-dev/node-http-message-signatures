@@ -1,5 +1,6 @@
 import * as sh from 'structured-headers';
 import { RFC9530Prefernece, chooseRFC9530HashAlgorithmByPreference, genRFC9530DigestHeader, verifyRFC9530DigestHeader } from './digest-rfc9530';
+import { verifyDigestHeader } from './digest';
 
 const base64Resultes = new Map([
 	['{"hello": "world"}\n', {
@@ -160,5 +161,24 @@ describe('rfc9530', () => {
 					.toThrow('Unsupported hash algorithm detected in opts.hashAlgorithms: md5 (supported: sha-256, sha-512)');
 			});
 		});
+	});
+});
+
+describe(verifyDigestHeader, () => {
+	test('normal', async () => {
+		const request = {
+			headers: {
+				'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:`,
+			}
+		};
+		expect(await verifyDigestHeader(request as any, '')).toBe(true);
+	});
+	test('fail', async () => {
+		const request = {
+			headers: {
+				'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:`,
+			}
+		};
+		expect(await verifyDigestHeader(request as any, '', { algorithms: ['SHA-512'] })).toBe(false);
 	});
 });

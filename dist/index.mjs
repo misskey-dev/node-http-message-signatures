@@ -30,7 +30,7 @@ var require_types = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ByteSequence = void 0;
-    var ByteSequence2 = class {
+    var ByteSequence3 = class {
       constructor(base64Value) {
         this.base64Value = base64Value;
       }
@@ -38,7 +38,7 @@ var require_types = __commonJS({
         return this.base64Value;
       }
     };
-    exports.ByteSequence = ByteSequence2;
+    exports.ByteSequence = ByteSequence3;
   }
 });
 
@@ -229,11 +229,11 @@ var require_parser = __commonJS({
     var types_1 = require_types();
     var token_1 = require_token();
     var util_1 = require_util();
-    function parseDictionary2(input) {
+    function parseDictionary3(input) {
       const parser = new Parser(input);
       return parser.parseDictionary();
     }
-    exports.parseDictionary = parseDictionary2;
+    exports.parseDictionary = parseDictionary3;
     function parseList2(input) {
       const parser = new Parser(input);
       return parser.parseList();
@@ -1513,7 +1513,12 @@ async function genRFC3230DigestHeader(body, hashAlgorithm) {
   return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64)}`;
 }
 var digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
-async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
+async function verifyRFC3230DigestHeader(request, rawBody, opts = {
+  failOnNoDigest: true,
+  algorithms: ["SHA-256", "SHA-512"]
+}, errorLogger) {
+  const failOnNoDigest = typeof opts === "boolean" ? opts : opts.failOnNoDigest;
+  const algorithms = typeof opts === "boolean" ? ["SHA-256", "SHA-512"] : opts.algorithms;
   const digestHeader = getHeaderValue(collectHeaders(request), "digest");
   if (!digestHeader) {
     if (failOnNoDigest) {
@@ -1541,6 +1546,11 @@ async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true
       errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
     return false;
   }
+  if (!algorithms.includes(algo) && !(algo === "SHA" && algorithms.includes("SHA-1"))) {
+    if (errorLogger)
+      errorLogger(`Unsupported hash algorithm detected in opts.algorithms: ${algo} (supported: ${algorithms.join(", ")})`);
+    return false;
+  }
   let hash;
   try {
     hash = await createBase64Digest(rawBody, algo);
@@ -1560,13 +1570,218 @@ async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true
   return true;
 }
 
+// src/digest/digest-rfc9530.ts
+var sh = __toESM(require_dist(), 1);
+import { base64 as base643 } from "rfc4648";
+var RFC9530GenerateDigestHeaderError = class extends Error {
+  constructor(message) {
+    super(message);
+  }
+};
+var RFC9530HashAlgorithmRegistry = {
+  "sha-512": "Active",
+  "sha-256": "Active",
+  "md5": "Deprecated",
+  "sha": "Deprecated",
+  "unixsum": "Deprecated",
+  "unixcksum": "Deprecated",
+  "adler": "Deprecated",
+  "crc32c": "Deprecated"
+};
+var supportedHashAlgorithmsWithRFC9530AndWebCrypto = ["sha-256", "sha-512"];
+function isRFC9530Prefernece(obj) {
+  if (!(obj instanceof Map))
+    return false;
+  if (obj.size === 0)
+    return false;
+  const zeroth = obj.values().next().value;
+  if (!(zeroth instanceof Array))
+    return false;
+  if (zeroth.length !== 2)
+    return false;
+  if (typeof zeroth[0] !== "number")
+    return false;
+  if (!(zeroth[1] instanceof Map))
+    return false;
+  return true;
+}
+function isSupportedRFC9530HashAlgorithm(algo) {
+  return supportedHashAlgorithmsWithRFC9530AndWebCrypto.includes(algo.toLowerCase());
+}
+function convertHashAlgorithmFromRFC9530ToWebCrypto(algo) {
+  const lowercased = algo.toLowerCase();
+  if (lowercased === "sha-256")
+    return "SHA-256";
+  if (lowercased === "sha-512")
+    return "SHA-512";
+  throw new Error(`Unsupported hash algorithm: ${algo}`);
+}
+function convertHashAlgorithmFromWebCryptoToRFC9530(algo) {
+  const uppercased = algo.toUpperCase();
+  if (uppercased === "SHA-256")
+    return "sha-256";
+  if (uppercased === "SHA-512")
+    return "sha-512";
+  throw new Error(`Unsupported hash algorithm: ${algo}`);
+}
+function chooseRFC9530HashAlgorithmByPreference(prefernece, meAcceptable = supportedHashAlgorithmsWithRFC9530AndWebCrypto) {
+  const meAcceptableLower = new Set(meAcceptable.map((v) => v.toLowerCase()));
+  const arr = Array.from(
+    prefernece.entries(),
+    ([k, [v]]) => [k.toLowerCase(), v]
+    // 一応lowercaseにしておく
+  );
+  const res = arr.reduce(([kp, vp], [kc, vc]) => {
+    if (!meAcceptableLower.has(kc) || vc === 0)
+      return [kp, vp];
+    if (kc == null)
+      return [kp, vp];
+    if (vc > vp) {
+      return [kc, vc];
+    }
+    return [kp, vp];
+  }, [null, 0]);
+  return res[0];
+}
+async function genSingleRFC9530DigestHeader(body, hashAlgorithm) {
+  if (!isSupportedRFC9530HashAlgorithm(hashAlgorithm)) {
+    throw new RFC9530GenerateDigestHeaderError("Unsupported hash algorithm");
+  }
+  return [
+    [
+      hashAlgorithm.toLowerCase(),
+      [
+        new sh.ByteSequence(
+          await createBase64Digest(body, convertHashAlgorithmFromRFC9530ToWebCrypto(hashAlgorithm)).then((data) => base643.stringify(new Uint8Array(data)))
+        ),
+        /* @__PURE__ */ new Map()
+      ]
+    ]
+  ];
+}
+async function genRFC9530DigestHeader(body, hashAlgorithms = ["SHA-256"], process = "concurrent") {
+  if (typeof hashAlgorithms === "string") {
+    return await genSingleRFC9530DigestHeader(body, hashAlgorithms);
+  }
+  if (isRFC9530Prefernece(hashAlgorithms)) {
+    const chosen = chooseRFC9530HashAlgorithmByPreference(hashAlgorithms);
+    if (chosen == null) {
+      throw new RFC9530GenerateDigestHeaderError("Provided hashAlgorithms does not contain SHA-256 or SHA-512");
+    }
+    return await genSingleRFC9530DigestHeader(body, chosen);
+  }
+  if (process === "concurrent") {
+    return await Promise.all(Array.from(
+      hashAlgorithms,
+      (algo) => genSingleRFC9530DigestHeader(body, algo).then(([v]) => v)
+    ));
+  }
+  const result = [];
+  for (const algo of hashAlgorithms) {
+    await genSingleRFC9530DigestHeader(body, algo).then(([v]) => result.push(v));
+  }
+  return result;
+}
+async function verifyRFC9530DigestHeader(request, rawBody, opts = {
+  failOnNoDigest: true,
+  verifyAll: true,
+  hashAlgorithms: ["sha-256", "sha-512"]
+}, errorLogger) {
+  const headers = collectHeaders(request);
+  const contentDigestHeader = getHeaderValue(headers, "content-digest");
+  if (!contentDigestHeader) {
+    if (opts.failOnNoDigest) {
+      if (errorLogger)
+        errorLogger("Repr-Digest or Content-Digest header not found");
+      return false;
+    }
+    return true;
+  }
+  let dictionary;
+  try {
+    dictionary = Array.from(sh.parseDictionary(contentDigestHeader), ([k, v]) => [k.toLowerCase(), v]);
+  } catch (e) {
+    if (errorLogger)
+      errorLogger("Invalid Digest header");
+    return false;
+  }
+  if (dictionary.length === 0) {
+    if (errorLogger)
+      errorLogger("Digest header is empty");
+    return false;
+  }
+  let hashAlgorithms = (opts.hashAlgorithms || ["sha-256", "sha-512"]).map((v) => v.toLowerCase());
+  if (hashAlgorithms.length === 0) {
+    throw new Error("hashAlgorithms is empty");
+  }
+  for (const algo of hashAlgorithms) {
+    if (!isSupportedRFC9530HashAlgorithm(algo)) {
+      throw new Error(`Unsupported hash algorithm detected in opts.hashAlgorithms: ${algo} (supported: ${supportedHashAlgorithmsWithRFC9530AndWebCrypto.join(", ")})`);
+    }
+  }
+  const dictionaryAlgorithms = dictionary.reduce((prev, [k]) => prev.add(k), /* @__PURE__ */ new Set());
+  if (!hashAlgorithms.some((v) => dictionaryAlgorithms.has(v))) {
+    if (errorLogger)
+      errorLogger("No supported Content-Digest header algorithm");
+    return false;
+  }
+  if (!opts.verifyAll) {
+    hashAlgorithms = [hashAlgorithms.find((v) => dictionaryAlgorithms.has(v))];
+  }
+  const results = await Promise.allSettled(
+    dictionary.map(([algo, [value]]) => {
+      if (!hashAlgorithms.includes(algo.toLowerCase())) {
+        return Promise.resolve(null);
+      }
+      if (!(value instanceof sh.ByteSequence)) {
+        return Promise.reject(new Error("Invalid dictionary value type"));
+      }
+      return createBase64Digest(rawBody, convertHashAlgorithmFromRFC9530ToWebCrypto(algo.toLowerCase())).then((hash) => compareUint8Array(base643.parse(value.toBase64()), new Uint8Array(hash)));
+    })
+  );
+  if (!results.some((v) => v.status === "fulfilled" && v.value === true)) {
+    if (errorLogger)
+      errorLogger(`No digest(s) matched`);
+    return false;
+  }
+  for (const result of results) {
+    if (result.status === "fulfilled" && result.value === false) {
+      if (errorLogger)
+        errorLogger(`Content-Digest header hash simply mismatched`);
+      return false;
+    } else if (result.status === "rejected") {
+      if (errorLogger)
+        errorLogger(`Content-Digest header parse error: ${result.reason}`);
+      return false;
+    }
+  }
+  return true;
+}
+
 // src/digest/digest.ts
-async function verifyDigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
+async function verifyDigestHeader(request, rawBody, opts = {
+  failOnNoDigest: true,
+  algorithms: ["SHA-256", "SHA-512"],
+  verifyAll: true
+}, errorLogger) {
+  const failOnNoDigest = typeof opts === "boolean" ? opts : opts.failOnNoDigest;
+  const algorithms = typeof opts === "boolean" ? ["SHA-256", "SHA-512"] : opts.algorithms;
+  const verifyAll = typeof opts === "boolean" ? true : opts.verifyAll;
   const headerKeys = new Set(Object.keys(collectHeaders(request)));
   if (headerKeys.has("content-digest")) {
-    throw new Error("Not implemented yet");
+    return await verifyRFC9530DigestHeader(
+      request,
+      rawBody,
+      { failOnNoDigest, verifyAll, hashAlgorithms: algorithms.map(convertHashAlgorithmFromWebCryptoToRFC9530) },
+      errorLogger
+    );
   } else if (headerKeys.has("digest")) {
-    return await verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest, errorLogger);
+    return await verifyRFC3230DigestHeader(
+      request,
+      rawBody,
+      { failOnNoDigest, algorithms },
+      errorLogger
+    );
   }
   if (failOnNoDigest) {
     if (errorLogger)
@@ -1577,12 +1792,12 @@ async function verifyDigestHeader(request, rawBody, failOnNoDigest = true, error
 }
 
 // src/draft/verify.ts
-import { base64 as base643 } from "rfc4648";
+import { base64 as base644 } from "rfc4648";
 var genSignInfoDraft = parseSignInfo;
 async function verifyDraftSignature(parsed, key, errorLogger) {
   try {
     const { publicKey, algorithm } = await parseAndImportPublicKey(key, ["verify"], parsed.algorithm);
-    const verify = await (await getWebcrypto()).subtle.verify(algorithm, publicKey, base643.parse(parsed.params.signature), textEncoder.encode(parsed.signingString));
+    const verify = await (await getWebcrypto()).subtle.verify(algorithm, publicKey, base644.parse(parsed.params.signature), textEncoder.encode(parsed.signingString));
     if (verify !== true)
       throw new Error(`verification simply failed, result: ${verify}`);
     return verify;
@@ -1620,7 +1835,7 @@ var knownSfvHeaderTypeDictionary = {
 };
 
 // src/rfc9421/sign.ts
-var sh = __toESM(require_dist(), 1);
+var sh2 = __toESM(require_dist(), 1);
 var requestTargetDerivedComponents = [
   "@method",
   "@authority",
@@ -1659,11 +1874,11 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
     if (!this.request.method) {
       throw new Error("Request method is empty");
     }
-    this.requestSignatureInput = typeof requestSignatureParams === "string" ? sh.parseDictionary(requestSignatureParams) : requestSignatureParams && _RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(requestSignatureParams);
+    this.requestSignatureInput = typeof requestSignatureParams === "string" ? sh2.parseDictionary(requestSignatureParams) : requestSignatureParams && _RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(requestSignatureParams);
     if (this.isRequest() && !this.requestSignatureInput) {
       throw new Error("requestSignatureParams is not provided");
     }
-    this.responseSignatureInput = typeof responseSignatureParams === "string" ? sh.parseDictionary(responseSignatureParams) : responseSignatureParams && _RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(responseSignatureParams);
+    this.responseSignatureInput = typeof responseSignatureParams === "string" ? sh2.parseDictionary(responseSignatureParams) : responseSignatureParams && _RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(responseSignatureParams);
     if (this.isResponse() && !this.responseSignatureInput) {
       throw new Error("responseSignatureParams is not provided");
     }
@@ -1691,7 +1906,7 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
   }
   get(name, paramsLike = /* @__PURE__ */ new Map()) {
     const params = getMap(paramsLike);
-    const componentIdentifier = sh.serializeItem([name, params]);
+    const componentIdentifier = sh2.serializeItem([name, params]);
     if (!name) {
       throw new Error(`Type is empty: ${componentIdentifier}`);
     }
@@ -1794,11 +2009,11 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
         }
         const canonicalized = canonicalizeHeaderValue(rawValue);
         if (this.sfvTypeDictionary[name] === "dict") {
-          return sh.serializeDictionary(sh.parseDictionary(canonicalized));
+          return sh2.serializeDictionary(sh2.parseDictionary(canonicalized));
         } else if (this.sfvTypeDictionary[name] === "list") {
-          return sh.serializeList(sh.parseList(canonicalized));
+          return sh2.serializeList(sh2.parseList(canonicalized));
         } else if (this.sfvTypeDictionary[name] === "item") {
-          return sh.serializeItem(sh.parseItem(canonicalized));
+          return sh2.serializeItem(sh2.parseItem(canonicalized));
         }
       }
       if (key) {
@@ -1809,15 +2024,15 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
           throw new Error(`Key specified but value is not a string: ${componentIdentifier}`);
         }
         if (this.sfvTypeDictionary[name] === "dict") {
-          const dictionary = sh.parseDictionary(rawValue);
+          const dictionary = sh2.parseDictionary(rawValue);
           const value = dictionary.get(key);
           if (value === void 0) {
             throw new Error(`Key not found in dictionary: ${key} (${componentIdentifier})`);
           }
           if (Array.isArray(value[0])) {
-            return sh.serializeList([value]);
+            return sh2.serializeList([value]);
           } else {
-            return sh.serializeItem(value);
+            return sh2.serializeItem(value);
           }
         } else {
           throw new Error(`"${name}" is not dict: ${this.sfvTypeDictionary[name]} (${componentIdentifier})`);
@@ -1829,7 +2044,7 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
             throw new Error(`Invalid header value type: ${typeof x}`);
           }
           return [
-            new sh.ByteSequence(
+            new sh2.ByteSequence(
               encodeArrayBufferToBase64(
                 textEncoder.encode(canonicalizeHeaderValue(x)).buffer
               )
@@ -1837,7 +2052,7 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
             /* @__PURE__ */ new Map()
           ];
         });
-        return sh.serializeList(sequences);
+        return sh2.serializeList(sequences);
       }
       return canonicalizeHeaderValue(rawValue);
     }
@@ -1848,7 +2063,7 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
       throw new Error(`label not found: ${label}`);
     }
     if (!Array.isArray(item[0])) {
-      throw new Error(`item is not InnerList: ${sh.serializeDictionary(/* @__PURE__ */ new Map([[label, item]]))}`);
+      throw new Error(`item is not InnerList: ${sh2.serializeDictionary(/* @__PURE__ */ new Map([[label, item]]))}`);
     }
     const results = /* @__PURE__ */ new Map();
     for (const component of item[0]) {
@@ -1861,13 +2076,13 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
         }
       }
       component[0] = name;
-      const componentIdentifier = sh.serializeItem(component);
+      const componentIdentifier = sh2.serializeItem(component);
       if (results.has(componentIdentifier)) {
         throw new Error(`Duplicate key: ${name}`);
       }
       results.set(componentIdentifier, this.get(name, component[1]));
     }
-    results.set('"@signature-params"', sh.serializeInnerList(item));
+    results.set('"@signature-params"', sh2.serializeInnerList(item));
     return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join("\n");
   }
 };
@@ -1882,6 +2097,8 @@ export {
   Pkcs1ParseError,
   Pkcs8ParseError,
   RFC9421SignatureBaseFactory,
+  RFC9530GenerateDigestHeaderError,
+  RFC9530HashAlgorithmRegistry,
   RequestHasMultipleDateHeadersError,
   RequestHasMultipleSignatureHeadersError,
   SignatureHeaderNotFoundError,
@@ -1890,8 +2107,10 @@ export {
   asn1ToArrayBuffer,
   canonicalizeHeaderValue,
   checkClockSkew,
+  chooseRFC9530HashAlgorithmByPreference,
   collectHeaders,
   compareUint8Array,
+  convertHashAlgorithmFromWebCryptoToRFC9530,
   correctHeadersFromFlatArray,
   decodePem,
   defaultSignInfoDefaults,
@@ -1908,9 +2127,11 @@ export {
   genEd25519KeyPair,
   genEd448KeyPair,
   genRFC3230DigestHeader,
+  genRFC9530DigestHeader,
   genRsaKeyPair,
   genSignInfo,
   genSignInfoDraft,
+  genSingleRFC9530DigestHeader,
   genSpkiFromPkcs1,
   getDraftAlgoString,
   getHeaderValue,
@@ -1947,10 +2168,12 @@ export {
   signAsDraftToRequest,
   signatureHeaderIsDraft,
   splitPer64Chars,
+  supportedHashAlgorithmsWithRFC9530AndWebCrypto,
   toStringOrToLc,
   validateAndProcessParsedDraftSignatureHeader,
   validateRequestAndGetSignatureHeader,
   verifyDigestHeader,
   verifyDraftSignature,
-  verifyRFC3230DigestHeader
+  verifyRFC3230DigestHeader,
+  verifyRFC9530DigestHeader
 };

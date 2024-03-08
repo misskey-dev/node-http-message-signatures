@@ -39,17 +39,22 @@ function isRFC9530Prefernece(obj: any): obj is RFC9530Prefernece {
 	return true;
 }
 
-const supportedRFC9530HashAlgorithms = ['sha-256', 'sha-512'] satisfies RFC9530HashAlgorithm[];
-
 function isSupportedRFC9530HashAlgorithm(algo: string): algo is RFC9530HashAlgorithm {
-	return supportedRFC9530HashAlgorithms.includes(algo.toLowerCase() as any);
+	return supportedHashAlgorithmsWithRFC9530AndWebCrypto.includes(algo.toLowerCase() as any);
 }
 
-function convertRFC9530HashAlgorithmToWebCrypto(algo: RFC9530HashAlgorithm): DigestHashAlgorithm {
+function convertHashAlgorithmFromRFC9530ToWebCrypto(algo: RFC9530HashAlgorithm): DigestHashAlgorithm {
 	const lowercased = algo.toLowerCase();
 	if (lowercased === 'sha-256') return 'SHA-256';
 	if (lowercased === 'sha-512') return 'SHA-512';
-	throw new Error(`Unsupported hash algorithm: ${lowercased}`);
+	throw new Error(`Unsupported hash algorithm: ${algo}`);
+}
+
+export function convertHashAlgorithmFromWebCryptoToRFC9530(algo: DigestHashAlgorithm): RFC9530HashAlgorithm {
+	const uppercased = algo.toUpperCase();
+	if (uppercased === 'SHA-256') return 'sha-256';
+	if (uppercased === 'SHA-512') return 'sha-512';
+	throw new Error(`Unsupported hash algorithm: ${algo}`);
 }
 
 /**
@@ -96,7 +101,7 @@ export async function genSingleRFC9530DigestHeader(body: DigestSource, hashAlgor
 			hashAlgorithm.toLowerCase(),
 			[
 				new sh.ByteSequence(
-					await createBase64Digest(body, convertRFC9530HashAlgorithmToWebCrypto(hashAlgorithm))
+					await createBase64Digest(body, convertHashAlgorithmFromRFC9530ToWebCrypto(hashAlgorithm))
 						.then(data => base64.stringify(new Uint8Array(data)))
 				),
 				new Map()
@@ -234,7 +239,7 @@ export async function verifyRFC9530DigestHeader(
 			if (!(value instanceof sh.ByteSequence)) {
 				return Promise.reject(new Error('Invalid dictionary value type'));
 			}
-			return createBase64Digest(rawBody, convertRFC9530HashAlgorithmToWebCrypto(algo.toLowerCase() as RFC9530HashAlgorithm))
+			return createBase64Digest(rawBody, convertHashAlgorithmFromRFC9530ToWebCrypto(algo.toLowerCase() as RFC9530HashAlgorithm))
 				.then(hash => compareUint8Array(base64.parse(value.toBase64()), new Uint8Array(hash)));
 		})
 	);

@@ -10,6 +10,7 @@ export * from './keypair.js';
 
 export * from './digest/digest.js';
 export * from './digest/digest-rfc3230.js';
+export * from './digest/digest-rfc9530.js';
 
 export * from './draft/const.js';
 export * from './draft/parse.js';
