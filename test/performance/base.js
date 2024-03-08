@@ -8,11 +8,12 @@ function round3(value) {
 export class PerformanceBase {
 	constructor(
 		TRYES,
+		title = 'Performance test',
 		log = console.log,
 	) {
 		this.TRYES = TRYES;
 		this.log = log;
-		this.log(chalk.bold('Performance test, TRYES:'), TRYES);
+		this.log(chalk.bold(title), 'TRYES:', TRYES);
 	}
 
 	start(

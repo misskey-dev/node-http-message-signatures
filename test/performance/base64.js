@@ -50,7 +50,7 @@ const b64Arr = [72, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100];
 }
 
 {
-	function equal(a, b) {
+	const equal = (a, b) => {
 		if (a.length !== b.length) return false;
 		for (let i = 0; i < a.length; i++) {
 			if (a[i] !== b[i]) return false;
@@ -69,7 +69,7 @@ const b64Arr = [72, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100];
 	test.end();
 }
 {
-	function equal(a, b) {
+	const equal = (a, b) => {
 		if (a.length !== b.length) return false;
 		return a.every((v, i) => v === b[i]);
 	}
