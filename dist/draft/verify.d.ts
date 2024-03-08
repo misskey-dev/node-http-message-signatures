@@ -1,5 +1,5 @@
-import { ParsedDraftSignature } from "../types";
-import { parseSignInfo } from "../shared/verify";
+import { ParsedDraftSignature } from "../types.js";
+import { parseSignInfo } from "../shared/verify.js";
 /**
  * @deprecated Use `parseSignInfo`
  */

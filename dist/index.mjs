@@ -880,6 +880,7 @@ async function parseAndImportPublicKey(source, keyUsages = ["verify"], providedA
 }
 
 // src/utils.ts
+import { base64 } from "rfc4648";
 async function getWebcrypto() {
   return globalThis.crypto ?? (await import("node:crypto")).webcrypto;
 }
@@ -998,15 +999,18 @@ function genASN1Length(length) {
   const lengthUint8Array = numberToUint8Array(length);
   return new Uint8Array([128 + lengthUint8Array.length, ...lengthUint8Array]);
 }
-function encodeArrayBufferToBase64NonRFC4648(buffer) {
+function encodeArrayBufferToBase64(buffer) {
   const uint8Array = new Uint8Array(buffer);
-  const binary = String.fromCharCode(...uint8Array);
-  return btoa(binary);
+  return base64.stringify(uint8Array);
 }
 function compareUint8Array(a, b) {
   if (a.length !== b.length)
     return false;
-  return a.every((v, i) => v === b[i]);
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i])
+      return false;
+  }
+  return true;
 }
 var KeyValidationError = class extends Error {
   constructor(message) {
@@ -1100,6 +1104,9 @@ async function importPrivateKey(key, keyUsages = ["sign"], defaults = defaultSig
   return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, extractable, keyUsages);
 }
 
+// src/const.ts
+var textEncoder = new TextEncoder();
+
 // src/draft/sign.ts
 function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
   const verifyHash = () => {
@@ -1161,8 +1168,8 @@ function genDraftSigningString(source, includeHeaders, additional) {
   return results.join("\n");
 }
 async function genDraftSignature(privateKey, signingString, defaults = defaultSignInfoDefaults) {
-  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, new TextEncoder().encode(signingString));
-  return encodeArrayBufferToBase64NonRFC4648(signatureAB);
+  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, textEncoder.encode(signingString));
+  return encodeArrayBufferToBase64(signatureAB);
 }
 function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
   return `keyId="${keyId}",algorithm="${algorithm}",headers="${includeHeaders.join(" ")}",signature="${signature}"`;
@@ -1426,11 +1433,11 @@ function parseRequestSignature(request, options) {
 // src/keypair.ts
 async function exportPublicKeyPem(key) {
   const ab = await (await getWebcrypto()).subtle.exportKey("spki", key);
-  return "-----BEGIN PUBLIC KEY-----\n" + splitPer64Chars(encodeArrayBufferToBase64NonRFC4648(ab)).join("\n") + "\n-----END PUBLIC KEY-----\n";
+  return "-----BEGIN PUBLIC KEY-----\n" + splitPer64Chars(encodeArrayBufferToBase64(ab)).join("\n") + "\n-----END PUBLIC KEY-----\n";
 }
 async function exportPrivateKeyPem(key) {
   const ab = await (await getWebcrypto()).subtle.exportKey("pkcs8", key);
-  return "-----BEGIN PRIVATE KEY-----\n" + splitPer64Chars(encodeArrayBufferToBase64NonRFC4648(ab)).join("\n") + "\n-----END PRIVATE KEY-----\n";
+  return "-----BEGIN PRIVATE KEY-----\n" + splitPer64Chars(encodeArrayBufferToBase64(ab)).join("\n") + "\n-----END PRIVATE KEY-----\n";
 }
 async function genRsaKeyPair(modulusLength = 4096, keyUsage = ["sign", "verify"]) {
   const keyPair = await (await getWebcrypto()).subtle.generateKey(
@@ -1495,15 +1502,15 @@ async function createBase64Digest(body, hash = "SHA-256") {
     hash = "SHA-1";
   }
   if (typeof body === "string") {
-    body = new TextEncoder().encode(body);
+    body = textEncoder.encode(body);
   }
   return await (await getWebcrypto()).subtle.digest(hash, body);
 }
 
 // src/digest/digest-rfc3230.ts
-import { base64 } from "rfc4648";
+import { base64 as base642 } from "rfc4648";
 async function genRFC3230DigestHeader(body, hashAlgorithm) {
-  return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64NonRFC4648)}`;
+  return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64)}`;
 }
 var digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
 async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true, errorLogger) {
@@ -1527,7 +1534,7 @@ async function verifyRFC3230DigestHeader(request, rawBody, failOnNoDigest = true
       errorLogger("Invalid Digest header format");
     return false;
   }
-  const value = base64.parse(match[2]);
+  const value = base642.parse(match[2]);
   const algo = match[1];
   if (!algo) {
     if (errorLogger)
@@ -1570,12 +1577,12 @@ async function verifyDigestHeader(request, rawBody, failOnNoDigest = true, error
 }
 
 // src/draft/verify.ts
-import { base64 as base642 } from "rfc4648";
+import { base64 as base643 } from "rfc4648";
 var genSignInfoDraft = parseSignInfo;
 async function verifyDraftSignature(parsed, key, errorLogger) {
   try {
     const { publicKey, algorithm } = await parseAndImportPublicKey(key, ["verify"], parsed.algorithm);
-    const verify = await (await getWebcrypto()).subtle.verify(algorithm, publicKey, base642.parse(parsed.params.signature), new TextEncoder().encode(parsed.signingString));
+    const verify = await (await getWebcrypto()).subtle.verify(algorithm, publicKey, base643.parse(parsed.params.signature), textEncoder.encode(parsed.signingString));
     if (verify !== true)
       throw new Error(`verification simply failed, result: ${verify}`);
     return verify;
@@ -1817,7 +1824,19 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
         }
       }
       if (isBs) {
-        const sequences = (Array.isArray(rawValue) ? rawValue : [rawValue]).map((x) => canonicalizeHeaderValue(x)).map((x) => new TextEncoder().encode(x)).map((x) => encodeArrayBufferToBase64NonRFC4648(x.buffer)).map((x) => new sh.ByteSequence(x)).map((x) => [x, /* @__PURE__ */ new Map()]);
+        const sequences = (Array.isArray(rawValue) ? rawValue : [rawValue]).map((x) => {
+          if (typeof x !== "string") {
+            throw new Error(`Invalid header value type: ${typeof x}`);
+          }
+          return [
+            new sh.ByteSequence(
+              encodeArrayBufferToBase64(
+                textEncoder.encode(canonicalizeHeaderValue(x)).buffer
+              )
+            ),
+            /* @__PURE__ */ new Map()
+          ];
+        });
         return sh.serializeList(sequences);
       }
       return canonicalizeHeaderValue(rawValue);
@@ -1877,7 +1896,7 @@ export {
   decodePem,
   defaultSignInfoDefaults,
   digestHeaderRegEx,
-  encodeArrayBufferToBase64NonRFC4648,
+  encodeArrayBufferToBase64,
   exportPrivateKeyPem,
   exportPublicKeyPem,
   genASN1Length,

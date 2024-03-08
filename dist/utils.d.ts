@@ -48,7 +48,7 @@ export declare function genASN1Length(length: number | bigint): Uint8Array;
 /**
  * ArrayBuffer to base64
  */
-export declare function encodeArrayBufferToBase64NonRFC4648(buffer: ArrayBuffer): string;
+export declare function encodeArrayBufferToBase64(buffer: ArrayBuffer): string;
 export declare function compareUint8Array(a: Uint8Array, b: Uint8Array): boolean;
 export declare class KeyValidationError extends Error {
     constructor(message: string);

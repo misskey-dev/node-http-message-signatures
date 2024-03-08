@@ -1,4 +1,4 @@
-import type { ECNamedCurve } from './types';
+import type { ECNamedCurve } from './types.js';
 export declare function exportPublicKeyPem(key: CryptoKey): Promise<string>;
 export declare function exportPrivateKeyPem(key: CryptoKey): Promise<string>;
 export declare function genRsaKeyPair(modulusLength?: number, keyUsage?: KeyUsage[]): Promise<{

@@ -1,6 +1,6 @@
 import ASN1 from '@lapo/asn1js';
-import { ECNamedCurve, KeyAlgorithmName } from '../types';
-import { SignInfoDefaults } from '../utils';
+import { ECNamedCurve, KeyAlgorithmName } from '../types.js';
+import { SignInfoDefaults } from '../utils.js';
 export declare class SpkiParseError extends Error {
     constructor(message: string);
 }
@@ -112,6 +112,6 @@ export declare function parseAndImportPublicKey(source: ASN1.StreamOrBinary | Cr
     publicKey: CryptoKey;
     algorithm: {
         name: string;
-        hash: import("../types").SignatureHashAlgorithmUpperSnake;
+        hash: import("../types.js").SignatureHashAlgorithmUpperSnake;
     };
 }>;

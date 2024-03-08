@@ -1,5 +1,5 @@
-import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike } from "../types";
-import { SFVHeaderTypeDictionary } from "./const";
+import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike } from "../types.js";
+import { SFVHeaderTypeDictionary } from "./const.js";
 export declare const requestTargetDerivedComponents: string[];
 export declare const responseTargetDerivedComponents: string[];
 export type Kot<T> = keyof T extends 'req' ? T : null;
