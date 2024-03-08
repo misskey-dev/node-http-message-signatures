@@ -1,21 +1,8 @@
 import { genEd25519KeyPair, genRsaKeyPair, importPrivateKey } from '../../dist/index.mjs';
 import bytes from 'bytes';
+import { PerformanceBase } from './base.js';
 
-const COUNTS = 50;
-
-function round3(value) {
-	const pow = Math.pow(10, 3);
-	return Math.round(value * pow) / pow;
-}
-
-/**
- * @param {string} name
- * @param {[number, number]} diff
- */
-function logPerf(name, diff) {
-	const ms = diff[0] * 1e3 + diff[1] / 1e6;
-	console.log(name, '\n', round3(ms), 'ms', round3(COUNTS / (ms / 1e3)), 'ops/s');
-}
+const test = new PerformanceBase(50);
 
 function logMemUsage(name, before, after) {
 	console.log(name, {
@@ -34,15 +21,15 @@ for (const [type, genFn] of [ ['rsa4096', genRsaKeyPair], ['ed25519', genEd25519
 	const initial = process.memoryUsage();
 	{
 		{
-			const startCreateKeypairs = process.hrtime();
-			const keypairs = await Promise.all(new Array(COUNTS).fill(0).map(() => genFn()));
-			logPerf(`${type} keypairs cration(Promise.all)`, process.hrtime(startCreateKeypairs));
+			test.start(`${type} keypairs cration(Promise.all)`);
+			const keypairs = await Promise.all(new Array(test.TRYES).fill(0).map(() => genFn()));
+			test.end();
 
-			const startImport = process.hrtime();
-			for (let i = 0; i < COUNTS; i++) {
+			test.start(`${type} import private key and set CryptoKey`);
+			for (let i = 0; i < test.TRYES; i++) {
 				map.set(i, await importPrivateKey(keypairs[i].privateKey));
 			}
-			logPerf(`${type} import private key and set CryptoKey`, process.hrtime(startImport));
+			test.end();
 		}
 		const beforeGC = process.memoryUsage();
 		global.gc();
