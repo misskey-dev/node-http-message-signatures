@@ -1,6 +1,6 @@
-import { collectHeaders, compareUint8Array, encodeArrayBufferToBase64, getHeaderValue } from '../utils';
-import { DigestSource, createBase64Digest } from './utils';
-import { DigestHashAlgorithm, IncomingRequest } from '../types';
+import { collectHeaders, compareUint8Array, encodeArrayBufferToBase64, getHeaderValue } from '../utils.js';
+import { DigestSource, createBase64Digest } from './utils.js';
+import { DigestHashAlgorithm, IncomingRequest } from '../types.js';
 import { base64 } from 'rfc4648';
 
 export async function genRFC3230DigestHeader(body: DigestSource, hashAlgorithm: DigestHashAlgorithm) {

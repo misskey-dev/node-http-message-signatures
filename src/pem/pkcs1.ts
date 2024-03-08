@@ -1,6 +1,6 @@
 import ASN1 from '@lapo/asn1js';
-import { asn1ToArrayBuffer, decodePem } from './spki';
-import { genASN1Length } from 'src/utils';
+import { asn1ToArrayBuffer, decodePem } from './spki.js';
+import { genASN1Length } from '../utils.js';
 
 export class Pkcs1ParseError extends Error {
 	constructor(message: string) { super(message); }

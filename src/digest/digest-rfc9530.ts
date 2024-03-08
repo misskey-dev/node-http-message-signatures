@@ -1,6 +1,6 @@
-import { collectHeaders, getHeaderValue } from '../utils';
-import { DigestSource, createBase64Digest } from './utils';
-import type { DigestHashAlgorithm, IncomingRequest } from '../types';
+import { collectHeaders, getHeaderValue } from '../utils.js';
+import { DigestSource, createBase64Digest } from './utils.js';
+import type { DigestHashAlgorithm, IncomingRequest } from '../types.js';
 import * as sh from 'structured-headers';
 import { base64 } from 'rfc4648';
 

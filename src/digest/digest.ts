@@ -1,7 +1,7 @@
-import { IncomingRequest } from "../types";
-import { collectHeaders } from "../utils";
-import { verifyRFC3230DigestHeader } from "./digest-rfc3230";
-import { DigestSource } from "./utils";
+import { IncomingRequest } from "../types.js";
+import { collectHeaders } from "../utils.js";
+import { verifyRFC3230DigestHeader } from "./digest-rfc3230.js";
+import { DigestSource } from "./utils.js";
 
 export async function verifyDigestHeader(
 	request: IncomingRequest,

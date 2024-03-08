@@ -1,5 +1,6 @@
-import { DigestHashAlgorithm } from '../types';
-import { getWebcrypto } from '../utils';
+import { textEncoder } from '../const.js';
+import { DigestHashAlgorithm } from '../types.js';
+import { getWebcrypto } from '../utils.js';
 
 export type DigestSource = BufferSource | string;
 
@@ -11,7 +12,7 @@ export async function createBase64Digest(
 		hash = 'SHA-1';
 	}
 	if (typeof body === 'string') {
-		body = (new TextEncoder()).encode(body);
+		body = textEncoder.encode(body);
 	}
 	return await (await getWebcrypto()).subtle.digest(hash, body);
 }

@@ -2,6 +2,7 @@ import type { IncomingRequest, PrivateKey, SignatureHashAlgorithmUpperSnake } fr
 import { type SignInfoDefaults, defaultSignInfoDefaults, encodeArrayBufferToBase64, getWebcrypto, genAlgorithmForSignAndVerify, collectHeaders } from '../utils.js';
 import { importPrivateKey } from '../pem/pkcs8.js';
 import { keyHashAlgosForDraftEncofing } from './const.js';
+import { textEncoder } from '../const.js';
 
 /**
  * Get the algorithm string for draft encoding
@@ -86,7 +87,7 @@ export function genDraftSigningString(
 }
 
 export async function genDraftSignature(privateKey: CryptoKey, signingString: string, defaults: SignInfoDefaults = defaultSignInfoDefaults) {
-	const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, new TextEncoder().encode(signingString));
+	const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, textEncoder.encode(signingString));
 	return encodeArrayBufferToBase64(signatureAB);
 }
 

@@ -1,10 +1,10 @@
 import ASN1 from '@lapo/asn1js';
 import Hex from '@lapo/asn1js/hex.js';
 import Base64 from '@lapo/asn1js/base64.js';
-import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1';
-import { ECNamedCurve, KeyAlgorithmName } from '../types';
-import { SignInfoDefaults, defaultSignInfoDefaults, genAlgorithmForSignAndVerify, genSignInfo, getWebcrypto } from '../utils';
-import { parseSignInfo } from '../shared/verify';
+import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1.js';
+import { ECNamedCurve, KeyAlgorithmName } from '../types.js';
+import { SignInfoDefaults, defaultSignInfoDefaults, genAlgorithmForSignAndVerify, genSignInfo, getWebcrypto } from '../utils.js';
+import { parseSignInfo } from '../shared/verify.js';
 
 export class SpkiParseError extends Error {
 	constructor(message: string) { super(message); }

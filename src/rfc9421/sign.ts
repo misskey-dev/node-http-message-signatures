@@ -1,10 +1,11 @@
 
 // TODO
 
-import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, collectHeaders, isBrowserRequest, isBrowserResponse } from "../utils";
-import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike, HeadersValueLikeArrayable } from "../types";
+import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, collectHeaders, isBrowserRequest, isBrowserResponse } from "../utils.js";
+import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike, HeadersValueLikeArrayable } from "../types.js";
 import * as sh from "structured-headers";
-import { SFVHeaderTypeDictionary, knownSfvHeaderTypeDictionary } from "./const";
+import { SFVHeaderTypeDictionary, knownSfvHeaderTypeDictionary } from "./const.js";
+import { textEncoder } from '../const.js';
 
 // https://datatracker.ietf.org/doc/html/rfc9421#name-initial-contents-3
 export const requestTargetDerivedComponents = [
@@ -280,11 +281,19 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 			if (isBs) {
 				// https://datatracker.ietf.org/doc/html/rfc9421#section-2.1.3
 				const sequences = (Array.isArray(rawValue) ? rawValue : [rawValue])
-					.map(x => canonicalizeHeaderValue(x))
-					.map(x => (new TextEncoder()).encode(x))
-					.map(x => encodeArrayBufferToBase64(x.buffer))
-					.map(x => new sh.ByteSequence(x))
-					.map(x => [x, new Map()] as sh.Item);
+					.map(x => {
+						if (typeof x !== 'string') {
+							throw new Error(`Invalid header value type: ${typeof x}`);
+						}
+						return [
+							new sh.ByteSequence(
+								encodeArrayBufferToBase64(
+									textEncoder.encode(canonicalizeHeaderValue(x)).buffer
+								)
+							),
+							new Map()
+						] as sh.Item;
+					});
 				return sh.serializeList(sequences);
 			}
 
