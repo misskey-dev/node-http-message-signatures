@@ -1,10 +1,10 @@
-import { collectHeaders, compareUint8Array, encodeArrayBufferToBase64NonRFC4648, getHeaderValue } from '../utils';
+import { collectHeaders, compareUint8Array, encodeArrayBufferToBase64, getHeaderValue } from '../utils';
 import { DigestSource, createBase64Digest } from './utils';
 import { DigestHashAlgorithm, IncomingRequest } from '../types';
 import { base64 } from 'rfc4648';
 
 export async function genRFC3230DigestHeader(body: DigestSource, hashAlgorithm: DigestHashAlgorithm) {
-	return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64NonRFC4648)}`;
+	return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64)}`;
 }
 
 export const digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;

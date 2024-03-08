@@ -1,5 +1,6 @@
 import type { MapLikeObj, SignInfo, SignatureHashAlgorithmUpperSnake, HeadersLike, HeadersValueLike, HeadersValueLikeArrayable, IncomingRequest, OutgoingResponse } from './types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from './pem/spki.js';
+import { base64 } from 'rfc4648';
 
 export async function getWebcrypto() {
 	return globalThis.crypto ?? (await import('node:crypto')).webcrypto;
@@ -158,10 +159,9 @@ export function genASN1Length(length: number | bigint): Uint8Array {
 /**
  * ArrayBuffer to base64
  */
-export function encodeArrayBufferToBase64NonRFC4648(buffer: ArrayBuffer): string {
+export function encodeArrayBufferToBase64(buffer: ArrayBuffer): string {
 	const uint8Array = new Uint8Array(buffer);
-	const binary = String.fromCharCode(...uint8Array);
-	return btoa(binary);
+	return base64.stringify(uint8Array);
 }
 
 // If equal, return true

@@ -3,20 +3,20 @@
  * SPDX-License-Identifier: MIT
  */
 
-import { encodeArrayBufferToBase64NonRFC4648, getWebcrypto, splitPer64Chars } from './utils';
+import { encodeArrayBufferToBase64, getWebcrypto, splitPer64Chars } from './utils';
 import type { ECNamedCurve } from './types';
 
 export async function exportPublicKeyPem(key: CryptoKey) {
 	const ab = await (await getWebcrypto()).subtle.exportKey('spki', key);
 	return '-----BEGIN PUBLIC KEY-----\n' +
-		splitPer64Chars(encodeArrayBufferToBase64NonRFC4648(ab)).join('\n') +
+		splitPer64Chars(encodeArrayBufferToBase64(ab)).join('\n') +
 		'\n-----END PUBLIC KEY-----\n';
 }
 
 export async function exportPrivateKeyPem(key: CryptoKey) {
 	const ab = await (await getWebcrypto()).subtle.exportKey('pkcs8', key);
 	return '-----BEGIN PRIVATE KEY-----\n' +
-	splitPer64Chars(encodeArrayBufferToBase64NonRFC4648(ab)).join('\n') +
+	splitPer64Chars(encodeArrayBufferToBase64(ab)).join('\n') +
 		'\n-----END PRIVATE KEY-----\n';
 }
 

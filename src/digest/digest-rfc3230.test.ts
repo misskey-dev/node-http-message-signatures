@@ -1,7 +1,7 @@
 import { digestHeaderRegEx, verifyRFC3230DigestHeader } from './digest-rfc3230';
 import { verifyDigestHeader } from './digest';
 import { createBase64Digest } from './utils';
-import { encodeArrayBufferToBase64NonRFC4648 } from '../utils';
+import { encodeArrayBufferToBase64 } from '../utils';
 
 describe('rfc3230', () => {
 	describe('regex', () => {
@@ -33,7 +33,7 @@ describe('rfc3230', () => {
 		test('normal SHA-1', async () => {
 			const request = {
 				headers: {
-					'digest': `SHA=${encodeArrayBufferToBase64NonRFC4648(await createBase64Digest('foo', 'SHA-1'))}`,
+					'digest': `SHA=${encodeArrayBufferToBase64(await createBase64Digest('foo', 'SHA-1'))}`,
 				},
 			} as any;
 			expect(await verifyRFC3230DigestHeader(request, 'foo')).toBe(true);
@@ -41,7 +41,7 @@ describe('rfc3230', () => {
 		test('normal SHA-256', async () => {
 			const request = {
 				headers: {
-					'digest': `SHA-256=${encodeArrayBufferToBase64NonRFC4648(await createBase64Digest('foo', 'SHA-256'))}`,
+					'digest': `SHA-256=${encodeArrayBufferToBase64(await createBase64Digest('foo', 'SHA-256'))}`,
 				},
 			} as any;
 			expect(await verifyRFC3230DigestHeader(request, 'foo')).toBe(true);
@@ -49,7 +49,7 @@ describe('rfc3230', () => {
 		test('Unrecognized algorithm name', async () => {
 			const request = {
 				headers: {
-					'digest': `FOO=${encodeArrayBufferToBase64NonRFC4648(await createBase64Digest('foo', 'SHA-256'))}`,
+					'digest': `FOO=${encodeArrayBufferToBase64(await createBase64Digest('foo', 'SHA-256'))}`,
 				},
 			} as any;
 			expect(await verifyRFC3230DigestHeader(request, 'foo')).toBe(false);
@@ -61,7 +61,7 @@ describe(verifyDigestHeader, () => {
 	test('RFC3230', async () => {
 		const request = {
 			headers: {
-				'digest': `SHA-256=${encodeArrayBufferToBase64NonRFC4648(await createBase64Digest('foo', 'SHA-256'))}`,
+				'digest': `SHA-256=${encodeArrayBufferToBase64(await createBase64Digest('foo', 'SHA-256'))}`,
 			},
 		} as any;
 		expect(await verifyDigestHeader(request, 'foo')).toBe(true);

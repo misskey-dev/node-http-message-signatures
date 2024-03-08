@@ -1,7 +1,7 @@
 
 // TODO
 
-import { canonicalizeHeaderValue, encodeArrayBufferToBase64NonRFC4648, getValueByLc, lcObjectKey, getMap, collectHeaders, isBrowserRequest, isBrowserResponse } from "../utils";
+import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, collectHeaders, isBrowserRequest, isBrowserResponse } from "../utils";
 import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike, HeadersValueLikeArrayable } from "../types";
 import * as sh from "structured-headers";
 import { SFVHeaderTypeDictionary, knownSfvHeaderTypeDictionary } from "./const";
@@ -282,7 +282,7 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 				const sequences = (Array.isArray(rawValue) ? rawValue : [rawValue])
 					.map(x => canonicalizeHeaderValue(x))
 					.map(x => (new TextEncoder()).encode(x))
-					.map(x => encodeArrayBufferToBase64NonRFC4648(x.buffer))
+					.map(x => encodeArrayBufferToBase64(x.buffer))
 					.map(x => new sh.ByteSequence(x))
 					.map(x => [x, new Map()] as sh.Item);
 				return sh.serializeList(sequences);
