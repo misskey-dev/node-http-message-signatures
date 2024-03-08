@@ -2,10 +2,12 @@ import { base64 } from 'rfc4648';
 import { PerformanceBase } from './base.js';
 
 const test = new PerformanceBase(1e6);
+const testForLong = new PerformanceBase(1e3);
 
 // Hello world
 const b64Str = 'SGVsbG8gd29ybGQ=';
 const b64Arr = [72, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100];
+const tooLongUint8Array = new Uint8Array(1e6);
 
 {
 	if (base64.parse(b64Str).join(',') !== b64Arr.join(',')) {
@@ -57,30 +59,58 @@ const b64Arr = [72, 101, 108, 108, 111, 32, 119, 111, 114, 108, 100];
 		}
 		return true;
 	}
-	const arrA = new Uint8Array(b64Arr);
-	const arrB = new Uint8Array(b64Arr);
-	if (arrA === arrB) {
-		throw new Error('comparing same object');
+	{
+		const arrA = new Uint8Array(b64Arr);
+		const arrB = new Uint8Array(b64Arr);
+		if (arrA === arrB) {
+			throw new Error('comparing same object');
+		}
+		test.start(`uint8array equality for of (short)`);
+		for (let i = 0; i < test.TRYES; i++) {
+			if (!equal(arrA, arrB)) throw new Error('not equal');
+		}
+		test.end();
 	}
-	test.start(`uint8array equality for of`);
-	for (let i = 0; i < test.TRYES; i++) {
-		if (!equal(arrA, arrB)) throw new Error('not equal');
+	{
+		const tooLongArrA = new Uint8Array(tooLongUint8Array);
+		const tooLongArrB = new Uint8Array(tooLongUint8Array);
+		if (tooLongArrA === tooLongArrB) {
+			throw new Error('comparing same object');
+		}
+		testForLong.start(`uint8array equality for of (long)`);
+		for (let i = 0; i < testForLong.TRYES; i++) {
+			if (!equal(tooLongArrA, tooLongArrB)) throw new Error('not equal');
+		}
+		testForLong.end();
 	}
-	test.end();
 }
 {
 	const equal = (a, b) => {
 		if (a.length !== b.length) return false;
 		return a.every((v, i) => v === b[i]);
 	}
-	const arrA = new Uint8Array(b64Arr);
-	const arrB = new Uint8Array(b64Arr);
-	if (arrA === arrB) {
-		throw new Error('comparing same object');
+	{
+		const arrA = new Uint8Array(b64Arr);
+		const arrB = new Uint8Array(b64Arr);
+		if (arrA === arrB) {
+			throw new Error('comparing same object');
+		}
+		test.start(`uint8array equality arr.every (short)`);
+		for (let i = 0; i < test.TRYES; i++) {
+			if (!equal(arrA, arrB)) throw new Error('not equal');
+		}
+		test.end();
 	}
-	test.start(`uint8array equality arr.every`);
-	for (let i = 0; i < test.TRYES; i++) {
-		if (!equal(arrA, arrB)) throw new Error('not equal');
+	{
+		const tooLongArrA = new Uint8Array(tooLongUint8Array);
+		const tooLongArrB = new Uint8Array(tooLongUint8Array);
+		if (tooLongArrA === tooLongArrB) {
+			throw new Error('comparing same object');
+		}
+		testForLong.start(`uint8array equality arr.every (long)`);
+		for (let i = 0; i < testForLong.TRYES; i++) {
+			if (!equal(tooLongArrA, tooLongArrB)) throw new Error('not equal');
+		}
+		testForLong.end();
 	}
-	test.end();
 }
