@@ -123,7 +123,7 @@ describe('rfc9530', () => {
 					'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:, sha-512=:${base64Resultes.get(body)?.['sha-512']}:`,
 				}
 			};
-			expect(await verifyRFC9530DigestHeader(request as any, '', { verifyAll: false, hashAlgorithms: ['sha-256', 'sha-512'] })).toBe(true);
+			expect(await verifyRFC9530DigestHeader(request as any, '', { verifyAll: false, algorithms: ['sha-256', 'sha-512'] })).toBe(true);
 		});
 		test('verify one first algorithm fail', async () => {
 			const request = {
@@ -131,7 +131,7 @@ describe('rfc9530', () => {
 					'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:, sha-512=:${base64Resultes.get(body)?.['sha-512']}:`,
 				}
 			};
-			expect(await verifyRFC9530DigestHeader(request as any, '', { verifyAll: false, hashAlgorithms: ['sha-512', 'sha-256'] })).toBe(false);
+			expect(await verifyRFC9530DigestHeader(request as any, '', { verifyAll: false, algorithms: ['sha-512', 'sha-256'] })).toBe(false);
 		});
 		test('algorithms missmatch must fail', async () => {
 			const request = {
@@ -139,7 +139,7 @@ describe('rfc9530', () => {
 					'content-digest': `sha-512=:${base64Resultes.get('')?.['sha-512']}:`,
 				}
 			};
-			expect(await verifyRFC9530DigestHeader(request as any, '', { hashAlgorithms: ['sha-256'] })).toBe(false);
+			expect(await verifyRFC9530DigestHeader(request as any, '', { algorithms: ['sha-256'] })).toBe(false);
 		});
 
 		describe('errors', () => {
@@ -149,7 +149,7 @@ describe('rfc9530', () => {
 						'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:`,
 					}
 				};
-				expect(verifyRFC9530DigestHeader(request as any, '', { hashAlgorithms: [] })).rejects.toThrow('hashAlgorithms is empty');
+				expect(verifyRFC9530DigestHeader(request as any, '', { algorithms: [] })).rejects.toThrow('hashAlgorithms is empty');
 			});
 			test('algorithm not supported', async () => {
 				const request = {
@@ -157,8 +157,8 @@ describe('rfc9530', () => {
 						'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:`,
 					}
 				};
-				expect(verifyRFC9530DigestHeader(request as any, '', { hashAlgorithms: ['md5'] })).rejects
-					.toThrow('Unsupported hash algorithm detected in opts.hashAlgorithms: md5 (supported: sha-256, sha-512)');
+				expect(verifyRFC9530DigestHeader(request as any, '', { algorithms: ['md5'] })).rejects
+					.toThrow('Unsupported hash algorithm detected in opts.hashAlgorithms (supported: sha-256, sha-512)');
 			});
 		});
 	});

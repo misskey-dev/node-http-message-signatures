@@ -39,7 +39,7 @@ export async function verifyDigestHeader(
 	if (headerKeys.has('content-digest')) {
 		return await verifyRFC9530DigestHeader(
 			request, rawBody,
-			{ failOnNoDigest, verifyAll, hashAlgorithms: algorithms.map(convertHashAlgorithmFromWebCryptoToRFC9530) }, errorLogger,
+			{ failOnNoDigest, verifyAll, algorithms: algorithms.map(convertHashAlgorithmFromWebCryptoToRFC9530) }, errorLogger,
 		);
 	} else if (headerKeys.has('digest')) {
 		return await verifyRFC3230DigestHeader(

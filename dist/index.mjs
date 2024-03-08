@@ -1518,7 +1518,7 @@ async function verifyRFC3230DigestHeader(request, rawBody, opts = {
   algorithms: ["SHA-256", "SHA-512"]
 }, errorLogger) {
   const failOnNoDigest = typeof opts === "boolean" ? opts : opts.failOnNoDigest;
-  const algorithms = typeof opts === "boolean" ? ["SHA-256", "SHA-512"] : opts.algorithms;
+  const algorithms = typeof opts === "boolean" ? ["SHA-256", "SHA-512"] : opts.algorithms.map((algo2) => algo2.toUpperCase());
   const digestHeader = getHeaderValue(collectHeaders(request), "digest");
   if (!digestHeader) {
     if (failOnNoDigest) {
@@ -1540,12 +1540,13 @@ async function verifyRFC3230DigestHeader(request, rawBody, opts = {
     return false;
   }
   const value = base642.parse(match[2]);
-  const algo = match[1];
+  let algo = match[1];
   if (!algo) {
     if (errorLogger)
       errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
     return false;
   }
+  algo = algo.toUpperCase();
   if (!algorithms.includes(algo) && !(algo === "SHA" && algorithms.includes("SHA-1"))) {
     if (errorLogger)
       errorLogger(`Unsupported hash algorithm detected in opts.algorithms: ${algo} (supported: ${algorithms.join(", ")})`);
@@ -1685,7 +1686,7 @@ async function genRFC9530DigestHeader(body, hashAlgorithms = ["SHA-256"], proces
 async function verifyRFC9530DigestHeader(request, rawBody, opts = {
   failOnNoDigest: true,
   verifyAll: true,
-  hashAlgorithms: ["sha-256", "sha-512"]
+  algorithms: ["sha-256", "sha-512"]
 }, errorLogger) {
   const headers = collectHeaders(request);
   const contentDigestHeader = getHeaderValue(headers, "content-digest");
@@ -1710,27 +1711,25 @@ async function verifyRFC9530DigestHeader(request, rawBody, opts = {
       errorLogger("Digest header is empty");
     return false;
   }
-  let hashAlgorithms = (opts.hashAlgorithms || ["sha-256", "sha-512"]).map((v) => v.toLowerCase());
-  if (hashAlgorithms.length === 0) {
+  let acceptableAlgorithms = (opts.algorithms || ["sha-256", "sha-512"]).map((v) => v.toLowerCase());
+  if (acceptableAlgorithms.length === 0) {
     throw new Error("hashAlgorithms is empty");
   }
-  for (const algo of hashAlgorithms) {
-    if (!isSupportedRFC9530HashAlgorithm(algo)) {
-      throw new Error(`Unsupported hash algorithm detected in opts.hashAlgorithms: ${algo} (supported: ${supportedHashAlgorithmsWithRFC9530AndWebCrypto.join(", ")})`);
-    }
+  if (acceptableAlgorithms.some((algo) => !isSupportedRFC9530HashAlgorithm(algo))) {
+    throw new Error(`Unsupported hash algorithm detected in opts.hashAlgorithms (supported: ${supportedHashAlgorithmsWithRFC9530AndWebCrypto.join(", ")})`);
   }
   const dictionaryAlgorithms = dictionary.reduce((prev, [k]) => prev.add(k), /* @__PURE__ */ new Set());
-  if (!hashAlgorithms.some((v) => dictionaryAlgorithms.has(v))) {
+  if (!acceptableAlgorithms.some((v) => dictionaryAlgorithms.has(v))) {
     if (errorLogger)
       errorLogger("No supported Content-Digest header algorithm");
     return false;
   }
   if (!opts.verifyAll) {
-    hashAlgorithms = [hashAlgorithms.find((v) => dictionaryAlgorithms.has(v))];
+    acceptableAlgorithms = [acceptableAlgorithms.find((v) => dictionaryAlgorithms.has(v))];
   }
   const results = await Promise.allSettled(
     dictionary.map(([algo, [value]]) => {
-      if (!hashAlgorithms.includes(algo.toLowerCase())) {
+      if (!acceptableAlgorithms.includes(algo.toLowerCase())) {
         return Promise.resolve(null);
       }
       if (!(value instanceof sh.ByteSequence)) {
@@ -1772,7 +1771,7 @@ async function verifyDigestHeader(request, rawBody, opts = {
     return await verifyRFC9530DigestHeader(
       request,
       rawBody,
-      { failOnNoDigest, verifyAll, hashAlgorithms: algorithms.map(convertHashAlgorithmFromWebCryptoToRFC9530) },
+      { failOnNoDigest, verifyAll, algorithms: algorithms.map(convertHashAlgorithmFromWebCryptoToRFC9530) },
       errorLogger
     );
   } else if (headerKeys.has("digest")) {

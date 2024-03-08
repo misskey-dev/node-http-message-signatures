@@ -77,5 +77,5 @@ export declare function verifyRFC9530DigestHeader(request: IncomingRequest, rawB
      * If `varifyAll: false`, it is also used to choose the hash algorithm to verify.
      * (Younger index is preferred.)
      */
-    hashAlgorithms?: RFC9530HashAlgorithm[];
+    algorithms?: RFC9530HashAlgorithm[];
 }, errorLogger?: ((message: any) => any)): Promise<boolean>;

@@ -36,7 +36,12 @@ export async function verifyRFC3230DigestHeader(
 	errorLogger?: ((message: any) => any)
 ) {
 	const failOnNoDigest = typeof opts === 'boolean' ? opts : opts.failOnNoDigest;
-	const algorithms = typeof opts === 'boolean' ? ['SHA-256', 'SHA-512'] : opts.algorithms;
+	/**
+	 * UPPERCASED
+	 */
+	const algorithms = typeof opts === 'boolean' ?
+		['SHA-256', 'SHA-512']
+		: opts.algorithms.map((algo) => algo.toUpperCase() as DigestHashAlgorithm);
 	const digestHeader = getHeaderValue(collectHeaders(request), 'digest');
 	if (!digestHeader) {
 		if (failOnNoDigest) {
@@ -58,11 +63,15 @@ export async function verifyRFC3230DigestHeader(
 	}
 	const value = base64.parse(match[2]);
 
-	const algo = match[1] as DigestHashAlgorithm;
+	/**
+	 * UPPERCASED
+	 */
+	let algo = match[1] as DigestHashAlgorithm;
 	if (!algo) {
 		if (errorLogger) errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
 		return false;
 	}
+	algo = algo.toUpperCase() as DigestHashAlgorithm;
 	if (!algorithms.includes(algo) && !(algo === 'SHA' && algorithms.includes('SHA-1'))) {
 		if (errorLogger) errorLogger(`Unsupported hash algorithm detected in opts.algorithms: ${algo} (supported: ${algorithms.join(', ')})`);
 		return false;

@@ -182,11 +182,11 @@ export async function verifyRFC9530DigestHeader(
 		 * If `varifyAll: false`, it is also used to choose the hash algorithm to verify.
 		 * (Younger index is preferred.)
 		 */
-		hashAlgorithms?: RFC9530HashAlgorithm[],
+		algorithms?: RFC9530HashAlgorithm[],
 	} = {
 		failOnNoDigest: true,
 		verifyAll: true,
-		hashAlgorithms: ['sha-256', 'sha-512'],
+		algorithms: ['sha-256', 'sha-512'],
 	},
 	errorLogger?: ((message: any) => any)
 ) {
@@ -200,6 +200,9 @@ export async function verifyRFC9530DigestHeader(
 		return true;
 	}
 
+	/**
+	 * lowercased
+	 */
 	let dictionary: RFC9530DigestHeaderObject;
 	try {
 		dictionary = Array.from(sh.parseDictionary(contentDigestHeader), ([k, v]) => [k.toLowerCase(), v]) as RFC9530DigestHeaderObject;
@@ -213,27 +216,31 @@ export async function verifyRFC9530DigestHeader(
 		return false;
 	}
 
-	let hashAlgorithms = (opts.hashAlgorithms || ['sha-256', 'sha-512']).map(v => v.toLowerCase());
-	if (hashAlgorithms.length === 0) {
+	/**
+	 * lowercased
+	 */
+	let acceptableAlgorithms = (opts.algorithms || ['sha-256', 'sha-512']).map(v => v.toLowerCase());
+	if (acceptableAlgorithms.length === 0) {
 		throw new Error('hashAlgorithms is empty');
 	}
-	for (const algo of hashAlgorithms) {
-		if (!isSupportedRFC9530HashAlgorithm(algo)) {
-			throw new Error(`Unsupported hash algorithm detected in opts.hashAlgorithms: ${algo} (supported: ${supportedHashAlgorithmsWithRFC9530AndWebCrypto.join(', ')})`);
-		}
+	if (acceptableAlgorithms.some(algo => !isSupportedRFC9530HashAlgorithm(algo))) {
+		throw new Error(`Unsupported hash algorithm detected in opts.hashAlgorithms (supported: ${supportedHashAlgorithmsWithRFC9530AndWebCrypto.join(', ')})`);
 	}
+	/**
+	 * lowercased (from dictionary)
+	 */
 	const dictionaryAlgorithms = dictionary.reduce((prev, [k]) => prev.add(k), new Set<string>());
-	if (!hashAlgorithms.some(v => dictionaryAlgorithms.has(v))) {
+	if (!acceptableAlgorithms.some(v => dictionaryAlgorithms.has(v))) {
 		if (errorLogger) errorLogger('No supported Content-Digest header algorithm');
 		return false;
 	}
 	if (!opts.verifyAll) {
-		hashAlgorithms = [hashAlgorithms.find(v => dictionaryAlgorithms.has(v))!];
+		acceptableAlgorithms = [acceptableAlgorithms.find(v => dictionaryAlgorithms.has(v))!];
 	}
 
 	const results = await Promise.allSettled(
 		dictionary.map(([algo, [value]]) => {
-			if (!hashAlgorithms.includes(algo.toLowerCase() as RFC9530HashAlgorithm)) {
+			if (!acceptableAlgorithms.includes(algo.toLowerCase() as RFC9530HashAlgorithm)) {
 				return Promise.resolve(null);
 			}
 			if (!(value instanceof sh.ByteSequence)) {
