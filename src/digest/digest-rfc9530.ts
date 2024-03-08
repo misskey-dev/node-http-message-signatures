@@ -1,4 +1,4 @@
-import { collectHeaders, getHeaderValue } from '../utils.js';
+import { collectHeaders, compareUint8Array, getHeaderValue } from '../utils.js';
 import { DigestSource, createBase64Digest } from './utils.js';
 import type { DigestHashAlgorithm, IncomingRequest } from '../types.js';
 import * as sh from 'structured-headers';
@@ -39,6 +39,19 @@ function isRFC9530Prefernece(obj: any): obj is RFC9530Prefernece {
 	return true;
 }
 
+const supportedRFC9530HashAlgorithms = ['sha-256', 'sha-512'] satisfies RFC9530HashAlgorithm[];
+
+function isSupportedRFC9530HashAlgorithm(algo: string): algo is RFC9530HashAlgorithm {
+	return supportedRFC9530HashAlgorithms.includes(algo.toLowerCase() as any);
+}
+
+function convertRFC9530HashAlgorithmToWebCrypto(algo: RFC9530HashAlgorithm): DigestHashAlgorithm {
+	const lowercased = algo.toLowerCase();
+	if (lowercased === 'sha-256') return 'SHA-256';
+	if (lowercased === 'sha-512') return 'SHA-512';
+	throw new Error(`Unsupported hash algorithm: ${lowercased}`);
+}
+
 /**
  * @param prefernece Prefernece map (Want-*-Digest field parsed by structured-headers.parseDictionary)
  * @param meAcceptable The hash algorithms that You can accept or use
@@ -64,7 +77,7 @@ export function chooseRFC9530HashAlgorithmByPreference(
 	return res[0];
 }
 
-export type RFC9530ResultObject = [string, [sh.ByteSequence, Map<any, any>]][];
+export type RFC9530DigestHeaderObject = [string, [sh.ByteSequence, Map<any, any>]][];
 
 /**
  * Generate single Digest header
@@ -74,8 +87,8 @@ export type RFC9530ResultObject = [string, [sh.ByteSequence, Map<any, any>]][];
  * @returns `[[algorithm, [ByteSequence, Map(0)]]]`
  *	To convert to string, use serializeDictionary from structured-headers
  */
-export async function genSingleRFC9530DigestHeader(body: DigestSource, hashAlgorithm: string): Promise<RFC9530ResultObject> {
-	if (!['SHA-256', 'SHA-512'].includes(hashAlgorithm.toUpperCase())) {
+export async function genSingleRFC9530DigestHeader(body: DigestSource, hashAlgorithm: string): Promise<RFC9530DigestHeaderObject> {
+	if (!isSupportedRFC9530HashAlgorithm(hashAlgorithm)) {
 		throw new RFC9530GenerateDigestHeaderError('Unsupported hash algorithm');
 	}
 	return [
@@ -83,7 +96,7 @@ export async function genSingleRFC9530DigestHeader(body: DigestSource, hashAlgor
 			hashAlgorithm.toLowerCase(),
 			[
 				new sh.ByteSequence(
-					await createBase64Digest(body, hashAlgorithm.toUpperCase() as any)
+					await createBase64Digest(body, convertRFC9530HashAlgorithmToWebCrypto(hashAlgorithm))
 						.then(data => base64.stringify(new Uint8Array(data)))
 				),
 				new Map()
@@ -107,7 +120,7 @@ export async function genRFC9530DigestHeader(
 	body: DigestSource,
 	hashAlgorithms: string | RFC9530Prefernece | Iterable<string> = ['SHA-256'],
 	process: 'concurrent' | 'sequential' = 'concurrent',
-): Promise<RFC9530ResultObject> {
+): Promise<RFC9530DigestHeaderObject> {
 	if (typeof hashAlgorithms === 'string') {
 		return await genSingleRFC9530DigestHeader(body, hashAlgorithms);
 	}
@@ -128,63 +141,116 @@ export async function genRFC9530DigestHeader(
 		));
 	}
 
-	const result = [] as RFC9530ResultObject;
+	const result = [] as RFC9530DigestHeaderObject;
 	for (const algo of hashAlgorithms) {
 		await genSingleRFC9530DigestHeader(body, algo).then(([v]) => result.push(v));
 	}
 	return result;
 }
 
-export const digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
-
-export async function verifyRFC3230DigestHeader(
+/**
+ * Verify Content-Digest header (not Repr-Digest)
+ * @param request IncomingRequest
+ * @param rawBody Raw body
+ * @param opts Options
+ * @param errorLogger Error logger when verification fails
+ * @returns Whether digest is valid with the body
+ */
+export async function verifyRFC9530DigestHeader(
 	request: IncomingRequest,
 	rawBody: DigestSource,
-	failOnNoDigest = true,
+	opts: {
+		/**
+		 * If false, return true when no Digest header is found
+		 * @default true
+		 */
+		failOnNoDigest?: boolean,
+		/**
+		 * If true, verify all digests without not supported algorithms
+		 * If false, use the first supported and exisiting algorithm in hashAlgorithms
+		 * @default true
+		 */
+		verifyAll?: boolean,
+		/**
+		 * Specify hash algorithms you accept. (RFC 9530 algorithm registries)
+		 *
+		 * If `varifyAll: false`, it is also used to choose the hash algorithm to verify.
+		 * (Younger index is preferred.)
+		 */
+		hashAlgorithms?: RFC9530HashAlgorithm[],
+	} = {
+		failOnNoDigest: true,
+		verifyAll: true,
+		hashAlgorithms: ['sha-256', 'sha-512'],
+	},
 	errorLogger?: ((message: any) => any)
 ) {
-	const digestHeader = getHeaderValue(collectHeaders(request), 'digest');
-	if (!digestHeader) {
-		if (failOnNoDigest) {
-			if (errorLogger) errorLogger('Digest header not found');
+	const headers = collectHeaders(request);
+	const contentDigestHeader = getHeaderValue(headers, 'content-digest');
+	if (!contentDigestHeader) {
+		if (opts.failOnNoDigest) {
+			if (errorLogger) errorLogger('Repr-Digest or Content-Digest header not found');
 			return false;
 		}
 		return true;
 	}
 
-	const match = digestHeader.match(digestHeaderRegEx);
-	if (!match) {
-		if (errorLogger) errorLogger('Invalid Digest header format');
-		return false;
-	}
-
-	const value = match[2];
-	if (!value) {
-		if (errorLogger) errorLogger('Invalid Digest header format');
-		return false;
-	}
-
-	const algo = match[1] as DigestHashAlgorithm;
-	if (!algo) {
-		if (errorLogger) errorLogger(`Invalid Digest header algorithm: ${match[1]}`);
-		return false;
-	}
-
-	let hash: string;
+	let dictionary: RFC9530DigestHeaderObject;
 	try {
-		hash = await createBase64Digest(rawBody, algo);
+		dictionary = Array.from(sh.parseDictionary(contentDigestHeader), ([k, v]) => [k.toLowerCase(), v]) as RFC9530DigestHeaderObject;
 	} catch (e: any) {
-		if (e.name === 'NotSupportedError') {
-			if (errorLogger) errorLogger(`Invalid Digest header algorithm: ${algo}`);
+		if (errorLogger) errorLogger('Invalid Digest header');
+		return false;
+	}
+
+	if (dictionary.length === 0) {
+		if (errorLogger) errorLogger('Digest header is empty');
+		return false;
+	}
+
+	let hashAlgorithms = (opts.hashAlgorithms || ['sha-256', 'sha-512']).map(v => v.toLowerCase());
+	if (hashAlgorithms.length === 0) {
+		throw new Error('hashAlgorithms is empty');
+	}
+	for (const algo of hashAlgorithms) {
+		if (!isSupportedRFC9530HashAlgorithm(algo)) {
+			throw new Error(`Unsupported hash algorithm detected in opts.hashAlgorithms: ${algo} (supported: ${supportedHashAlgorithmsWithRFC9530AndWebCrypto.join(', ')})`);
+		}
+	}
+	const dictionaryAlgorithms = dictionary.reduce((prev, [k]) => prev.add(k), new Set<string>());
+	if (!hashAlgorithms.some(v => dictionaryAlgorithms.has(v))) {
+		if (errorLogger) errorLogger('No supported Content-Digest header algorithm');
+		return false;
+	}
+	if (!opts.verifyAll) {
+		hashAlgorithms = [hashAlgorithms.find(v => dictionaryAlgorithms.has(v))!];
+	}
+
+	const results = await Promise.allSettled(
+		dictionary.map(([algo, [value]]) => {
+			if (!hashAlgorithms.includes(algo.toLowerCase() as RFC9530HashAlgorithm)) {
+				return Promise.resolve(null);
+			}
+			if (!(value instanceof sh.ByteSequence)) {
+				return Promise.reject(new Error('Invalid dictionary value type'));
+			}
+			return createBase64Digest(rawBody, convertRFC9530HashAlgorithmToWebCrypto(algo.toLowerCase() as RFC9530HashAlgorithm))
+				.then(hash => compareUint8Array(base64.parse(value.toBase64()), new Uint8Array(hash)));
+		})
+	);
+	if (!results.some(v => v.status === 'fulfilled' && v.value === true)) {
+		// 全部fullfilled, nullだとtrueになってしまうので
+		if (errorLogger) errorLogger(`No digest(s) matched`);
+		return false;
+	}
+	for (const result of results) {
+		if (result.status === 'fulfilled' && result.value === false) {
+			if (errorLogger) errorLogger(`Content-Digest header hash simply mismatched`);
+			return false;
+		} else if (result.status === 'rejected') {
+			if (errorLogger) errorLogger(`Content-Digest header parse error: ${result.reason}`);
 			return false;
 		}
-		throw e;
 	}
-
-	if (hash !== value) {
-		if (errorLogger) errorLogger(`Digest header hash mismatch`);
-		return false;
-	}
-
 	return true;
 }

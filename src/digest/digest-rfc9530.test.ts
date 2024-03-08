@@ -1,11 +1,20 @@
 import * as sh from 'structured-headers';
-import { RFC9530Prefernece, chooseRFC9530HashAlgorithmByPreference, genRFC9530DigestHeader } from './digest-rfc9530';
+import { RFC9530Prefernece, chooseRFC9530HashAlgorithmByPreference, genRFC9530DigestHeader, verifyRFC9530DigestHeader } from './digest-rfc9530';
+
+const base64Resultes = new Map([
+	['{"hello": "world"}\n', {
+		'sha-256': 'RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg=',
+	}],
+	['', {
+		'sha-256': '47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=',
+		'sha-512': 'z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==',
+	}],
+]);
 
 describe('rfc9530', () => {
 	test('Want-*-Digest parse', () => {
 		const wantDigest = 'sha-256=10, sha-512=3';
 		const parsed = sh.parseDictionary(wantDigest) as RFC9530Prefernece;
-		console.log(parsed);
 		expect(parsed).toEqual(new Map([
 			['sha-256', [10, new Map()]],
 			['sha-512', [3, new Map()]],
@@ -48,9 +57,10 @@ describe('rfc9530', () => {
 
 	describe(genRFC9530DigestHeader, () => {
 		test('sha-256', async () => {
-			const result = await genRFC9530DigestHeader('{"hello": "world"}\n', 'sha-256');
+			const body = '{"hello": "world"}\n';
+			const result = await genRFC9530DigestHeader(body, 'sha-256');
 			expect(result).toEqual([
-				['sha-256', [new sh.ByteSequence('RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg='), new Map()]]
+				['sha-256', [new sh.ByteSequence(base64Resultes.get(body)?.['sha-256'] as any), new Map()]]
 			]);
 			const txt = sh.serializeDictionary(new Map(result));
 			expect(txt).toBe('sha-256=:RK/0qy18MlBSVnWgjwz6lZEWjP/lF5HF9bvEF8FabDg=:');
@@ -58,11 +68,97 @@ describe('rfc9530', () => {
 		test('sha-256, sha-512', async () => {
 			const result = await genRFC9530DigestHeader('', ['sha-256', 'sha-512']);
 			expect(result).toEqual([
-				['sha-256', [new sh.ByteSequence('47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='), new Map()]],
-				['sha-512', [new sh.ByteSequence('z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg=='), new Map()]],
+				['sha-256', [new sh.ByteSequence(base64Resultes.get('')?.['sha-256'] as any), new Map()]],
+				['sha-512', [new sh.ByteSequence(base64Resultes.get('')?.['sha-512'] as any), new Map()]],
 			]);
 			const txt = sh.serializeDictionary(new Map(result));
-			expect(txt).toBe('sha-256=:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=:, sha-512=:z4PhNX7vuL3xVChQ1m2AB9Yg5AULVxXcg/SpIdNs6c5H0NE8XYXysP+DGNKHfuwvY7kxvUdBeoGlODJ6+SfaPg==:');
+			expect(txt).toBe(`sha-256=:${base64Resultes.get('')?.['sha-256'] as any}:, sha-512=:${base64Resultes.get('')?.['sha-512'] as any}:`);
+		});
+	});
+
+	describe(verifyRFC9530DigestHeader, () => {
+		const body = '{"hello": "world"}\n';
+		test('normal', async () => {
+			const request = {
+				headers: {
+					'content-digest': `sha-256=:${base64Resultes.get(body)?.['sha-256']}:`,
+				}
+			};
+			expect(await verifyRFC9530DigestHeader(request as any, body)).toBe(true);
+		});
+		test('invalid', async () => {
+			const request = {
+				headers: {
+					'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:`,
+				}
+			};
+			expect(await verifyRFC9530DigestHeader(request as any, body)).toBe(false);
+		});
+		test('no digest', async () => {
+			const request = {
+				headers: {}
+			};
+			expect(await verifyRFC9530DigestHeader(request as any, body)).toBe(false);
+		});
+		test('verify many', async () => {
+			const request = {
+				headers: {
+					'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:, sha-512=:${base64Resultes.get('')?.['sha-512']}:`,
+				}
+			};
+			expect(await verifyRFC9530DigestHeader(request as any, '')).toBe(true);
+		});
+		test('verifyAll fail', async () => {
+			const request = {
+				headers: {
+					'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:, sha-512=:${base64Resultes.get(body)?.['sha-512']}:`,
+				}
+			};
+			expect(await verifyRFC9530DigestHeader(request as any, '')).toBe(false);
+		});
+		test('verify one first algorithm ok', async () => {
+			const request = {
+				headers: {
+					'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:, sha-512=:${base64Resultes.get(body)?.['sha-512']}:`,
+				}
+			};
+			expect(await verifyRFC9530DigestHeader(request as any, '', { verifyAll: false, hashAlgorithms: ['sha-256', 'sha-512'] })).toBe(true);
+		});
+		test('verify one first algorithm fail', async () => {
+			const request = {
+				headers: {
+					'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:, sha-512=:${base64Resultes.get(body)?.['sha-512']}:`,
+				}
+			};
+			expect(await verifyRFC9530DigestHeader(request as any, '', { verifyAll: false, hashAlgorithms: ['sha-512', 'sha-256'] })).toBe(false);
+		});
+		test('algorithms missmatch must fail', async () => {
+			const request = {
+				headers: {
+					'content-digest': `sha-512=:${base64Resultes.get('')?.['sha-512']}:`,
+				}
+			};
+			expect(await verifyRFC9530DigestHeader(request as any, '', { hashAlgorithms: ['sha-256'] })).toBe(false);
+		});
+
+		describe('errors', () => {
+			test('algorithms zero fail', async () => {
+				const request = {
+					headers: {
+						'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:`,
+					}
+				};
+				expect(verifyRFC9530DigestHeader(request as any, '', { hashAlgorithms: [] })).rejects.toThrow('hashAlgorithms is empty');
+			});
+			test('algorithm not supported', async () => {
+				const request = {
+					headers: {
+						'content-digest': `sha-256=:${base64Resultes.get('')?.['sha-256']}:`,
+					}
+				};
+				expect(verifyRFC9530DigestHeader(request as any, '', { hashAlgorithms: ['md5'] })).rejects
+					.toThrow('Unsupported hash algorithm detected in opts.hashAlgorithms: md5 (supported: sha-256, sha-512)');
+			});
 		});
 	});
 });

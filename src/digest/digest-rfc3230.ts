@@ -9,6 +9,14 @@ export async function genRFC3230DigestHeader(body: DigestSource, hashAlgorithm: 
 
 export const digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
 
+/**
+ *
+ * @param request Incoming request
+ * @param rawBody Raw body
+ * @param failOnNoDigest If false, return true when no Digest header is found (default: true)
+ * @param errorLogger When returing false, called with the error message
+ * @returns Promise<boolean>
+ */
 export async function verifyRFC3230DigestHeader(
 	request: IncomingRequest,
 	rawBody: DigestSource,
