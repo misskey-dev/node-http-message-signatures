@@ -27,51 +27,36 @@ export type RFC9530HashAlgorithm = keyof typeof RFC9530HashAlgorithmRegistry;
 export type RFC9530Prefernece = Map<string, [number, Map<any, any>]>;
 export type RFC9530ResultObject = [string, sh.ByteSequence][];
 
-async function genSingle(body: DigestSource, hashAlgorithm: string): Promise<string>;
-async function genSingle<T extends 'string'>(body: DigestSource, hashAlgorithm: string, returnType: T): Promise<string>;
-async function genSingle<T extends 'object'>(body: DigestSource, hashAlgorithm: string, returnType: T): Promise<RFC9530ResultObject>;
-async function genSingle<T extends 'string' | 'object'>(body: DigestSource, hashAlgorithm: string, returnType: T = 'string' as T): Promise<T extends 'string' ? string : RFC9530ResultObject> {
+async function genSingle(body: DigestSource, hashAlgorithm: string): Promise<RFC9530ResultObject> {
 	if (!['SHA-256', 'SHA-512'].includes(hashAlgorithm.toUpperCase())) {
 		throw new RFC9530GenerateDigestHeaderError('Unsupported hash algorithm');
 	}
-	if (returnType === 'string') {
-		return `${hashAlgorithm.toLowerCase()}=:${await createBase64Digest(body, hashAlgorithm.toUpperCase() as 'SHA-256' | 'SHA-512')}:`;
-	} else if (returnType === 'object') {
-		return [
-			[hashAlgorithm.toLowerCase(), new sh.ByteSequence(await createBase64Digest(body, hashAlgorithm.toUpperCase() as 'SHA-256' | 'SHA-512'))],
-		];
-	}
-	throw new RFC9530GenerateDigestHeaderError('Invalid returnType');
+	return [
+		[hashAlgorithm.toLowerCase(), new sh.ByteSequence(await createBase64Digest(body, hashAlgorithm.toUpperCase() as 'SHA-256' | 'SHA-512'))],
+	];
 }
 
 /**
- *
+ * Generate Digest header
  * @param body The body to be hashed
  * @param hashAlgorithms
  * 	RFC 9530 Registered & SubtleCrypto.digest Supported = Only supports 'SHA-256' and 'SHA-512'
  * 	RFC9530Prefernece: Keys must be lowercase
  * @param options
- * @returns
+ * @returns `[algorithm, ByteSequence][]`
+ *	To convert to string, use serializeDictionary from structured-headers
  */
-export async function genRFC9530DigestHeader(body: DigestSource, hashAlgorithms: string | RFC9530Prefernece | Iterable<'SHA-256' | 'SHA-512'>): Promise<string>;
-export async function genRFC9530DigestHeader<T extends 'object'>(body: DigestSource, hashAlgorithms: string | RFC9530Prefernece | Iterable<'SHA-256' | 'SHA-512'>, returnType: T, process: 'concurrent' | 'sequential'): Promise<RFC9530ResultObject>;
-export async function genRFC9530DigestHeader<T extends 'string'>(body: DigestSource, hashAlgorithms: string | RFC9530Prefernece | Iterable<'SHA-256' | 'SHA-512'>, returnType: T, process: 'concurrent' | 'sequential'): Promise<string>;
-export async function genRFC9530DigestHeader<T extends 'string' | 'object'>(
+export async function genRFC9530DigestHeader(
 	body: DigestSource,
 	hashAlgorithms: string | RFC9530Prefernece | Iterable<'SHA-256' | 'SHA-512'> = ['SHA-256'],
-	/**
-	 * 'string' to return serialized string, 'object' to return entries
-	 * @default 'string'
-	 */
-	returnType: T = 'string' as T,
 	/**
 	 * 'concurrent' to use Promise.all, 'sequential' to use for..of
 	 * @default 'concurrent'
 	 */
 	process: 'concurrent' | 'sequential' = 'concurrent',
-): Promise<T extends 'string' ? string : RFC9530ResultObject> {
+): Promise<RFC9530ResultObject> {
 	if (typeof hashAlgorithms === 'string') {
-		return await genSingle(body, hashAlgorithms, returnType);
+		return await genSingle(body, hashAlgorithms);
 	}
 
 	if (hashAlgorithms instanceof Map) {
@@ -87,19 +72,25 @@ export async function genRFC9530DigestHeader<T extends 'string' | 'object'>(
 				throw new RFC9530GenerateDigestHeaderError('Provided hashAlgorithms does not contain SHA-256 or SHA-512');
 			}
 			if ((sha256 ?? 0) <= (sha512 ?? 0)) {
-				return await genSingle(body, 'SHA-256', returnType);
+				return await genSingle(body, 'SHA-256');
 			} else {
-				return await genSingle(body, 'SHA-256', returnType);
+				return await genSingle(body, 'SHA-256');
 			}
 		}
 	}
 
 	if (process === 'concurrent') {
-		const result = await Array.from(hashAlgorithms as Iterable<'SHA-256' | 'SHA-512'>, async (algo) => {
-			return genSingle(body, algo, 'object');
-		});
-		return returnType === 'string' ? sh.serializeDictionary(new Map(result)) : result;
+		return await Promise.all(Array.from(
+			hashAlgorithms as Iterable<'SHA-256' | 'SHA-512'>,
+			(algo) => genSingle(body, algo).then(([v]) => v),
+		));
 	}
+
+	const result = [] as RFC9530ResultObject;
+	for (const algo of hashAlgorithms) {
+		await genSingle(body, algo).then(([v]) => result.push(v));
+	}
+	return result;
 }
 
 export const digestHeaderRegEx = /^([a-zA-Z0-9\-]+)=([^\,]+)/;
