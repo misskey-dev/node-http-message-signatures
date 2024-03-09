@@ -1,5 +1,5 @@
 import { DigestSource } from './utils.js';
-import type { DigestHashAlgorithm, IncomingRequest } from '../types.js';
+import type { DigestHashAlgorithm, IncomingRequest, OutgoingResponse } from '../types.js';
 import * as sh from 'structured-headers';
 export declare class RFC9530GenerateDigestHeaderError extends Error {
     constructor(message: string);
@@ -59,7 +59,7 @@ export declare function genRFC9530DigestHeader(body: DigestSource, hashAlgorithm
  * @param errorLogger Error logger when verification fails
  * @returns Whether digest is valid with the body
  */
-export declare function verifyRFC9530DigestHeader(request: IncomingRequest, rawBody: DigestSource, opts?: {
+export declare function verifyRFC9530DigestHeader(request: IncomingRequest | OutgoingResponse, rawBody: DigestSource, opts?: {
     /**
      * If false, return true when no Digest header is found
      * @default true

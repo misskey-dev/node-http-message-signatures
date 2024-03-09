@@ -1,6 +1,6 @@
 import { collectHeaders, compareUint8Array, getHeaderValue } from '../utils.js';
 import { DigestSource, createBase64Digest } from './utils.js';
-import type { DigestHashAlgorithm, IncomingRequest } from '../types.js';
+import type { DigestHashAlgorithm, IncomingRequest, OutgoingResponse } from '../types.js';
 import * as sh from 'structured-headers';
 import { base64 } from 'rfc4648';
 
@@ -162,7 +162,7 @@ export async function genRFC9530DigestHeader(
  * @returns Whether digest is valid with the body
  */
 export async function verifyRFC9530DigestHeader(
-	request: IncomingRequest,
+	request: IncomingRequest | OutgoingResponse,
 	rawBody: DigestSource,
 	opts: {
 		/**
