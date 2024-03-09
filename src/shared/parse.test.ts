@@ -43,7 +43,7 @@ describe('parse', () => {
 				url: '/foo/bar',
 			};
 			const result = validateRequestAndGetSignatureHeader(request, { now: theDate });
-			expect(result).toBe('test');
+			expect(result.signatureHeader).toBe('test');
 		});
 		test('invalid skew', () => {
 			const request = {
@@ -70,7 +70,7 @@ describe('parse', () => {
 				url: '/foo/bar',
 			};
 			const result = validateRequestAndGetSignatureHeader(request, { now: theDate });
-			expect(result).toBe('test');
+			expect(result.signatureHeader).toBe('test');
 		});
 		test('no signature', () => {
 			const request = {

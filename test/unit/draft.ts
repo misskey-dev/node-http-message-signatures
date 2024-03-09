@@ -3,7 +3,7 @@ import httpSignature from '@peertube/http-signature';
 
 import { genDraftSigningString, signAsDraftToRequest } from '@/draft/sign.js';
 import { verifyDraftSignature } from '@/draft/verify.js';
-import { parseRequestSignature, ClockSkewInvalidError } from '@/parse.js';
+import { parseRequestSignature, ClockSkewInvalidError } from '@/shared/parse.js';
 import * as keys from '../keys.js';
 import { collectHeaders } from '@/utils.js';
 import { importPrivateKey } from '@/pem/pkcs8.js';

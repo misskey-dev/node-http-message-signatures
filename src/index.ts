@@ -4,7 +4,7 @@
  */
 
 export type * from './types.js';
-export * from './parse.js';
+export * from './shared/parse.js';
 export * from './utils.js';
 export * from './keypair.js';
 
@@ -17,7 +17,7 @@ export * from './draft/parse.js';
 export * from './draft/sign.js';
 export * from './draft/verify.js';
 
-export * from './rfc9421/const.js';
+export * from './rfc9421/sfv.js';
 //export * from './rfc9421/parse.js';
 export * from './rfc9421/sign.js';
 //export * from './rfc9421/verify.js';

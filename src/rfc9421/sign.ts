@@ -4,7 +4,7 @@
 import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, collectHeaders, isBrowserRequest, isBrowserResponse } from "../utils.js";
 import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike, HeadersValueLikeArrayable } from "../types.js";
 import * as sh from "structured-headers";
-import { SFVHeaderTypeDictionary, knownSfvHeaderTypeDictionary } from "./const.js";
+import { SFVHeaderTypeDictionary, knownSfvHeaderTypeDictionary } from "./sfv.js";
 import { textEncoder } from '../const.js';
 
 // https://datatracker.ietf.org/doc/html/rfc9421#name-initial-contents-3
@@ -47,18 +47,20 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 	public url: URL;
 	public requestSignatureInput: SFVSignatureInputDictionary | undefined;
 	public responseSignatureInput: SFVSignatureInputDictionary | undefined;
+
+	/**
+	 *
+	 * @param source request or response, must include 'signature-input' header
+	 *	If source is node response, it must include 'req' property.
+	 * @param scheme optional, used when source request url starts with '/'
+	 * @param additionalSfvTypeDictionary additional SFV type dictionary
+	 * @param request optional, used when source is a browser Response
+	 */
 	constructor(
 		source: T,
-		/**
-		 * Must be signature params of the request
-		 */
-		requestSignatureParams?: SFVSignatureInputDictionaryForInput | string,
 		scheme: string = 'https',
 		additionalSfvTypeDictionary: SFVHeaderTypeDictionary = {},
-		/**
-		 * Set if provided object is response
-		 */
-		responseSignatureParams?: SFVSignatureInputDictionaryForInput | string,
+		request?: Request,
 	) {
 		this.sfvTypeDictionary = lcObjectKey({ ...knownSfvHeaderTypeDictionary, ...additionalSfvTypeDictionary });
 
@@ -66,6 +68,12 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 			this.response = source;
 			this.responseHeaders = collectHeaders(source as any);
 			this.request = source.req as any;
+			this.requestHeaders = collectHeaders(this.request);
+		} else if (isBrowserResponse(source)) {
+			if (!request) throw new Error('Request is not provided');
+			this.response = source;
+			this.responseHeaders = collectHeaders(source as any);
+			this.request = request as any;
 			this.requestHeaders = collectHeaders(this.request);
 		} else {
 			this.response = null;
@@ -81,17 +89,13 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 			throw new Error('Request method is empty');
 		}
 
-		this.requestSignatureInput = typeof requestSignatureParams === 'string' ?
-			sh.parseDictionary(requestSignatureParams) as SFVSignatureInputDictionary
-			: (requestSignatureParams && RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(requestSignatureParams));
-		if (this.isRequest() && !this.requestSignatureInput) {
-			throw new Error('requestSignatureParams is not provided');
-		}
-		this.responseSignatureInput = typeof responseSignatureParams === 'string' ?
-			sh.parseDictionary(responseSignatureParams) as SFVSignatureInputDictionary
-			: (responseSignatureParams && RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(responseSignatureParams));
-		if (this.isResponse() && !this.responseSignatureInput) {
-			throw new Error('responseSignatureParams is not provided');
+		if (!('signature-input' in this.requestHeaders)) throw new Error('Signature-Input header is not found in request');
+		this.requestSignatureInput = sh.parseDictionary(canonicalizeHeaderValue(this.requestHeaders['signature-input'])) as SFVSignatureInputDictionary;
+
+		if (this.isResponse()) {
+			if (!this.responseHeaders) throw new Error('responseHeaders is empty');
+			if (!('signature-input' in this.responseHeaders)) throw new Error('Signature-Input header is not found in response');
+			this.responseSignatureInput = sh.parseDictionary(canonicalizeHeaderValue(this.responseHeaders['signature-input'])) as SFVSignatureInputDictionary;
 		}
 
 		this.sfvTypeDictionary = lcObjectKey(additionalSfvTypeDictionary);
@@ -106,20 +110,6 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 		const host = canonicalizeHeaderValue(rawHost);
 		this.targetUri = this.request.url.startsWith('/') ? (new URL(this.request.url, `${scheme}://${host}`)).href : this.request.url;
 		this.url = new URL(this.targetUri);
-	}
-
-	static inputSignatureParamsDictionary(input: SFVSignatureInputDictionaryForInput): SFVSignatureInputDictionary {
-		const output = getMap(input) as unknown as SFVSignatureInputDictionary;
-		for (const [label, item] of output) {
-			if (Array.isArray(item)) {
-				const [components, params] = item;
-				for (let i = 0; i < components.length; i++) {
-					components[i][1] = getMap(components[i][1]);
-				}
-				output.set(label, [components, getMap(params)]);
-			}
-		}
-		return output;
 	}
 
 	public get(
@@ -333,4 +323,18 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 
 		return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join('\n');
 	}
+}
+
+export function convertSignatureParamsDictionary(input: SFVSignatureInputDictionaryForInput): string {
+	const output = getMap(input) as unknown as SFVSignatureInputDictionary;
+	for (const [label, item] of output) {
+		if (Array.isArray(item)) {
+			const [components, params] = item;
+			for (let i = 0; i < components.length; i++) {
+				components[i][1] = getMap(components[i][1]);
+			}
+			output.set(label, [components, getMap(params)]);
+		}
+	}
+	return sh.serializeDictionary(output);
 }

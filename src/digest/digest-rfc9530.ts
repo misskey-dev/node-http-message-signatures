@@ -179,7 +179,7 @@ export async function verifyRFC9530DigestHeader(
 		/**
 		 * Specify hash algorithms you accept. (RFC 9530 algorithm registries)
 		 *
-		 * If `varifyAll: false`, it is also used to choose the hash algorithm to verify.
+		 * If `verifyAll: false`, it is also used to choose the hash algorithm to verify.
 		 * (Younger index is preferred.)
 		 */
 		algorithms?: RFC9530HashAlgorithm[],

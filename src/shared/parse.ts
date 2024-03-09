@@ -1,6 +1,6 @@
-import { parseDraftRequest } from './draft/parse.js';
-import type { ClockSkewSettings, IncomingRequest, ParsedSignature } from './types.js';
-import { canonicalizeHeaderValue, collectHeaders } from './utils.js';
+import { parseDraftRequest } from '../draft/parse.js';
+import type { ClockSkewSettings, IncomingRequest, OutgoingResponse, ParsedSignature } from '../types.js';
+import { canonicalizeHeaderValue, collectHeaders, isBrowserResponse } from '../utils.js';
 
 export type RequestParseOptions = {
 	/**
@@ -18,6 +18,21 @@ export type RequestParseOptions = {
 		rfc9421?: string[];
 	};
 	clockSkew?: ClockSkewSettings;
+	/**
+	 * Only used in RFC 9421, used in
+	 * If set to true, all algorithms are verified.
+	 * @default false
+	 */
+	verifyAll?: boolean;
+	/**
+	 * Specify sign algorithms you accept.
+	 *
+	 * If `verifyAll: false`, it is also used to choose the hash algorithm to verify.
+	 * (Younger index is preferred.)
+	 */
+	algorithms?: {
+		rfc9421?: string[];
+	}
 };
 
 //#region parse errors
@@ -51,14 +66,19 @@ export class UnknownSignatureHeaderFormatError extends HTTPMessageSignaturesPars
 
 //#region draft parse errors
 // ここに書かないと循環参照でCannot access 'HTTPMessageSignaturesParseError' before initializationになる
-export class DraftSignatureHeaderContentLackedError extends HTTPMessageSignaturesParseError {
+export class SignatureParamsContentLackedError extends HTTPMessageSignaturesParseError {
 	constructor(lackedContent: string) { super(`Signature header content lacked: ${lackedContent}`); }
 }
 
-export class DraftSignatureHeaderClockInvalidError extends HTTPMessageSignaturesParseError {
+export class SignatureParamsClockInvalidError extends HTTPMessageSignaturesParseError {
 	constructor(prop: 'created' | 'expires') { super(`Clock skew is invalid (${prop})`); }
 }
 //#endregion
+
+//#region rfc9421 parse errors
+export class SignatureInputLackedError extends HTTPMessageSignaturesParseError {
+	constructor(message: any) { super(message); }
+}
 //#endregion
 
 /**
@@ -69,13 +89,6 @@ export class DraftSignatureHeaderClockInvalidError extends HTTPMessageSignatures
  */
 export function signatureHeaderIsDraft(signatureHeader: string) {
 	return signatureHeader.includes('signature="');
-}
-
-/**
- * Check if request is based on RFC 9421
- */
-export function requestIsRFC9421(request: IncomingRequest) {
-	return 'signature-input' in collectHeaders(request);
 }
 
 /**
@@ -92,26 +105,29 @@ export function checkClockSkew(reqDate: Date, nowDate: Date, delay: number = 300
 	if (reqTime < nowTime - delay) throw new ClockSkewInvalidError(reqDate, nowDate);
 }
 
+/**
+ * Check clock skew and get the signature and signature-input header
+ */
 export function validateRequestAndGetSignatureHeader(
-	request: IncomingRequest,
+	source: IncomingRequest | OutgoingResponse,
 	clock?: ClockSkewSettings,
-): string {
-	if (!request.headers) throw new SignatureHeaderNotFoundError();
-	const headers = collectHeaders(request);
+) {
+	const headers = collectHeaders(source);
 
 	if (headers['date']) {
-		if (Array.isArray(headers['date']) && headers['date'].length > 1) throw new RequestHasMultipleDateHeadersError();
-		checkClockSkew(new Date([headers['date']].flat(1)[0]!), clock?.now || new Date(), clock?.delay, clock?.forward);
+		checkClockSkew(new Date(canonicalizeHeaderValue(headers['date'])), clock?.now || new Date(), clock?.delay, clock?.forward);
 	} else if (headers['x-date']) {
 		if (Array.isArray(headers['x-date'])) throw new RequestHasMultipleDateHeadersError();
-		checkClockSkew(new Date([headers['x-date']].flat(1)[0]), clock?.now || new Date(), clock?.delay, clock?.forward);
+		checkClockSkew(new Date(canonicalizeHeaderValue(headers['date'])), clock?.now || new Date(), clock?.delay, clock?.forward);
 	}
 
-	if (!request.method) throw new InvalidRequestError('Request method not found');
+	const request = 'req' in source ? source.req : source;
+	if (!isBrowserResponse(request) && !('method' in request)) {
+		throw new InvalidRequestError('Request method not found');
+	}
 	if (!request.url) throw new InvalidRequestError('Request URL not found');
 
-	const signatureHeader = headers['signature'] && canonicalizeHeaderValue(headers['signature']);
-	if (signatureHeader) return signatureHeader;
+	let signatureHeader = 'signature' in headers ? canonicalizeHeaderValue(headers['signature']) : null;
 
 	/**
 	 * Joyent spec uses `Authorization` header
@@ -119,10 +135,20 @@ export function validateRequestAndGetSignatureHeader(
 	 */
 	const authorizationHeader = canonicalizeHeaderValue(headers['authorization']);
 	if (authorizationHeader) {
-		if (authorizationHeader.startsWith('Signature ')) return authorizationHeader.slice(10);
+		if (authorizationHeader.startsWith('Signature ')) {
+			signatureHeader = authorizationHeader.slice(10);
+		}
 	}
 
-	throw new SignatureHeaderNotFoundError();
+	if (!signatureHeader) {
+		throw new SignatureHeaderNotFoundError();
+	}
+
+	return {
+		signatureHeader,
+		signatureInput: 'signature-input' in headers ? canonicalizeHeaderValue(headers['signature-input']) : null,
+		headers,
+	};
 }
 
 /**
@@ -131,13 +157,13 @@ export function validateRequestAndGetSignatureHeader(
  * @param options
  */
 export function parseRequestSignature(request: IncomingRequest, options?: RequestParseOptions): ParsedSignature {
-	const signatureHeader = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
+	const validated = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
 
-	if (requestIsRFC9421(request)) {
+	if (validated.signatureInput != null) {
 		throw new Error('Not implemented');
 		// return parseRFC9421Request(request, options);
-	} else if (signatureHeaderIsDraft(signatureHeader)) {
-		return parseDraftRequest(request, options);
+	} else if (signatureHeaderIsDraft(validated.signatureHeader)) {
+		return parseDraftRequest(request, options, validated);
 	}
 	throw new UnknownSignatureHeaderFormatError();
 }
