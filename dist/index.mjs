@@ -1758,6 +1758,18 @@ async function verifyRFC9530DigestHeader(request, rawBody, opts = {
 }
 
 // src/digest/digest.ts
+async function genDigestHeaderBothRFC3230AndRFC9530(request, body, hashAlgorithm = "SHA-256") {
+  const base645 = await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64);
+  const digest = `${hashAlgorithm}=${base645}`;
+  const contentDigest = `${convertHashAlgorithmFromWebCryptoToRFC9530(hashAlgorithm)}=:${base645}:`;
+  if (isBrowserHeader(request.headers)) {
+    request.headers.set("Digest", digest);
+    request.headers.set("Content-Digest", contentDigest);
+  } else {
+    request.headers["Digest"] = digest;
+    request.headers["Content-Digest"] = contentDigest;
+  }
+}
 async function verifyDigestHeader(request, rawBody, opts = {
   failOnNoDigest: true,
   algorithms: ["SHA-256", "SHA-512"],
@@ -2119,6 +2131,7 @@ export {
   exportPublicKeyPem,
   genASN1Length,
   genAlgorithmForSignAndVerify,
+  genDigestHeaderBothRFC3230AndRFC9530,
   genDraftSignature,
   genDraftSignatureHeader,
   genDraftSigningString,

@@ -138,7 +138,7 @@ fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => 
 ### Sign and Post
 ```ts
 import {
-	genRFC3230DigestHeader,
+	genDigestHeaderBothRFC3230AndRFC9530,
 	signAsDraftToRequest,
 	RequestLike,
 } from '@misskey-dev/node-http-message-signatures';
@@ -171,12 +171,11 @@ export async function send(url: string | URL, body: string, keyId: string) {
 		body,
 	};
 
+	await genDigestHeaderBothRFC3230AndRFC9530(request, body, 'SHA-256');
+
 	if (targetSupportsRFC9421(url)) {
 		// TODO
 	} else {
-		// Draft
-		request.headers['Digest'] = await genRFC3230DigestHeader(body, 'SHA-256');
-
 		await signAsDraftToRequest(request, { keyId, privateKeyPem }, includeHeaders);
 
 		fetch(u, {

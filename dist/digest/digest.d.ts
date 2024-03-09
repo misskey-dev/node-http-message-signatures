@@ -1,5 +1,6 @@
 import { DigestHashAlgorithm, IncomingRequest } from "../types.js";
 import { DigestSource } from "./utils.js";
+export declare function genDigestHeaderBothRFC3230AndRFC9530<T extends IncomingRequest>(request: T, body: DigestSource, hashAlgorithm?: 'SHA-256' | 'SHA-512'): Promise<void>;
 export declare function verifyDigestHeader(request: IncomingRequest, rawBody: DigestSource, opts?: boolean | {
     /**
      * If false, return true when no Digest header is found
