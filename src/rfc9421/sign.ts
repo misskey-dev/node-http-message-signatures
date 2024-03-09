@@ -66,19 +66,19 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 
 		if ('req' in source) {
 			this.response = source;
-			this.responseHeaders = collectHeaders(source as any);
-			this.request = source.req as any;
+			this.responseHeaders = collectHeaders(source);
+			this.request = source.req;
 			this.requestHeaders = collectHeaders(this.request);
 		} else if (isBrowserResponse(source)) {
 			if (!request) throw new Error('Request is not provided');
 			this.response = source;
-			this.responseHeaders = collectHeaders(source as any);
-			this.request = request as any;
+			this.responseHeaders = collectHeaders(source);
+			this.request = request;
 			this.requestHeaders = collectHeaders(this.request);
 		} else {
 			this.response = null;
 			this.responseHeaders = null;
-			this.request = source as any;
+			this.request = source;
 			this.requestHeaders = collectHeaders(source);
 		}
 
