@@ -62,14 +62,14 @@ export function parseSingleRFC9421Signature(
 	};
 }
 
-export function parseRFC9421Request(
+export function parseRFC9421RequestOrResponse(
 	request: IncomingRequest | OutgoingResponse,
 	options?: RequestParseOptions,
 	validated?: ReturnType<typeof validateRequestAndGetSignatureHeader>
 ): ParsedRFC9421Signature {
 	if (!validated) validated = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
 	if (validated.signatureInput == null) throw new SignatureInputLackedError('signatureInput');
-	const signatureDictionary = sh.parseDictionary(validated.signatureInput);
+	const signatureDictionary = sh.parseDictionary(validated.signatureHeader);
 	const signatureInput = sh.parseDictionary(validated.signatureInput);
 
 	const inputIsValid = validateRFC9421SignatureInputParameters(signatureInput, options);
@@ -114,9 +114,9 @@ export function parseRFC9421Request(
 
 			const bs = signatureDictionary.get(label);
 			if (!bs) throw new Error('signature not found');
-			if (!(bs instanceof sh.ByteSequence)) throw new Error('signature not ByteSequence');
+			if (!(bs[0] instanceof sh.ByteSequence)) throw new Error('signature not ByteSequence');
 
-			return [label, parseSingleRFC9421Signature(label, factory, params, bs)];
+			return [label, parseSingleRFC9421Signature(label, factory, params, bs[0])];
 		}),
 	};
 	//#endregion
