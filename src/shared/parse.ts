@@ -98,7 +98,7 @@ export function signatureHeaderIsDraft(signatureHeader: string) {
  * @param delay Tolerance of request's clock delay (ms)
  * @param forward Tolerance of request's clock forwarding (ms)
  */
-export function checkClockSkew(reqDate: Date, nowDate: Date, delay: number = 300 * 1e3, forward: number = 100) {
+export function checkClockSkew(reqDate: Date, nowDate: Date, delay: number = 300 * 1e3, forward: number = 2000) {
 	const reqTime = reqDate.getTime();
 	const nowTime = nowDate.getTime();
 	if (reqTime > nowTime + forward) throw new ClockSkewInvalidError(reqDate, nowDate);

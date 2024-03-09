@@ -44,6 +44,7 @@ export type ClockSkewSettings = {
 	/**
 	 * Toleration of time difference between the sender and me, when the sender's time is faster (gained) than mine
 	 * In milliseconds
+	 * @default 2000
 	 */
 	forward?: number;
 

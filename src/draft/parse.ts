@@ -106,7 +106,7 @@ export function validateAndProcessParsedDraftSignatureHeader(parsed: DraftSignat
 		const createdSec = parseInt(parsed.created);
 		if (isNaN(createdSec)) throw new SignatureParamsClockInvalidError('created');
 		const nowTime = (options?.clockSkew?.now || new Date()).getTime();
-		if (createdSec * 1000 > nowTime + (options?.clockSkew?.forward ?? 100)) {
+		if (createdSec * 1000 > nowTime + (options?.clockSkew?.forward ?? 2000)) {
 			throw new SignatureParamsClockInvalidError('created');
 		}
 	}
@@ -114,7 +114,7 @@ export function validateAndProcessParsedDraftSignatureHeader(parsed: DraftSignat
 		const expiresSec = parseInt(parsed.expires);
 		if (isNaN(expiresSec)) throw new SignatureParamsClockInvalidError('expires');
 		const nowTime = (options?.clockSkew?.now || new Date()).getTime();
-		if (expiresSec * 1000 < nowTime - (options?.clockSkew?.forward ?? 100)) {
+		if (expiresSec * 1000 < nowTime - (options?.clockSkew?.forward ?? 2000)) {
 			throw new SignatureParamsClockInvalidError('expires');
 		}
 	}

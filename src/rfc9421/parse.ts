@@ -24,7 +24,7 @@ export function validateRFC9421SignatureInputParameters(input: sh.Dictionary, op
 			const createdSec = params.get('created');
 			if (typeof createdSec !== 'number') throw new SignatureParamsClockInvalidError('created');
 			const nowTime = (options?.clockSkew?.now || new Date()).getTime();
-			if (createdSec * 1000 > nowTime + (options?.clockSkew?.forward ?? 100)) {
+			if (createdSec * 1000 > nowTime + (options?.clockSkew?.forward ?? 2000)) {
 				throw new SignatureParamsClockInvalidError('created');
 			}
 		}
@@ -32,7 +32,7 @@ export function validateRFC9421SignatureInputParameters(input: sh.Dictionary, op
 			const expiresSec = params.get('expires');
 			if (typeof expiresSec !== 'number') throw new SignatureParamsClockInvalidError('expires');
 			const nowTime = (options?.clockSkew?.now || new Date()).getTime();
-			if (expiresSec * 1000 < nowTime - (options?.clockSkew?.forward ?? 100)) {
+			if (expiresSec * 1000 < nowTime - (options?.clockSkew?.forward ?? 2000)) {
 				throw new SignatureParamsClockInvalidError('expires');
 			}
 		}
