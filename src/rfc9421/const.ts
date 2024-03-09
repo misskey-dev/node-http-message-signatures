@@ -3,9 +3,9 @@
  * https://datatracker.ietf.org/doc/html/rfc8941
  *
  * key: field name
- * value: 'item' | 'list' | 'dict' | 'item' | 'bs' | 'int' | 'dec' | 'str' | 'bool' | 'token'
+ * value: 'list' | 'dict' | 'item' | 'bs' | 'int' | 'dec' | 'str' | 'bool' | 'token'
  */
-export type SFVHeaderTypeDictionary = Record<string, 'item' | 'list' | 'dict' | 'item' | 'bs' | 'int' | 'dec' | 'str' | 'bool' | 'token'>
+export type SFVHeaderTypeDictionary = Record<string, 'list' | 'dict' | 'item' | 'bs' | 'int' | 'dec' | 'str' | 'bool' | 'token'>
 
 /**
  * Dictionary of field name known to be structured field value
