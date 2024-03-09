@@ -3,13 +3,13 @@
  * https://datatracker.ietf.org/doc/html/rfc8941
  *
  * key: field name
- * value: item, list, dict
+ * value: 'item' | 'list' | 'dict' | 'bs' | 'int' | 'dec' | 'str' | 'bool' | 'token'
  */
-export type SFVHeaderTypeDictionary = Record<string, 'item' | 'list' | 'dict'>
+export type SFVHeaderTypeDictionary = Record<string, 'item' | 'list' | 'dict' | 'bs' | 'int' | 'dec' | 'str' | 'bool' | 'token'>
 
 /**
  * Dictionary of field name known to be structured field value
- * TODO: Find official registry
+ * https://datatracker.ietf.org/doc/rfc8941/referencedby/
  */
 export const knownSfvHeaderTypeDictionary = {
 	/**
@@ -35,4 +35,21 @@ export const knownSfvHeaderTypeDictionary = {
 	'want-content-digest': 'dict',
 	// https://datatracker.ietf.org/doc/html/rfc9530#want-fields
 	'want-repr-digest': 'dict',
+
+	// https://datatracker.ietf.org/doc/html/rfc8942#name-the-accept-ch-response-head
+	'accept-ch': 'list',
+
+	// https://datatracker.ietf.org/doc/html/rfc9209#name-the-proxy-status-http-field
+	'proxy-status': 'list',
+
+	// https://datatracker.ietf.org/doc/html/rfc9211#name-the-cache-status-http-respo
+	'cache-status': 'list',
+
+	// https://datatracker.ietf.org/doc/html/rfc9218#name-priority-parameters
+	'priority': 'dict',
+
+	// https://datatracker.ietf.org/doc/html/rfc9440#name-client-cert-http-header-fie
+	'client-cert': 'bs',
+	// https://datatracker.ietf.org/doc/html/rfc9440#name-client-cert-chain-http-head
+	'client-cert-chain': 'list',
 } satisfies SFVHeaderTypeDictionary;

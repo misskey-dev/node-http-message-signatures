@@ -251,6 +251,8 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 					return sh.serializeList(sh.parseList(canonicalized));
 				} else if (this.sfvTypeDictionary[name] === 'item') {
 					return sh.serializeItem(sh.parseItem(canonicalized));
+				} else if (['bs', 'int', 'dec', 'str', 'bool', 'token'].includes(this.sfvTypeDictionary[name])) {
+					return sh.serializeItem(sh.parseItem(canonicalized));
 				}
 			}
 
