@@ -62,6 +62,14 @@ describe('rfc3230', () => {
 			} as any;
 			expect(await verifyRFC3230DigestHeader(request, 'foo')).toBe(false);
 		});
+		test('Invalid base64 padding', async () => {
+			const request = {
+				headers: {
+					'digest': `FOO=abc`,
+				},
+			} as any;
+			expect(await verifyRFC3230DigestHeader(request, 'foo')).toBe(false);
+		});
 	});
 });
 

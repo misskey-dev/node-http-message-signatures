@@ -61,7 +61,14 @@ export async function verifyRFC3230DigestHeader(
 		if (errorLogger) errorLogger('Invalid Digest header format');
 		return false;
 	}
-	const value = base64.parse(match[2]);
+
+	let value: Uint8Array;
+	try {
+		value = base64.parse(match[2]);
+	} catch {
+		if (errorLogger) errorLogger(`Invalid Digest header format. (base64 syntax)`);
+		return false;
+	}
 
 	/**
 	 * UPPERCASED

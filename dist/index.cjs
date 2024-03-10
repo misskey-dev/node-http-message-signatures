@@ -1649,7 +1649,14 @@ async function verifyRFC3230DigestHeader(request, rawBody, opts = {
       errorLogger("Invalid Digest header format");
     return false;
   }
-  const value = import_rfc46482.base64.parse(match[2]);
+  let value;
+  try {
+    value = import_rfc46482.base64.parse(match[2]);
+  } catch {
+    if (errorLogger)
+      errorLogger(`Invalid Digest header format. (base64 syntax)`);
+    return false;
+  }
   let algo = match[1];
   if (!algo) {
     if (errorLogger)
