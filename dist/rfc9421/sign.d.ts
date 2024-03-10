@@ -1,5 +1,5 @@
 import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike } from "../types.js";
-import { SFVHeaderTypeDictionary } from "./const.js";
+import { SFVHeaderTypeDictionary } from "./sfv.js";
 export declare const requestTargetDerivedComponents: string[];
 export declare const responseTargetDerivedComponents: string[];
 export type Kot<T> = keyof T extends 'req' ? T : null;
@@ -20,17 +20,17 @@ export declare class RFC9421SignatureBaseFactory<T extends IncomingRequest | Out
     url: URL;
     requestSignatureInput: SFVSignatureInputDictionary | undefined;
     responseSignatureInput: SFVSignatureInputDictionary | undefined;
-    constructor(source: T, 
     /**
-     * Must be signature params of the request
+     *
+     * @param source request or response, must include 'signature-input' header
+     *	If source is node response, it must include 'req' property.
+     * @param scheme optional, used when source request url starts with '/'
+     * @param additionalSfvTypeDictionary additional SFV type dictionary
+     * @param request optional, used when source is a browser Response
      */
-    requestSignatureParams?: SFVSignatureInputDictionaryForInput | string, scheme?: string, additionalSfvTypeDictionary?: SFVHeaderTypeDictionary, 
-    /**
-     * Set if provided object is response
-     */
-    responseSignatureParams?: SFVSignatureInputDictionaryForInput | string);
-    static inputSignatureParamsDictionary(input: SFVSignatureInputDictionaryForInput): SFVSignatureInputDictionary;
+    constructor(source: T, scheme?: string, additionalSfvTypeDictionary?: SFVHeaderTypeDictionary, request?: Request);
     get(name: '@query-param', paramsLike?: MapLikeObj<'name', string>): string;
     get(name: string, paramsLike?: MapLikeObj<'req' | 'key', string> | MapLikeObj<'sf' | 'bs' | 'tr', boolean>): string;
     generate(label: string): string;
 }
+export declare function convertSignatureParamsDictionary(input: SFVSignatureInputDictionaryForInput): string;

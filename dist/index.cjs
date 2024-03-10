@@ -605,8 +605,6 @@ var require_dist = __commonJS({
 var src_exports = {};
 __export(src_exports, {
   ClockSkewInvalidError: () => ClockSkewInvalidError,
-  DraftSignatureHeaderClockInvalidError: () => DraftSignatureHeaderClockInvalidError,
-  DraftSignatureHeaderContentLackedError: () => DraftSignatureHeaderContentLackedError,
   DraftSignatureHeaderKeys: () => DraftSignatureHeaderKeys,
   HTTPMessageSignaturesParseError: () => HTTPMessageSignaturesParseError,
   InvalidRequestError: () => InvalidRequestError,
@@ -619,6 +617,9 @@ __export(src_exports, {
   RequestHasMultipleDateHeadersError: () => RequestHasMultipleDateHeadersError,
   RequestHasMultipleSignatureHeadersError: () => RequestHasMultipleSignatureHeadersError,
   SignatureHeaderNotFoundError: () => SignatureHeaderNotFoundError,
+  SignatureInputLackedError: () => SignatureInputLackedError,
+  SignatureParamsClockInvalidError: () => SignatureParamsClockInvalidError,
+  SignatureParamsContentLackedError: () => SignatureParamsContentLackedError,
   SpkiParseError: () => SpkiParseError,
   UnknownSignatureHeaderFormatError: () => UnknownSignatureHeaderFormatError,
   asn1ToArrayBuffer: () => asn1ToArrayBuffer,
@@ -628,6 +629,7 @@ __export(src_exports, {
   collectHeaders: () => collectHeaders,
   compareUint8Array: () => compareUint8Array,
   convertHashAlgorithmFromWebCryptoToRFC9530: () => convertHashAlgorithmFromWebCryptoToRFC9530,
+  convertSignatureParamsDictionary: () => convertSignatureParamsDictionary,
   correctHeadersFromFlatArray: () => correctHeadersFromFlatArray,
   decodePem: () => decodePem,
   defaultSignInfoDefaults: () => defaultSignInfoDefaults,
@@ -679,7 +681,6 @@ __export(src_exports, {
   parseRequestSignature: () => parseRequestSignature,
   parseSpki: () => parseSpki,
   removeObsoleteLineFolding: () => removeObsoleteLineFolding,
-  requestIsRFC9421: () => requestIsRFC9421,
   requestTargetDerivedComponents: () => requestTargetDerivedComponents,
   responseTargetDerivedComponents: () => responseTargetDerivedComponents,
   rsaASN1AlgorithmIdentifier: () => rsaASN1AlgorithmIdentifier,
@@ -1359,13 +1360,13 @@ function parseDraftRequestSignatureHeader(signatureHeader) {
 }
 function validateAndProcessParsedDraftSignatureHeader(parsed, options) {
   if (!parsed.keyId)
-    throw new DraftSignatureHeaderContentLackedError("keyId");
+    throw new SignatureParamsContentLackedError("keyId");
   if (!parsed.algorithm)
-    throw new DraftSignatureHeaderContentLackedError("algorithm");
+    throw new SignatureParamsContentLackedError("algorithm");
   if (!parsed.signature)
-    throw new DraftSignatureHeaderContentLackedError("signature");
+    throw new SignatureParamsContentLackedError("signature");
   if (!parsed.headers)
-    throw new DraftSignatureHeaderContentLackedError("headers");
+    throw new SignatureParamsContentLackedError("headers");
   const headersArray = parsed.headers.split(" ");
   const requiredHeaders = options?.requiredComponents?.draft || options?.requiredInputs?.draft;
   if (requiredHeaders) {
@@ -1375,28 +1376,28 @@ function validateAndProcessParsedDraftSignatureHeader(parsed, options) {
           continue;
         if (headersArray.includes("x-date"))
           continue;
-        throw new DraftSignatureHeaderContentLackedError(`headers.${requiredInput}`);
+        throw new SignatureParamsContentLackedError(`headers.${requiredInput}`);
       }
       if (!headersArray.includes(requiredInput))
-        throw new DraftSignatureHeaderContentLackedError(`headers.${requiredInput}`);
+        throw new SignatureParamsContentLackedError(`headers.${requiredInput}`);
     }
   }
   if (parsed.created) {
     const createdSec = parseInt(parsed.created);
     if (isNaN(createdSec))
-      throw new DraftSignatureHeaderClockInvalidError("created");
+      throw new SignatureParamsClockInvalidError("created");
     const nowTime = (options?.clockSkew?.now || /* @__PURE__ */ new Date()).getTime();
-    if (createdSec * 1e3 > nowTime + (options?.clockSkew?.forward ?? 100)) {
-      throw new DraftSignatureHeaderClockInvalidError("created");
+    if (createdSec * 1e3 > nowTime + (options?.clockSkew?.forward ?? 2e3)) {
+      throw new SignatureParamsClockInvalidError("created");
     }
   }
   if (parsed.expires) {
     const expiresSec = parseInt(parsed.expires);
     if (isNaN(expiresSec))
-      throw new DraftSignatureHeaderClockInvalidError("expires");
+      throw new SignatureParamsClockInvalidError("expires");
     const nowTime = (options?.clockSkew?.now || /* @__PURE__ */ new Date()).getTime();
-    if (expiresSec * 1e3 < nowTime - (options?.clockSkew?.forward ?? 100)) {
-      throw new DraftSignatureHeaderClockInvalidError("expires");
+    if (expiresSec * 1e3 < nowTime - (options?.clockSkew?.forward ?? 2e3)) {
+      throw new SignatureParamsClockInvalidError("expires");
     }
   }
   return {
@@ -1409,9 +1410,10 @@ function validateAndProcessParsedDraftSignatureHeader(parsed, options) {
     opaque: parsed.opaque
   };
 }
-function parseDraftRequest(request, options) {
-  const signatureHeader = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
-  const parsedSignatureHeader = validateAndProcessParsedDraftSignatureHeader(parseDraftRequestSignatureHeader(signatureHeader), options);
+function parseDraftRequest(request, options, validated) {
+  if (!validated)
+    validated = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
+  const parsedSignatureHeader = validateAndProcessParsedDraftSignatureHeader(parseDraftRequestSignatureHeader(validated.signatureHeader), options);
   const signingString = genDraftSigningString(
     request,
     parsedSignatureHeader.headers,
@@ -1435,7 +1437,7 @@ function parseDraftRequest(request, options) {
   };
 }
 
-// src/parse.ts
+// src/shared/parse.ts
 var HTTPMessageSignaturesParseError = class extends Error {
   constructor(message) {
     super(message);
@@ -1471,23 +1473,25 @@ var UnknownSignatureHeaderFormatError = class extends HTTPMessageSignaturesParse
     super("Unknown signature header format");
   }
 };
-var DraftSignatureHeaderContentLackedError = class extends HTTPMessageSignaturesParseError {
+var SignatureParamsContentLackedError = class extends HTTPMessageSignaturesParseError {
   constructor(lackedContent) {
     super(`Signature header content lacked: ${lackedContent}`);
   }
 };
-var DraftSignatureHeaderClockInvalidError = class extends HTTPMessageSignaturesParseError {
+var SignatureParamsClockInvalidError = class extends HTTPMessageSignaturesParseError {
   constructor(prop) {
     super(`Clock skew is invalid (${prop})`);
+  }
+};
+var SignatureInputLackedError = class extends HTTPMessageSignaturesParseError {
+  constructor(message) {
+    super(message);
   }
 };
 function signatureHeaderIsDraft(signatureHeader) {
   return signatureHeader.includes('signature="');
 }
-function requestIsRFC9421(request) {
-  return "signature-input" in collectHeaders(request);
-}
-function checkClockSkew(reqDate, nowDate, delay = 300 * 1e3, forward = 100) {
+function checkClockSkew(reqDate, nowDate, delay = 300 * 1e3, forward = 2e3) {
   const reqTime = reqDate.getTime();
   const nowTime = nowDate.getTime();
   if (reqTime > nowTime + forward)
@@ -1495,39 +1499,43 @@ function checkClockSkew(reqDate, nowDate, delay = 300 * 1e3, forward = 100) {
   if (reqTime < nowTime - delay)
     throw new ClockSkewInvalidError(reqDate, nowDate);
 }
-function validateRequestAndGetSignatureHeader(request, clock) {
-  if (!request.headers)
-    throw new SignatureHeaderNotFoundError();
-  const headers = collectHeaders(request);
+function validateRequestAndGetSignatureHeader(source, clock) {
+  const headers = collectHeaders(source);
   if (headers["date"]) {
-    if (Array.isArray(headers["date"]) && headers["date"].length > 1)
-      throw new RequestHasMultipleDateHeadersError();
-    checkClockSkew(new Date([headers["date"]].flat(1)[0]), clock?.now || /* @__PURE__ */ new Date(), clock?.delay, clock?.forward);
+    checkClockSkew(new Date(canonicalizeHeaderValue(headers["date"])), clock?.now || /* @__PURE__ */ new Date(), clock?.delay, clock?.forward);
   } else if (headers["x-date"]) {
     if (Array.isArray(headers["x-date"]))
       throw new RequestHasMultipleDateHeadersError();
-    checkClockSkew(new Date([headers["x-date"]].flat(1)[0]), clock?.now || /* @__PURE__ */ new Date(), clock?.delay, clock?.forward);
+    checkClockSkew(new Date(canonicalizeHeaderValue(headers["date"])), clock?.now || /* @__PURE__ */ new Date(), clock?.delay, clock?.forward);
   }
-  if (!request.method)
+  const request = "req" in source ? source.req : source;
+  if (!isBrowserResponse(request) && !("method" in request)) {
     throw new InvalidRequestError("Request method not found");
+  }
   if (!request.url)
     throw new InvalidRequestError("Request URL not found");
-  const signatureHeader = headers["signature"] && canonicalizeHeaderValue(headers["signature"]);
-  if (signatureHeader)
-    return signatureHeader;
+  let signatureHeader = "signature" in headers ? canonicalizeHeaderValue(headers["signature"]) : null;
   const authorizationHeader = canonicalizeHeaderValue(headers["authorization"]);
   if (authorizationHeader) {
-    if (authorizationHeader.startsWith("Signature "))
-      return authorizationHeader.slice(10);
+    if (authorizationHeader.startsWith("Signature ")) {
+      signatureHeader = authorizationHeader.slice(10);
+    }
   }
-  throw new SignatureHeaderNotFoundError();
+  if (!signatureHeader) {
+    throw new SignatureHeaderNotFoundError();
+  }
+  return {
+    signatureHeader,
+    signatureInput: "signature-input" in headers ? canonicalizeHeaderValue(headers["signature-input"]) : null,
+    headers
+  };
 }
 function parseRequestSignature(request, options) {
-  const signatureHeader = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
-  if (requestIsRFC9421(request)) {
+  const validated = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
+  if (validated.signatureInput != null) {
     throw new Error("Not implemented");
-  } else if (signatureHeaderIsDraft(signatureHeader)) {
-    return parseDraftRequest(request, options);
+  } else if (signatureHeaderIsDraft(validated.signatureHeader)) {
+    return parseDraftRequest(request, options, validated);
   }
   throw new UnknownSignatureHeaderFormatError();
 }
@@ -1921,7 +1929,7 @@ async function verifyDraftSignature(parsed, key, errorLogger) {
   }
 }
 
-// src/rfc9421/const.ts
+// src/rfc9421/sfv.ts
 var knownSfvHeaderTypeDictionary = {
   /**
    * RFC 9421 HTTP Message Signatures
@@ -1944,7 +1952,19 @@ var knownSfvHeaderTypeDictionary = {
   // https://datatracker.ietf.org/doc/html/rfc9530#name-integrity-preference-fields
   "want-content-digest": "dict",
   // https://datatracker.ietf.org/doc/html/rfc9530#want-fields
-  "want-repr-digest": "dict"
+  "want-repr-digest": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc8942#name-the-accept-ch-response-head
+  "accept-ch": "list",
+  // https://datatracker.ietf.org/doc/html/rfc9209#name-the-proxy-status-http-field
+  "proxy-status": "list",
+  // https://datatracker.ietf.org/doc/html/rfc9211#name-the-cache-status-http-respo
+  "cache-status": "list",
+  // https://datatracker.ietf.org/doc/html/rfc9218#name-priority-parameters
+  "priority": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc9440#name-client-cert-http-header-fie
+  "client-cert": "bs",
+  // https://datatracker.ietf.org/doc/html/rfc9440#name-client-cert-chain-http-head
+  "client-cert-chain": "list"
 };
 
 // src/rfc9421/sign.ts
@@ -1961,19 +1981,34 @@ var requestTargetDerivedComponents = [
 var responseTargetDerivedComponents = [
   "@status"
 ];
-var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
+var RFC9421SignatureBaseFactory = class {
   isRequest() {
     return this.response === null;
   }
   isResponse() {
     return this.response !== null;
   }
-  constructor(source, requestSignatureParams, scheme = "https", additionalSfvTypeDictionary = {}, responseSignatureParams) {
+  /**
+   *
+   * @param source request or response, must include 'signature-input' header
+   *	If source is node response, it must include 'req' property.
+   * @param scheme optional, used when source request url starts with '/'
+   * @param additionalSfvTypeDictionary additional SFV type dictionary
+   * @param request optional, used when source is a browser Response
+   */
+  constructor(source, scheme = "https", additionalSfvTypeDictionary = {}, request) {
     this.sfvTypeDictionary = lcObjectKey({ ...knownSfvHeaderTypeDictionary, ...additionalSfvTypeDictionary });
     if ("req" in source) {
       this.response = source;
       this.responseHeaders = collectHeaders(source);
       this.request = source.req;
+      this.requestHeaders = collectHeaders(this.request);
+    } else if (isBrowserResponse(source)) {
+      if (!request)
+        throw new Error("Request is not provided");
+      this.response = source;
+      this.responseHeaders = collectHeaders(source);
+      this.request = request;
       this.requestHeaders = collectHeaders(this.request);
     } else {
       this.response = null;
@@ -1987,13 +2022,15 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
     if (!this.request.method) {
       throw new Error("Request method is empty");
     }
-    this.requestSignatureInput = typeof requestSignatureParams === "string" ? sh2.parseDictionary(requestSignatureParams) : requestSignatureParams && _RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(requestSignatureParams);
-    if (this.isRequest() && !this.requestSignatureInput) {
-      throw new Error("requestSignatureParams is not provided");
-    }
-    this.responseSignatureInput = typeof responseSignatureParams === "string" ? sh2.parseDictionary(responseSignatureParams) : responseSignatureParams && _RFC9421SignatureBaseFactory.inputSignatureParamsDictionary(responseSignatureParams);
-    if (this.isResponse() && !this.responseSignatureInput) {
-      throw new Error("responseSignatureParams is not provided");
+    if (!("signature-input" in this.requestHeaders))
+      throw new Error("Signature-Input header is not found in request");
+    this.requestSignatureInput = sh2.parseDictionary(canonicalizeHeaderValue(this.requestHeaders["signature-input"]));
+    if (this.isResponse()) {
+      if (!this.responseHeaders)
+        throw new Error("responseHeaders is empty");
+      if (!("signature-input" in this.responseHeaders))
+        throw new Error("Signature-Input header is not found in response");
+      this.responseSignatureInput = sh2.parseDictionary(canonicalizeHeaderValue(this.responseHeaders["signature-input"]));
     }
     this.sfvTypeDictionary = lcObjectKey(additionalSfvTypeDictionary);
     this.scheme = this.request.url.startsWith("/") ? scheme : new URL(this.request.url).protocol.replace(":", "");
@@ -2003,19 +2040,6 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
     const host = canonicalizeHeaderValue(rawHost);
     this.targetUri = this.request.url.startsWith("/") ? new URL(this.request.url, `${scheme}://${host}`).href : this.request.url;
     this.url = new URL(this.targetUri);
-  }
-  static inputSignatureParamsDictionary(input) {
-    const output = getMap(input);
-    for (const [label, item] of output) {
-      if (Array.isArray(item)) {
-        const [components, params] = item;
-        for (let i = 0; i < components.length; i++) {
-          components[i][1] = getMap(components[i][1]);
-        }
-        output.set(label, [components, getMap(params)]);
-      }
-    }
-    return output;
   }
   get(name, paramsLike = /* @__PURE__ */ new Map()) {
     const params = getMap(paramsLike);
@@ -2125,7 +2149,7 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
           return sh2.serializeDictionary(sh2.parseDictionary(canonicalized));
         } else if (this.sfvTypeDictionary[name] === "list") {
           return sh2.serializeList(sh2.parseList(canonicalized));
-        } else if (this.sfvTypeDictionary[name] === "item") {
+        } else if (["item", "bs", "int", "dec", "str", "bool", "token"].includes(this.sfvTypeDictionary[name])) {
           return sh2.serializeItem(sh2.parseItem(canonicalized));
         }
       }
@@ -2199,11 +2223,22 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
     return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join("\n");
   }
 };
+function convertSignatureParamsDictionary(input) {
+  const output = getMap(input);
+  for (const [label, item] of output) {
+    if (Array.isArray(item)) {
+      const [components, params] = item;
+      for (let i = 0; i < components.length; i++) {
+        components[i][1] = getMap(components[i][1]);
+      }
+      output.set(label, [components, getMap(params)]);
+    }
+  }
+  return sh2.serializeDictionary(output);
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   ClockSkewInvalidError,
-  DraftSignatureHeaderClockInvalidError,
-  DraftSignatureHeaderContentLackedError,
   DraftSignatureHeaderKeys,
   HTTPMessageSignaturesParseError,
   InvalidRequestError,
@@ -2216,6 +2251,9 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
   RequestHasMultipleDateHeadersError,
   RequestHasMultipleSignatureHeadersError,
   SignatureHeaderNotFoundError,
+  SignatureInputLackedError,
+  SignatureParamsClockInvalidError,
+  SignatureParamsContentLackedError,
   SpkiParseError,
   UnknownSignatureHeaderFormatError,
   asn1ToArrayBuffer,
@@ -2225,6 +2263,7 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
   collectHeaders,
   compareUint8Array,
   convertHashAlgorithmFromWebCryptoToRFC9530,
+  convertSignatureParamsDictionary,
   correctHeadersFromFlatArray,
   decodePem,
   defaultSignInfoDefaults,
@@ -2276,7 +2315,6 @@ var RFC9421SignatureBaseFactory = class _RFC9421SignatureBaseFactory {
   parseRequestSignature,
   parseSpki,
   removeObsoleteLineFolding,
-  requestIsRFC9421,
   requestTargetDerivedComponents,
   responseTargetDerivedComponents,
   rsaASN1AlgorithmIdentifier,

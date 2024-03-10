@@ -38,6 +38,7 @@ export type ClockSkewSettings = {
     /**
      * Toleration of time difference between the sender and me, when the sender's time is faster (gained) than mine
      * In milliseconds
+     * @default 2000
      */
     forward?: number;
     /**
@@ -83,6 +84,19 @@ export type SignatureHashAlgorithmUpperSnake = 'SHA-1' | 'SHA-256' | 'SHA-384' |
 export type DigestHashAlgorithm = 'SHA' | 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512';
 export type DraftSignatureAlgorithm = 'rsa-sha1' | 'rsa-sha256' | 'rsa-sha384' | 'rsa-sha512' | 'ecdsa-sha1' | 'ecdsa-sha256' | 'ecdsa-sha384' | 'ecdsa-sha512' | 'ed25519-sha512' | 'ed25519' | 'ed448';
 export type RFC9421SignatuerAlgorithm = 'rsa-pss-sha512' | 'rsa-v1_5-sha256' | 'hmac-sha256' | 'ecdsa-p256-sha256' | 'ecdsa-p384-sha384' | 'ed25519';
+export type MapLikeObj<K, V> = Map<K, V> | Record<string, V> | [K, V][];
+export type SFVParametersLike = MapLikeObj<string, string | boolean | number>;
+/**
+ * sh.InnerList
+ * @examples [["@method", Map([])], Map({keyid: "x", algo: ""})]
+ */
+export type SFVSignatureParams = [[string, Map<string, string | boolean>][], Map<string, string | boolean | number>];
+export type SFVSignatureParamsForInput = [[string, MapLikeObj<string, string | boolean>][], MapLikeObj<string, string | boolean | number>];
+/**
+ * Result of `sh.parseDictionary('(value of signateure-input)')`
+ */
+export type SFVSignatureInputDictionary = Map<string, SFVSignatureParams>;
+export type SFVSignatureInputDictionaryForInput = MapLikeObj<string, SFVSignatureParamsForInput>;
 export type ParsedDraftSignature = {
     version: 'draft';
     /**
@@ -113,33 +127,19 @@ export type ParsedDraftSignature = {
         keyId: string;
     };
 };
-export type MapLikeObj<K, V> = Map<K, V> | Record<string, V> | [K, V][];
-export type SFVParametersLike = MapLikeObj<string, string | boolean | number>;
-/**
- * sh.InnerList
- * @examples [["@method", Map([])], Map({keyid: "x", algo: ""})]
- */
-export type SFVSignatureParams = [[string, Map<string, string | boolean>][], Map<string, string | boolean | number>];
-export type SFVSignatureParamsForInput = [[string, MapLikeObj<string, string | boolean>][], MapLikeObj<string, string | boolean | number>];
-/**
- * Result of `sh.parseDictionary('(value of signateure-input)')`
- */
-export type SFVSignatureInputDictionary = Map<string, SFVSignatureParams>;
-export type SFVSignatureInputDictionaryForInput = MapLikeObj<string, SFVSignatureParamsForInput>;
 export type ParsedRFC9421SignatureValue = {
-    label: string;
     keyid: string;
+    signature: string;
     /**
      * alg
      * @example 'rsa-v1_5-sha256'
      */
     algorithm: string;
-    /**
-     * @example ['@method', '@path', '@authority', 'date', 'content-digest', '@signature-params']
-     */
-    components: string[];
+    params: string;
     created?: number;
     expires?: number;
+    nonce?: string;
+    tag?: string;
 };
 export type ParsedRFC9421SignatureValueWithBase = ParsedRFC9421SignatureValue & {
     /**
@@ -155,6 +155,6 @@ export type ParsedRFC9421SignatureValueWithBase = ParsedRFC9421SignatureValue & 
 };
 export type ParsedRFC9421Signature = {
     version: 'rfc9421';
-    value: ParsedRFC9421SignatureValueWithBase[];
+    value: [string, ParsedRFC9421SignatureValueWithBase][];
 };
 export type ParsedSignature = ParsedDraftSignature | ParsedRFC9421Signature;
