@@ -1,3 +1,4 @@
+import { parseRFC9421RequestOrResponse } from 'src/rfc9421/parse.js';
 import { parseDraftRequest } from '../draft/parse.js';
 import type { ClockSkewSettings, IncomingRequest, OutgoingResponse, ParsedSignature } from '../types.js';
 import { canonicalizeHeaderValue, collectHeaders, isBrowserResponse } from '../utils.js';
@@ -160,8 +161,7 @@ export function parseRequestSignature(request: IncomingRequest, options?: Reques
 	const validated = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
 
 	if (validated.signatureInput != null) {
-		throw new Error('Not implemented');
-		// return parseRFC9421Request(request, options);
+		return parseRFC9421RequestOrResponse(request, options);
 	} else if (signatureHeaderIsDraft(validated.signatureHeader)) {
 		return parseDraftRequest(request, options, validated);
 	}

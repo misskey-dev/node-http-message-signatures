@@ -257,3 +257,15 @@ export function getMap<T extends MapLikeObj<K, V>, K, V>(
 	if (Array.isArray(obj)) return new Map(obj);
 	return new Map(Object.entries(obj) as [K, V][]);
 }
+
+export function getMapWithoutUndefined<T extends MapLikeObj<K, V>, K, V>(
+	obj: T,
+): Map<K, NonNullable<V>> {
+	const map = getMap<T, K, V>(obj);
+	for (const [k, v] of map.entries()) {
+		if (v === undefined) {
+			map.delete(k);
+		}
+	}
+	return map as any;
+}

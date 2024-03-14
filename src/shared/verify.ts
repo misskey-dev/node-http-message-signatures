@@ -2,10 +2,12 @@
  * Verify Request (Parsed)
  */
 
-import type { ECNamedCurve, SignInfo } from '../types.js';
+import type { ECNamedCurve, ParsedSignature, SignInfo } from '../types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from '../pem/spki.js';
 import type { SignatureHashAlgorithmUpperSnake } from '../types.js';
 import { keyHashAlgosForDraftDecoding } from '../draft/const.js';
+import { verifyDraftSignature } from 'src/draft/verify.js';
+import { verifyRFC9421Signature } from 'src/rfc9421/verify.js';
 
 export class KeyHashValidationError extends Error {
 	constructor(message: string) { super(message); }
@@ -122,4 +124,13 @@ export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorit
 	}
 
 	throw new KeyHashValidationError(`unsupported keyAlgorithm: ${realKeyType} (provided: ${algorithm})`);
+}
+
+export function verifyParsedSignature(parsed: ParsedSignature, key: string | CryptoKey, errorLogger?: ((message: any) => any)): Promise<boolean> {
+	if (parsed.version === 'draft') {
+		return verifyDraftSignature(parsed.value, key, errorLogger);
+	} else if (parsed.version === 'rfc9421') {
+		return verifyRFC9421Signature(parsed.value, key, errorLogger);
+	}
+	throw new Error(`unsupported parsed signature`);
 }

@@ -1,4 +1,4 @@
-import type { IncomingRequest, PrivateKey, SFVSignatureParamsForInput, SignatureHashAlgorithmUpperSnake } from '../types.js';
+import type { IncomingRequest, OutgoingResponse, PrivateKey, SFVSignatureParamsForInput, SignatureHashAlgorithmUpperSnake } from '../types.js';
 import { type SignInfoDefaults, defaultSignInfoDefaults, setHeaderToRequestOrResponse } from '../utils.js';
 import { importPrivateKey } from '../pem/pkcs8.js';
 import { RFC9421SignatureBaseFactory, convertSignatureParamsDictionary } from './base.js';
@@ -107,8 +107,8 @@ export async function processSingleRFC9421SignSource(source: RFC9421SignSource) 
  * @param opts
  * @returns result object
  */
-export async function signAsRFC9421ToRequest(
-	request: IncomingRequest,
+export async function signAsRFC9421ToRequestOrResponse(
+	request: IncomingRequest | OutgoingResponse,
 	sources: Map<string, RFC9421SignSource>,
 	signatureBaseOptions: {
 		// e.g. https
@@ -119,7 +119,6 @@ export async function signAsRFC9421ToRequest(
 		scheme: 'https',
 		additionalSfvTypeDictionary: {}
 	},
-	opts: SignInfoDefaults = defaultSignInfoDefaults
 ) {
 	const keys = new Map<string, CryptoKey>;
 	const inputDictionary = new Map<string, SFVSignatureParamsForInput>();
@@ -132,7 +131,12 @@ export async function signAsRFC9421ToRequest(
 	const inputHeader = convertSignatureParamsDictionary(inputDictionary);
 	setHeaderToRequestOrResponse(request, 'Signature-Input', inputHeader);
 
-	const factory = new RFC9421SignatureBaseFactory(request, signatureBaseOptions.scheme, signatureBaseOptions.additionalSfvTypeDictionary, signatureBaseOptions.request);
+	const factory = new RFC9421SignatureBaseFactory(
+		request,
+		signatureBaseOptions.scheme,
+		signatureBaseOptions.additionalSfvTypeDictionary,
+		signatureBaseOptions.request
+	);
 
 	const signaturesEntries = (factory.isRequest() ? factory.requestSignatureInput : factory.responseSignatureInput!)?.keys();
 	if (!signaturesEntries) throw new Error(`signaturesEntries is undefined`);
@@ -141,8 +145,15 @@ export async function signAsRFC9421ToRequest(
 	const signatureBases = new Map<string, string>();
 	for (const label of signaturesEntries) {
 		const base = factory.generate(label);
+		const key = keys.get(label);
+		if (!key) throw new Error(`key not found: ${label}`);
 		signatureBases.set(label, base);
-		signatureDictionary.set(label, [new sh.ByteSequence(await genSignature(keys.get(label)!, base, opts)), new Map()]);
+		signatureDictionary.set(label, [
+			new sh.ByteSequence(
+				await genSignature(key, base, sources.get(label)?.defaults ?? defaultSignInfoDefaults)
+			),
+			new Map(),
+		]);
 	}
 
 	const signatureHeader = sh.serializeDictionary(signatureDictionary);

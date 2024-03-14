@@ -1,7 +1,7 @@
 
 // TODO
 
-import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, collectHeaders, isBrowserRequest, isBrowserResponse } from "../utils.js";
+import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, collectHeaders, isBrowserRequest, isBrowserResponse, getMapWithoutUndefined } from "../utils.js";
 import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike, HeadersValueLikeArrayable, SFVSignatureParamsForInput } from "../types.js";
 import * as sh from "structured-headers";
 import { SFVHeaderTypeDictionary, knownSfvHeaderTypeDictionary } from "./sfv.js";
@@ -335,9 +335,9 @@ export function convertSignatureParamsDictionary(input: SFVSignatureInputDiction
 				components.map(
 					identifier => typeof identifier === 'string' ?
 						[identifier, new Map()]
-						: [identifier[0], getMap(identifier[1]) as Map<string, string | boolean>]
+						: [identifier[0], getMapWithoutUndefined(identifier[1]) as Map<string, string | boolean>]
 				),
-				getMap(params),
+				getMapWithoutUndefined(params),
 			],
 		);
 	}

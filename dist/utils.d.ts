@@ -70,3 +70,4 @@ export declare function genAlgorithmForSignAndVerify(keyAlgorithm: KeyAlgorithm,
 };
 export declare function splitPer64Chars(str: string): string[];
 export declare function getMap<T extends MapLikeObj<K, V>, K, V>(obj: T): Map<K, V>;
+export declare function getMapWithoutUndefined<T extends MapLikeObj<K, V>, K, V>(obj: T): Map<K, NonNullable<V>>;
