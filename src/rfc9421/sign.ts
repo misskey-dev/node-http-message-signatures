@@ -129,7 +129,8 @@ export async function signAsRFC9421ToRequest(
 		inputDictionary.set(label, params);
 	}
 
-	setHeaderToRequestOrResponse(request, 'Signature-Input', convertSignatureParamsDictionary(inputDictionary));
+	const inputHeader = convertSignatureParamsDictionary(inputDictionary);
+	setHeaderToRequestOrResponse(request, 'Signature-Input', inputHeader);
 
 	const factory = new RFC9421SignatureBaseFactory(request, signatureBaseOptions.scheme, signatureBaseOptions.additionalSfvTypeDictionary, signatureBaseOptions.request);
 
@@ -137,13 +138,20 @@ export async function signAsRFC9421ToRequest(
 	if (!signaturesEntries) throw new Error(`signaturesEntries is undefined`);
 
 	const signatureDictionary = new Map<string, [sh.ByteSequence, Map<any, any>]>();
+	const signatureBases = new Map<string, string>();
 	for (const label of signaturesEntries) {
-		signatureDictionary.set(label, [new sh.ByteSequence(await genSignature(keys.get(label)!, factory.generate(label), opts)), new Map()]);
+		const base = factory.generate(label);
+		signatureBases.set(label, base);
+		signatureDictionary.set(label, [new sh.ByteSequence(await genSignature(keys.get(label)!, base, opts)), new Map()]);
 	}
 
-	setHeaderToRequestOrResponse(request, 'Signature', sh.serializeDictionary(signatureDictionary));
+	const signatureHeader = sh.serializeDictionary(signatureDictionary);
+	setHeaderToRequestOrResponse(request, 'Signature', signatureHeader);
 
 	return {
+		inputHeader,
+		signatureHeader,
 		signatureDictionary,
+		signatureBases,
 	};
 }
