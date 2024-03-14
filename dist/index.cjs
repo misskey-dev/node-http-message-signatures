@@ -1172,72 +1172,7 @@ function getMap(obj) {
   return new Map(Object.entries(obj));
 }
 
-// src/pem/pkcs8.ts
-var import_asn1js3 = __toESM(require("@lapo/asn1js"), 1);
-var Pkcs8ParseError = class extends Error {
-  constructor(message) {
-    super(message);
-  }
-};
-function parsePkcs8(input) {
-  const parsed = import_asn1js3.default.decode(decodePem(input));
-  if (!parsed.sub || parsed.sub.length < 3 || parsed.sub.length > 4)
-    throw new Pkcs8ParseError("Invalid PKCS#8 (invalid sub length)");
-  const version = parsed.sub[0];
-  if (!version || !version.tag || version.tag.tagNumber !== 2)
-    throw new Pkcs8ParseError("Invalid PKCS#8 (invalid version)");
-  const privateKeyAlgorithm = parseAlgorithmIdentifier(parsed.sub[1]);
-  const privateKey = parsed.sub[2];
-  if (!privateKey || !privateKey.tag || privateKey.tag.tagNumber !== 4)
-    throw new Pkcs8ParseError("Invalid PKCS#8 (invalid privateKey)");
-  const attributes = parsed.sub[3];
-  if (attributes) {
-    if (attributes.tag.tagNumber !== 49)
-      throw new Pkcs8ParseError("Invalid PKCS#8 (invalid attributes)");
-  }
-  return {
-    der: asn1ToArrayBuffer(parsed),
-    ...privateKeyAlgorithm,
-    attributesRaw: attributes ? asn1ToArrayBuffer(attributes) : null
-  };
-}
-async function importPrivateKey(key, keyUsages = ["sign"], defaults = defaultSignInfoDefaults, extractable = false) {
-  const parsedPrivateKey = parsePkcs8(key);
-  const importParams = genSignInfo(parsedPrivateKey, defaults);
-  return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, extractable, keyUsages);
-}
-
-// src/const.ts
-var textEncoder = new TextEncoder();
-
-// src/draft/sign.ts
-function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
-  const verifyHash = () => {
-    if (!hashAlgorithm)
-      throw new Error(`hash is required or must not be null`);
-    if (!(hashAlgorithm in keyHashAlgosForDraftEncofing))
-      throw new Error(`unsupported hash: ${hashAlgorithm}`);
-  };
-  if (keyAlgorithm === "RSASSA-PKCS1-v1_5") {
-    verifyHash();
-    return `rsa-${keyHashAlgosForDraftEncofing[hashAlgorithm]}`;
-  }
-  if (keyAlgorithm === "ECDSA") {
-    verifyHash();
-    return `ecdsa-${keyHashAlgosForDraftEncofing[hashAlgorithm]}`;
-  }
-  if (keyAlgorithm === "ECDH") {
-    verifyHash();
-    return `ecdh-${keyHashAlgosForDraftEncofing[hashAlgorithm]}`;
-  }
-  if (keyAlgorithm === "Ed25519") {
-    return `ed25519-sha512`;
-  }
-  if (keyAlgorithm === "Ed448") {
-    return `ed448`;
-  }
-  throw new Error(`unsupported keyAlgorithm`);
-}
+// src/draft/string.ts
 function genDraftSigningString(source, includeHeaders, additional) {
   if (!source.method) {
     throw new Error("Request method not found");
@@ -1269,31 +1204,6 @@ function genDraftSigningString(source, includeHeaders, additional) {
     }
   }
   return results.join("\n");
-}
-async function genDraftSignature(privateKey, signingString, defaults = defaultSignInfoDefaults) {
-  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, textEncoder.encode(signingString));
-  return encodeArrayBufferToBase64(signatureAB);
-}
-function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
-  return `keyId="${keyId}",algorithm="${algorithm}",headers="${includeHeaders.join(" ")}",signature="${signature}"`;
-}
-async function signAsDraftToRequest(request, key, includeHeaders, opts = defaultSignInfoDefaults) {
-  if (opts.hashAlgorithm) {
-    opts.hash = opts.hashAlgorithm;
-  }
-  const privateKey = "privateKey" in key ? key.privateKey : await importPrivateKey(key.privateKeyPem, ["sign"], opts);
-  const algoString = getDraftAlgoString(privateKey.algorithm.name, opts.hash);
-  const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
-  const signature = await genDraftSignature(privateKey, signingString, opts);
-  const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, algoString);
-  Object.assign(request.headers, {
-    Signature: signatureHeader
-  });
-  return {
-    signingString,
-    signature,
-    signatureHeader
-  };
 }
 
 // src/draft/parse.ts
@@ -1605,6 +1515,9 @@ async function genEd448KeyPair(keyUsage) {
     privateKey: await exportPrivateKeyPem(keyPair.privateKey)
   };
 }
+
+// src/const.ts
+var textEncoder = new TextEncoder();
 
 // src/digest/utils.ts
 async function createBase64Digest(body, hash = "SHA-256") {
@@ -1919,6 +1832,95 @@ async function verifyDigestHeader(request, rawBody, opts = {
   return true;
 }
 
+// src/pem/pkcs8.ts
+var import_asn1js3 = __toESM(require("@lapo/asn1js"), 1);
+var Pkcs8ParseError = class extends Error {
+  constructor(message) {
+    super(message);
+  }
+};
+function parsePkcs8(input) {
+  const parsed = import_asn1js3.default.decode(decodePem(input));
+  if (!parsed.sub || parsed.sub.length < 3 || parsed.sub.length > 4)
+    throw new Pkcs8ParseError("Invalid PKCS#8 (invalid sub length)");
+  const version = parsed.sub[0];
+  if (!version || !version.tag || version.tag.tagNumber !== 2)
+    throw new Pkcs8ParseError("Invalid PKCS#8 (invalid version)");
+  const privateKeyAlgorithm = parseAlgorithmIdentifier(parsed.sub[1]);
+  const privateKey = parsed.sub[2];
+  if (!privateKey || !privateKey.tag || privateKey.tag.tagNumber !== 4)
+    throw new Pkcs8ParseError("Invalid PKCS#8 (invalid privateKey)");
+  const attributes = parsed.sub[3];
+  if (attributes) {
+    if (attributes.tag.tagNumber !== 49)
+      throw new Pkcs8ParseError("Invalid PKCS#8 (invalid attributes)");
+  }
+  return {
+    der: asn1ToArrayBuffer(parsed),
+    ...privateKeyAlgorithm,
+    attributesRaw: attributes ? asn1ToArrayBuffer(attributes) : null
+  };
+}
+async function importPrivateKey(key, keyUsages = ["sign"], defaults = defaultSignInfoDefaults, extractable = false) {
+  const parsedPrivateKey = parsePkcs8(key);
+  const importParams = genSignInfo(parsedPrivateKey, defaults);
+  return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, extractable, keyUsages);
+}
+
+// src/draft/sign.ts
+function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
+  const verifyHash = () => {
+    if (!hashAlgorithm)
+      throw new Error(`hash is required or must not be null`);
+    if (!(hashAlgorithm in keyHashAlgosForDraftEncofing))
+      throw new Error(`unsupported hash: ${hashAlgorithm}`);
+  };
+  if (keyAlgorithm === "RSASSA-PKCS1-v1_5") {
+    verifyHash();
+    return `rsa-${keyHashAlgosForDraftEncofing[hashAlgorithm]}`;
+  }
+  if (keyAlgorithm === "ECDSA") {
+    verifyHash();
+    return `ecdsa-${keyHashAlgosForDraftEncofing[hashAlgorithm]}`;
+  }
+  if (keyAlgorithm === "ECDH") {
+    verifyHash();
+    return `ecdh-${keyHashAlgosForDraftEncofing[hashAlgorithm]}`;
+  }
+  if (keyAlgorithm === "Ed25519") {
+    return `ed25519-sha512`;
+  }
+  if (keyAlgorithm === "Ed448") {
+    return `ed448`;
+  }
+  throw new Error(`unsupported keyAlgorithm`);
+}
+async function genDraftSignature(privateKey, signingString, defaults = defaultSignInfoDefaults) {
+  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, textEncoder.encode(signingString));
+  return encodeArrayBufferToBase64(signatureAB);
+}
+function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
+  return `keyId="${keyId}",algorithm="${algorithm}",headers="${includeHeaders.join(" ")}",signature="${signature}"`;
+}
+async function signAsDraftToRequest(request, key, includeHeaders, opts = defaultSignInfoDefaults) {
+  if (opts.hashAlgorithm) {
+    opts.hash = opts.hashAlgorithm;
+  }
+  const privateKey = "privateKey" in key ? key.privateKey : await importPrivateKey(key.privateKeyPem, ["sign"], opts);
+  const algoString = getDraftAlgoString(privateKey.algorithm.name, opts.hash);
+  const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
+  const signature = await genDraftSignature(privateKey, signingString, opts);
+  const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, algoString);
+  Object.assign(request.headers, {
+    Signature: signatureHeader
+  });
+  return {
+    signingString,
+    signature,
+    signatureHeader
+  };
+}
+
 // src/draft/verify.ts
 var import_rfc46484 = require("rfc4648");
 var genSignInfoDraft = parseSignInfo;
@@ -1974,7 +1976,7 @@ var knownSfvHeaderTypeDictionary = {
   "client-cert-chain": "list"
 };
 
-// src/rfc9421/sign.ts
+// src/rfc9421/base.ts
 var sh2 = __toESM(require_dist(), 1);
 var requestTargetDerivedComponents = [
   "@method",

@@ -1,5 +1,5 @@
 import { RequestLike, ResponseLike, SFVSignatureInputDictionaryForInput } from '../types';
-import { RFC9421SignatureBaseFactory, convertSignatureParamsDictionary } from './sign';
+import { RFC9421SignatureBaseFactory, convertSignatureParamsDictionary } from './base';
 
 const tinySignatureInput = `x=(x)`;
 const requestBase = {

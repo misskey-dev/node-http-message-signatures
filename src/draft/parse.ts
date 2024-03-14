@@ -4,7 +4,7 @@
 
 import { SignatureParamsClockInvalidError, SignatureParamsContentLackedError, RequestParseOptions, validateRequestAndGetSignatureHeader } from "../shared/parse.js";
 import type { ParsedDraftSignature, IncomingRequest, RequestLike } from '../types.js';
-import { genDraftSigningString } from './sign.js';
+import { genDraftSigningString } from './string.js';
 
 export const DraftSignatureHeaderKeys = ['keyId', 'algorithm', 'created', 'expires', 'opaque', 'headers', 'signature'] as const;
 export type DraftSignatureHeaderParsedRaw = {

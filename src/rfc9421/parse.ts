@@ -4,7 +4,7 @@
 
 import { SignatureParamsClockInvalidError, SignatureParamsContentLackedError, RequestParseOptions, validateRequestAndGetSignatureHeader, SignatureInputLackedError } from "../shared/parse.js";
 import type { IncomingRequest, ParsedRFC9421SignatureValueWithBase, OutgoingResponse, SFVSignatureInputDictionary, ParsedRFC9421Signature, SFVSignatureParams } from '../types.js';
-import { RFC9421SignatureBaseFactory } from './sign.js';
+import { RFC9421SignatureBaseFactory } from './base.js';
 import * as sh from 'structured-headers';
 
 // https://datatracker.ietf.org/doc/html/rfc9421#name-signature-parameters

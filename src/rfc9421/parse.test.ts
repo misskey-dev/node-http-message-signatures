@@ -1,5 +1,5 @@
 import { parseRFC9421RequestOrResponse, parseSingleRFC9421Signature } from './parse';
-import { RFC9421SignatureBaseFactory } from './sign';
+import { RFC9421SignatureBaseFactory } from './base';
 import * as sh from 'structured-headers';
 
 const request = {
