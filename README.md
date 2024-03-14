@@ -115,7 +115,7 @@ fastify.post('/inbox', { config: { rawBody: true } }, async (request, reply) => 
 	// Parse raw request
 	const parsedSignature = parseRequestSignature(request.raw);
 
-	if (parsedSignature && parsedSignature.version === 'draft') {
+	if (parsedSignature && ) {
 		// Get public key by keyId
 		const publicKeyPem = publicKeyMap.get(parsedSignature.keyId)
 		if (!publicKeyPem) {
