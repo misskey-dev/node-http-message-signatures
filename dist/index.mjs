@@ -695,7 +695,9 @@ function parseSignInfo(algorithm, real, errorLogger) {
     }
   }
   if (realKeyType === "RSASSA-PKCS1-v1_5") {
-    if (!algorithm || algorithm === "hs2019" || algorithm === "rsa-sha256" || algorithm === "rsa-v1_5-sha256") {
+    if (!algorithm || algorithm === "hs2019" || // Draft
+    algorithm === "rsa-sha256" || // Draft
+    algorithm === "rsa-v1_5-sha256") {
       return { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
     }
     if (algorithm === "rsa-pss-sha512") {
@@ -714,7 +716,8 @@ function parseSignInfo(algorithm, real, errorLogger) {
     const namedCurve = "parameter" in real ? getNistCurveFromOid(real.parameter) : real.namedCurve;
     if (!namedCurve)
       throw new KeyHashValidationError("could not get namedCurve");
-    if (!algorithm || algorithm === "hs2019" || algorithm === "ecdsa-sha256") {
+    if (!algorithm || algorithm === "hs2019" || // Draft
+    algorithm === "ecdsa-sha256") {
       return { name: "ECDSA", hash: "SHA-256", namedCurve };
     }
     if (algorithm === "ecdsa-p256-sha256") {
@@ -974,6 +977,19 @@ function collectHeaders(source) {
     }
   }
   throw new Error("Cannot get headers from request object");
+}
+function setHeaderToRequestOrResponse(reqres, key, value) {
+  if ("setHeader" in reqres && typeof reqres.setHeader === "function") {
+    reqres.setHeader(key, value.toString());
+  } else if ("headers" in reqres && typeof reqres.headers === "object") {
+    if (isBrowserHeader(reqres.headers)) {
+      reqres.headers.set(key, value.toString());
+    } else {
+      reqres.headers[key] = value.toString();
+    }
+  } else {
+    throw new Error("Cannot set headers to request object");
+  }
 }
 function isBrowserResponse(input) {
   return "Response" in globalThis && typeof input === "object" && input instanceof Response;
@@ -1689,13 +1705,8 @@ async function genDigestHeaderBothRFC3230AndRFC9530(request, body, hashAlgorithm
   const base645 = await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64);
   const digest = `${hashAlgorithm}=${base645}`;
   const contentDigest = `${convertHashAlgorithmFromWebCryptoToRFC9530(hashAlgorithm)}=:${base645}:`;
-  if (isBrowserHeader(request.headers)) {
-    request.headers.set("Digest", digest);
-    request.headers.set("Content-Digest", contentDigest);
-  } else {
-    request.headers["Digest"] = digest;
-    request.headers["Content-Digest"] = contentDigest;
-  }
+  setHeaderToRequestOrResponse(request, "Digest", digest);
+  setHeaderToRequestOrResponse(request, "Content-Digest", contentDigest);
 }
 async function verifyDigestHeader(request, rawBody, opts = {
   failOnNoDigest: true,
@@ -1764,6 +1775,12 @@ async function importPrivateKey(key, keyUsages = ["sign"], defaults = defaultSig
   return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, extractable, keyUsages);
 }
 
+// src/shared/sign.ts
+async function genSignature(privateKey, signingString, defaults = defaultSignInfoDefaults) {
+  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, textEncoder.encode(signingString));
+  return encodeArrayBufferToBase64(signatureAB);
+}
+
 // src/draft/sign.ts
 function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
   const verifyHash = () => {
@@ -1792,10 +1809,7 @@ function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
   }
   throw new Error(`unsupported keyAlgorithm`);
 }
-async function genDraftSignature(privateKey, signingString, defaults = defaultSignInfoDefaults) {
-  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, textEncoder.encode(signingString));
-  return encodeArrayBufferToBase64(signatureAB);
-}
+var genDraftSignature = genSignature;
 function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
   return `keyId="${keyId}",algorithm="${algorithm}",headers="${includeHeaders.join(" ")}",signature="${signature}"`;
 }
@@ -1806,7 +1820,7 @@ async function signAsDraftToRequest(request, key, includeHeaders, opts = default
   const privateKey = "privateKey" in key ? key.privateKey : await importPrivateKey(key.privateKeyPem, ["sign"], opts);
   const algoString = getDraftAlgoString(privateKey.algorithm.name, opts.hash);
   const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
-  const signature = await genDraftSignature(privateKey, signingString, opts);
+  const signature = await genSignature(privateKey, signingString, opts);
   const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, algoString);
   Object.assign(request.headers, {
     Signature: signatureHeader
@@ -1824,15 +1838,26 @@ var genSignInfoDraft = parseSignInfo;
 async function verifyDraftSignature(parsed, key, errorLogger) {
   try {
     const { publicKey, algorithm } = await parseAndImportPublicKey(key, ["verify"], parsed.algorithm);
-    const verify = await (await getWebcrypto()).subtle.verify(algorithm, publicKey, base644.parse(parsed.params.signature), textEncoder.encode(parsed.signingString));
+    const verify = await (await getWebcrypto()).subtle.verify(
+      algorithm,
+      publicKey,
+      base644.parse(parsed.params.signature),
+      textEncoder.encode(parsed.signingString)
+    );
+    if (verify === true)
+      return true;
+    if (verify === false) {
+      if (errorLogger)
+        errorLogger(`verification simply failed`);
+      return false;
+    }
     if (verify !== true)
-      throw new Error(`verification simply failed, result: ${verify}`);
-    return verify;
+      throw new Error(verify);
   } catch (e) {
     if (errorLogger)
       errorLogger(e);
-    return false;
   }
+  return false;
 }
 
 // src/rfc9421/sfv.ts
@@ -2130,15 +2155,21 @@ var RFC9421SignatureBaseFactory = class {
   }
 };
 function convertSignatureParamsDictionary(input) {
-  const output = getMap(input);
-  for (const [label, item] of output) {
-    if (Array.isArray(item)) {
-      const [components, params] = item;
-      for (let i = 0; i < components.length; i++) {
-        components[i][1] = getMap(components[i][1]);
-      }
-      output.set(label, [components, getMap(params)]);
-    }
+  const map = getMap(input);
+  const output = /* @__PURE__ */ new Map();
+  for (const [label, item] of map) {
+    if (!Array.isArray(item))
+      throw new Error("item is not array");
+    const [components, params] = item;
+    output.set(
+      label,
+      [
+        components.map(
+          (identifier) => typeof identifier === "string" ? [identifier, /* @__PURE__ */ new Map()] : [identifier[0], getMap(identifier[1])]
+        ),
+        getMap(params)
+      ]
+    );
   }
   return sh2.serializeDictionary(output);
 }
@@ -2223,6 +2254,7 @@ export {
   requestTargetDerivedComponents,
   responseTargetDerivedComponents,
   rsaASN1AlgorithmIdentifier,
+  setHeaderToRequestOrResponse,
   signAsDraftToRequest,
   signatureHeaderIsDraft,
   splitPer64Chars,

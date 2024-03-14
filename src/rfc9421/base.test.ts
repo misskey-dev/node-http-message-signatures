@@ -32,6 +32,15 @@ describe(RFC9421SignatureBaseFactory, () => {
 			});
 			expect(result).toBe(`sig1=("@method" "@query-param";name="foo";hoge="fuga");keyid="x";algo="rsa-v1_5-sha256"`);
 		});
+		test('record with string identifier', () => {
+			const result = convertSignatureParamsDictionary({
+				sig1: [
+					['@method', ['@query-param', { name: 'foo', hoge: 'fuga' }]],
+					{ keyid: 'x', algo: 'rsa-v1_5-sha256' },
+				],
+			});
+			expect(result).toBe(`sig1=("@method" "@query-param";name="foo";hoge="fuga");keyid="x";algo="rsa-v1_5-sha256"`);
+		});
 		test('array', () => {
 			const result = convertSignatureParamsDictionary([
 				['sig1', [

@@ -19,7 +19,7 @@ export type RequestParseOptions = {
 	};
 	clockSkew?: ClockSkewSettings;
 	/**
-	 * Only used in RFC 9421, used in
+	 * Only used in RFC 9421.
 	 * If set to true, all algorithms are verified.
 	 * @default false
 	 */

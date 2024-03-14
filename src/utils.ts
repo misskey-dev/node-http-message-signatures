@@ -120,6 +120,21 @@ export function collectHeaders(source: IncomingRequest | OutgoingResponse): Head
 	throw new Error('Cannot get headers from request object');
 }
 
+export function setHeaderToRequestOrResponse(reqres: IncomingRequest | OutgoingResponse, key: string, value: string | number) {
+	if ('setHeader' in reqres && typeof reqres.setHeader === 'function') {
+		reqres.setHeader(key, value.toString());
+	} else if ('headers' in reqres && typeof reqres.headers === 'object') {
+		if (isBrowserHeader(reqres.headers)) {
+			// Browser Headers
+			reqres.headers.set(key, value.toString());
+		} else {
+			reqres.headers[key] = value.toString();
+		}
+	} else {
+		throw new Error('Cannot set headers to request object');
+	}
+}
+
 export function isBrowserResponse(input: any): input is Response {
 	return 'Response' in globalThis && typeof input === 'object' && input instanceof Response;
 }

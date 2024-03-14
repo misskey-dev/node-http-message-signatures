@@ -23,11 +23,17 @@ export async function verifyDraftSignature(
 ): Promise<boolean> {
 	try {
 		const { publicKey, algorithm } = await parseAndImportPublicKey(key, ['verify'], parsed.algorithm);
-		const verify = await (await getWebcrypto()).subtle.verify(algorithm, publicKey, base64.parse(parsed.params.signature), textEncoder.encode(parsed.signingString));
-		if (verify !== true) throw new Error(`verification simply failed, result: ${verify}`);
-		return verify;
+		const verify = await (await getWebcrypto()).subtle.verify(
+			algorithm, publicKey, base64.parse(parsed.params.signature), textEncoder.encode(parsed.signingString)
+		);
+		if (verify === true) return true;
+		if (verify === false) {
+			if (errorLogger) errorLogger(`verification simply failed`);
+			return false;
+		}
+		if (verify !== true) throw new Error(verify); // unknown result
 	} catch (e) {
 		if (errorLogger) errorLogger(e);
-		return false;
 	}
+	return false;
 }
