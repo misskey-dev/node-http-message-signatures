@@ -2,7 +2,6 @@ import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVSignatureInputDi
 import { SFVHeaderTypeDictionary } from "./sfv.js";
 export declare const requestTargetDerivedComponents: string[];
 export declare const responseTargetDerivedComponents: string[];
-export type Kot<T> = keyof T extends 'req' ? T : null;
 /**
  * Class for creating signature base,
  * construct with a request or a response

@@ -22,8 +22,6 @@ export const responseTargetDerivedComponents = [
 	'@status',
 ];
 
-export type Kot<T> = keyof T extends 'req' ? T : null;
-
 /**
  * Class for creating signature base,
  * construct with a request or a response
