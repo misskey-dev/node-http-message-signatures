@@ -2,7 +2,6 @@ import { describe, expect, test } from '@jest/globals';
 import httpSignature from '@peertube/http-signature';
 
 import { signAsDraftToRequest } from '@/draft/sign.js';
-import { verifyParsedSignature } from '@/shared/verify.js';
 import { parseRequestSignature, ClockSkewInvalidError } from '@/shared/parse.js';
 import * as keys from '../keys.js';
 import { collectHeaders } from '@/utils.js';
@@ -11,6 +10,7 @@ import { importPublicKey } from '@/pem/spki.js';
 import jest from 'jest-mock';
 import { HeadersLike } from '@/types.js';
 import { genDraftSigningString } from '@/draft/string.js';
+import { verifyDraftSignature } from '@/draft/verify.js';
 
 //#region data
 const theDate = new Date('2024-02-28T17:44:06.000Z');
@@ -64,7 +64,7 @@ describe('draft', () => {
 				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 				expect(parsed.version).toBe('draft');
 				if (parsed.version !== 'draft') return;
-				const verifyResult = await verifyParsedSignature(parsed, keys.rsa4096.publicKey, errorLogger);
+				const verifyResult = await verifyDraftSignature(parsed.value, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
 
@@ -83,7 +83,7 @@ describe('draft', () => {
 				expect(parsed.value.algorithm).toBe('RSA-SHA256');
 
 				const publicKeyPreImported = await importPublicKey(keys.rsa4096.publicKey, ['verify'], undefined);
-				const verifyResult = await verifyParsedSignature(parsed, publicKeyPreImported, errorLogger);
+				const verifyResult = await verifyDraftSignature(parsed.value, publicKeyPreImported, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
 
@@ -105,7 +105,7 @@ describe('draft', () => {
 				if (parsed.version !== 'draft') return;
 
 				const mockLogger = jest.fn();
-				const verifyResult = await verifyParsedSignature(parsed, keys.rsa4096.publicKey, mockLogger);
+				const verifyResult = await verifyDraftSignature(parsed.value, keys.rsa4096.publicKey, mockLogger);
 				expect(verifyResult).toBe(false);
 				expect(mockLogger).toBeCalled();
 			});
@@ -132,7 +132,7 @@ describe('draft', () => {
 				expect(parsed.version).toBe('draft');
 				if (parsed.version !== 'draft') return;
 				expect(parsed.value.algorithm).toBe('RSA-SHA512');
-				const verifyResult = await verifyParsedSignature(parsed, keys.rsa4096.publicKey, errorLogger);
+				const verifyResult = await verifyDraftSignature(parsed.value, keys.rsa4096.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
 		});
@@ -154,7 +154,7 @@ describe('draft', () => {
 				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 				expect(parsed.version).toBe('draft');
 				if (parsed.version !== 'draft') return;
-				const verifyResult = await verifyParsedSignature(parsed, keys.ed25519.publicKey, errorLogger);
+				const verifyResult = await verifyDraftSignature(parsed.value, keys.ed25519.publicKey, errorLogger);
 				expect(verifyResult).toBe(true);
 			});
 
@@ -177,7 +177,7 @@ describe('draft', () => {
 				expect(parsed.version).toBe('draft');
 				if (parsed.version !== 'draft') return;
 				const logger = jest.fn();
-				const verifyResult = await verifyParsedSignature(parsed, keys.ed25519.publicKey, logger);
+				const verifyResult = await verifyDraftSignature(parsed.value, keys.ed25519.publicKey, logger);
 				expect(verifyResult).toBe(false);
 				expect(logger).toBeCalled();
 			});
