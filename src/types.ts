@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "http";
 import type { Http2ServerRequest, Http2ServerResponse } from "http2";
+import type { Parameters } from "structured-headers";
 
 export type HeadersValueLike = string | number | null | undefined;
 export type HeadersValueLikeArrayable = HeadersValueLike | HeadersValueLike[];
@@ -96,7 +97,7 @@ export type SignatureHashAlgorithmUpperSnake = 'SHA-1' | 'SHA-256' | 'SHA-384' |
 export type DigestHashAlgorithm = 'SHA' | 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512';
 // sign専用
 export type DraftSignatureAlgorithm = 'rsa-sha1' | 'rsa-sha256' | 'rsa-sha384' | 'rsa-sha512' | 'ecdsa-sha1' | 'ecdsa-sha256' | 'ecdsa-sha384' | 'ecdsa-sha512' | 'ed25519-sha512' | 'ed25519' | 'ed448';
-export type RFC9421SignatuerAlgorithm = 'rsa-pss-sha512' | 'rsa-v1_5-sha256' | 'hmac-sha256' | 'ecdsa-p256-sha256' | 'ecdsa-p384-sha384' | 'ed25519';
+export type RFC9421SignatureAlgorithm = 'rsa-pss-sha512' | 'rsa-v1_5-sha256' | 'hmac-sha256' | 'ecdsa-p256-sha256' | 'ecdsa-p384-sha384' | 'ed25519';
 
 //#region SFV
 export type MapLikeObj<K, V> = Map<K, V> | Record<string, V> | [K, V][];
@@ -107,8 +108,8 @@ export type SFVParametersLike = MapLikeObj<string, string | boolean | number>;
  * sh.InnerList
  * @examples [["@method", Map([])], Map({keyid: "x", algo: ""})]
  */
-export type SFVSignatureParams = [[string, Map<string, string | boolean>][], Map<string, string | boolean | number>];
-export type SFVSignatureParamsForInput = [[string, MapLikeObj<string, string | boolean>][], MapLikeObj<string, string | boolean | number>];
+export type SFVSignatureParams = [[string, Map<string, string | boolean>][], Parameters];
+export type SFVSignatureParamsForInput = [(string | [string, MapLikeObj<string, string | boolean>])[], MapLikeObj<string, string | boolean | number>];
 
 /**
  * Result of `sh.parseDictionary('(value of signateure-input)')`
@@ -154,14 +155,19 @@ export type ParsedDraftSignature = {
 };
 
 export type ParsedRFC9421SignatureValue = {
-	keyid: string;
+	/**
+	 * Parsed from signature-input
+	 * If input is not string, it should be serialized by `sh.serializeBareItem`.
+	 * If input is string, it shoule not be serialized (should not be quoted).
+	 */
+	keyid?: string;
 	// base64
 	signature: string;
 	/**
 	 * alg
 	 * @example 'rsa-v1_5-sha256'
 	 */
-	algorithm: string;
+	algorithm?: string;
 	// ("@method" "date");keyid="x";alg="rsa-v1_5-sha256";created=1618884475
 	params: string;
 	created?: number;

@@ -1,8 +1,8 @@
 
 // TODO
 
-import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, collectHeaders, isBrowserRequest, isBrowserResponse } from "../utils.js";
-import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike, HeadersValueLikeArrayable } from "../types.js";
+import { canonicalizeHeaderValue, encodeArrayBufferToBase64, getValueByLc, lcObjectKey, getMap, collectHeaders, isBrowserRequest, isBrowserResponse, getMapWithoutUndefined } from "../utils.js";
+import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVParametersLike, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike, HeadersValueLikeArrayable, SFVSignatureParamsForInput } from "../types.js";
 import * as sh from "structured-headers";
 import { SFVHeaderTypeDictionary, knownSfvHeaderTypeDictionary } from "./sfv.js";
 import { textEncoder } from '../const.js';
@@ -43,7 +43,7 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 	public scheme: string;
 	public targetUri: string;
 	public url: URL;
-	public requestSignatureInput: SFVSignatureInputDictionary | undefined;
+	public requestSignatureInput: SFVSignatureInputDictionary;
 	public responseSignatureInput: SFVSignatureInputDictionary | undefined;
 
 	/**
@@ -324,15 +324,22 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 }
 
 export function convertSignatureParamsDictionary(input: SFVSignatureInputDictionaryForInput): string {
-	const output = getMap(input) as unknown as SFVSignatureInputDictionary;
-	for (const [label, item] of output) {
-		if (Array.isArray(item)) {
-			const [components, params] = item;
-			for (let i = 0; i < components.length; i++) {
-				components[i][1] = getMap(components[i][1]);
-			}
-			output.set(label, [components, getMap(params)]);
-		}
+	const map = getMap(input) as Map<string, SFVSignatureParamsForInput>;
+	const output = new Map() as SFVSignatureInputDictionary;
+	for (const [label, item] of map) {
+		if (!Array.isArray(item)) throw new Error('item is not array');
+		const [components, params] = item;
+		output.set(
+			label,
+			[
+				components.map(
+					identifier => typeof identifier === 'string' ?
+						[identifier, new Map()]
+						: [identifier[0], getMapWithoutUndefined(identifier[1]) as Map<string, string | boolean>]
+				),
+				getMapWithoutUndefined(params),
+			],
+		);
 	}
 	return sh.serializeDictionary(output);
 }

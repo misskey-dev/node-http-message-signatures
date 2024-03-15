@@ -1,9 +1,9 @@
 import type { IncomingRequest, PrivateKey, SignatureHashAlgorithmUpperSnake } from '../types.js';
-import { type SignInfoDefaults, defaultSignInfoDefaults, encodeArrayBufferToBase64, getWebcrypto, genAlgorithmForSignAndVerify } from '../utils.js';
+import { type SignInfoDefaults, defaultSignInfoDefaults } from '../utils.js';
 import { importPrivateKey } from '../pem/pkcs8.js';
 import { keyHashAlgosForDraftEncofing } from './const.js';
-import { textEncoder } from '../const.js';
 import { genDraftSigningString } from './string.js';
+import { genSignature } from '../shared/sign.js';
 
 /**
  * Get the algorithm string for draft encoding
@@ -40,10 +40,10 @@ export function getDraftAlgoString(keyAlgorithm: string, hashAlgorithm: Signatur
 	throw new Error(`unsupported keyAlgorithm`);
 }
 
-export async function genDraftSignature(privateKey: CryptoKey, signingString: string, defaults: SignInfoDefaults = defaultSignInfoDefaults) {
-	const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, textEncoder.encode(signingString));
-	return encodeArrayBufferToBase64(signatureAB);
-}
+/**
+ * @deprecated Use `genSignature`
+ */
+export const genDraftSignature = genSignature;
 
 export function genDraftSignatureHeader(includeHeaders: string[], keyId: string, signature: string, algorithm: string) {
 	return `keyId="${keyId}",algorithm="${algorithm}",headers="${includeHeaders.join(' ')}",signature="${signature}"`;
@@ -68,7 +68,7 @@ export async function signAsDraftToRequest(request: IncomingRequest, key: Privat
 
 	const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
 
-	const signature = await genDraftSignature(privateKey, signingString, opts);
+	const signature = await genSignature(privateKey, signingString, opts);
 	const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, algoString);
 
 	Object.assign(request.headers, {

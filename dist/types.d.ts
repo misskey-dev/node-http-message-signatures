@@ -91,7 +91,7 @@ export type SFVParametersLike = MapLikeObj<string, string | boolean | number>;
  * @examples [["@method", Map([])], Map({keyid: "x", algo: ""})]
  */
 export type SFVSignatureParams = [[string, Map<string, string | boolean>][], Map<string, string | boolean | number>];
-export type SFVSignatureParamsForInput = [[string, MapLikeObj<string, string | boolean>][], MapLikeObj<string, string | boolean | number>];
+export type SFVSignatureParamsForInput = [(string | [string, MapLikeObj<string, string | boolean>])[], MapLikeObj<string, string | boolean | number>];
 /**
  * Result of `sh.parseDictionary('(value of signateure-input)')`
  */

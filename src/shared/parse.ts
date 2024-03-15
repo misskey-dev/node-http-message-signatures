@@ -1,3 +1,4 @@
+import { parseRFC9421RequestOrResponse } from 'src/rfc9421/parse.js';
 import { parseDraftRequest } from '../draft/parse.js';
 import type { ClockSkewSettings, IncomingRequest, OutgoingResponse, ParsedSignature } from '../types.js';
 import { canonicalizeHeaderValue, collectHeaders, isBrowserResponse } from '../utils.js';
@@ -18,21 +19,6 @@ export type RequestParseOptions = {
 		rfc9421?: string[];
 	};
 	clockSkew?: ClockSkewSettings;
-	/**
-	 * Only used in RFC 9421, used in
-	 * If set to true, all algorithms are verified.
-	 * @default false
-	 */
-	verifyAll?: boolean;
-	/**
-	 * Specify sign algorithms you accept.
-	 *
-	 * If `verifyAll: false`, it is also used to choose the hash algorithm to verify.
-	 * (Younger index is preferred.)
-	 */
-	algorithms?: {
-		rfc9421?: string[];
-	}
 };
 
 //#region parse errors
@@ -160,8 +146,7 @@ export function parseRequestSignature(request: IncomingRequest, options?: Reques
 	const validated = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
 
 	if (validated.signatureInput != null) {
-		throw new Error('Not implemented');
-		// return parseRFC9421Request(request, options);
+		return parseRFC9421RequestOrResponse(request, options);
 	} else if (signatureHeaderIsDraft(validated.signatureHeader)) {
 		return parseDraftRequest(request, options, validated);
 	}
