@@ -130,7 +130,7 @@ export function verifyParsedSignature(parsed: ParsedSignature, key: string | Cry
 	if (parsed.version === 'draft') {
 		return verifyDraftSignature(parsed.value, key, errorLogger);
 	} else if (parsed.version === 'rfc9421') {
-		return verifyRFC9421Signature(parsed.value, key, errorLogger);
+		return verifyRFC9421Signature(parsed.value, key, undefined, errorLogger);
 	}
 	throw new Error(`unsupported parsed signature`);
 }
