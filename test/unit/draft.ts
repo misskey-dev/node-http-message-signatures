@@ -1,7 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import httpSignature from '@peertube/http-signature';
 
-import { genDraftSigningString, signAsDraftToRequest } from '@/draft/sign.js';
+import { signAsDraftToRequest } from '@/draft/sign.js';
 import { verifyDraftSignature } from '@/draft/verify.js';
 import { parseRequestSignature, ClockSkewInvalidError } from '@/shared/parse.js';
 import * as keys from '../keys.js';
@@ -10,6 +10,7 @@ import { importPrivateKey } from '@/pem/pkcs8.js';
 import { importPublicKey } from '@/pem/spki.js';
 import jest from 'jest-mock';
 import { HeadersLike } from '@/types.js';
+import { genDraftSigningString } from '@/draft/string.js';
 
 //#region data
 const theDate = new Date('2024-02-28T17:44:06.000Z');
