@@ -1,6 +1,7 @@
-import ASN1 from '@lapo/asn1js';
-import Hex from '@lapo/asn1js/hex.js';
-import Base64 from '@lapo/asn1js/base64.js';
+//@ts-expect-error 2317
+import { ASN1 } from '@lapo/asn1js';
+import { Hex } from '@lapo/asn1js/hex.js';
+import { Base64 } from '@lapo/asn1js/base64.js';
 import { genSpkiFromPkcs1, parsePkcs1 } from './pkcs1.js';
 import { ECNamedCurve, KeyAlgorithmName } from '../types.js';
 import { SignInfoDefaults, defaultSignInfoDefaults, genAlgorithmForSignAndVerify, genSignInfo, getWebcrypto } from '../utils.js';

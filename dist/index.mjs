@@ -596,12 +596,12 @@ var require_dist = __commonJS({
 });
 
 // src/pem/spki.ts
-import ASN12 from "@lapo/asn1js";
-import Hex from "@lapo/asn1js/hex.js";
-import Base64 from "@lapo/asn1js/base64.js";
+import { ASN1 as ASN12 } from "@lapo/asn1js";
+import { Hex } from "@lapo/asn1js/hex.js";
+import { Base64 } from "@lapo/asn1js/base64.js";
 
 // src/pem/pkcs1.ts
-import ASN1 from "@lapo/asn1js";
+import { ASN1 } from "@lapo/asn1js";
 var Pkcs1ParseError = class extends Error {
   constructor(message) {
     super(message);
@@ -1730,7 +1730,7 @@ async function verifyDigestHeader(request, rawBody, opts = {
 }
 
 // src/pem/pkcs8.ts
-import ASN13 from "@lapo/asn1js";
+import { ASN1 as ASN13 } from "@lapo/asn1js";
 var Pkcs8ParseError = class extends Error {
   constructor(message) {
     super(message);

@@ -1,4 +1,4 @@
-import ASN1 from '@lapo/asn1js';
+import { ASN1 } from '@lapo/asn1js';
 export declare class Pkcs1ParseError extends Error {
     constructor(message: string);
 }

@@ -1,4 +1,5 @@
-import ASN1 from '@lapo/asn1js';
+//@ts-expect-error 2317
+import { ASN1 } from '@lapo/asn1js';
 import { asn1ToArrayBuffer, decodePem } from './spki.js';
 import { genASN1Length } from '../utils.js';
 

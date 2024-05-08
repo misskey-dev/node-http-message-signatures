@@ -1,6 +1,6 @@
 {
   "name": "@misskey-dev/node-http-message-signatures",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "",
   "type": "module",
   "engines": {
@@ -55,7 +55,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@lapo/asn1js": "^1.2.4",
+    "@lapo/asn1js": "^2.0.4",
     "rfc4648": "^1.5.3",
     "structured-headers": "^1.0.1"
   },
@@ -67,7 +67,6 @@
     "@swc/core": "^1.4.2",
     "@swc/jest": "^0.2.36",
     "@types/jest": "^29.5.12",
-    "@types/lapo__asn1js": "^1.2.5",
     "@types/node": "^20.11.20",
     "@typescript-eslint/eslint-plugin": "^7.1.0",
     "@typescript-eslint/parser": "^7.1.0",
