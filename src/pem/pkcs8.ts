@@ -1,4 +1,3 @@
-//@ts-expect-error 2317
 import { ASN1 } from '@lapo/asn1js';
 import { ParsedAlgorithmIdentifierBase, asn1ToArrayBuffer, decodePem, parseAlgorithmIdentifier } from './spki.js';
 import { SignInfoDefaults, defaultSignInfoDefaults, genSignInfo, getWebcrypto } from '../utils.js';

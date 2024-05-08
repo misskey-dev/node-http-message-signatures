@@ -1,4 +1,3 @@
-//@ts-expect-error 2317
 import { ASN1 } from '@lapo/asn1js';
 import { Hex } from '@lapo/asn1js/hex.js';
 import { Base64 } from '@lapo/asn1js/base64.js';
