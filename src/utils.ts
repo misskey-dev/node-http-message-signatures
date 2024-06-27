@@ -120,6 +120,21 @@ export function collectHeaders(source: IncomingRequest | OutgoingResponse): Head
 	throw new Error('Cannot get headers from request object');
 }
 
+export function setHeaderToRequestOrResponse(reqres: IncomingRequest | OutgoingResponse, key: string, value: string | number) {
+	if ('setHeader' in reqres && typeof reqres.setHeader === 'function') {
+		reqres.setHeader(key, value.toString());
+	} else if ('headers' in reqres && typeof reqres.headers === 'object') {
+		if (isBrowserHeader(reqres.headers)) {
+			// Browser Headers
+			reqres.headers.set(key, value.toString());
+		} else {
+			reqres.headers[key] = value.toString();
+		}
+	} else {
+		throw new Error('Cannot set headers to request object');
+	}
+}
+
 export function isBrowserResponse(input: any): input is Response {
 	return 'Response' in globalThis && typeof input === 'object' && input instanceof Response;
 }
@@ -241,4 +256,16 @@ export function getMap<T extends MapLikeObj<K, V>, K, V>(
 	if (obj instanceof Map) return obj;
 	if (Array.isArray(obj)) return new Map(obj);
 	return new Map(Object.entries(obj) as [K, V][]);
+}
+
+export function getMapWithoutUndefined<T extends MapLikeObj<K, V>, K, V>(
+	obj: T,
+): Map<K, NonNullable<V>> {
+	const map = getMap<T, K, V>(obj);
+	for (const [k, v] of map.entries()) {
+		if (v === undefined) {
+			map.delete(k);
+		}
+	}
+	return map as any;
 }

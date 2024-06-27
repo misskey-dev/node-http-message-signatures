@@ -1,5 +1,5 @@
 import { DigestHashAlgorithm, IncomingRequest } from "../types.js";
-import { collectHeaders, encodeArrayBufferToBase64, isBrowserHeader } from "../utils.js";
+import { collectHeaders, encodeArrayBufferToBase64, setHeaderToRequestOrResponse } from "../utils.js";
 import { verifyRFC3230DigestHeader } from "./digest-rfc3230.js";
 import { convertHashAlgorithmFromWebCryptoToRFC9530, verifyRFC9530DigestHeader } from "./digest-rfc9530.js";
 import { DigestSource, createBase64Digest } from "./utils.js";
@@ -12,13 +12,8 @@ export async function genDigestHeaderBothRFC3230AndRFC9530<T extends IncomingReq
 	const base64 = await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64);
 	const digest = `${hashAlgorithm}=${base64}`;
 	const contentDigest = `${convertHashAlgorithmFromWebCryptoToRFC9530(hashAlgorithm)}=:${base64}:`;
-	if (isBrowserHeader(request.headers)) {
-		request.headers.set('Digest', digest);
-		request.headers.set('Content-Digest', contentDigest);
-	} else {
-		request.headers['Digest'] = digest;
-		request.headers['Content-Digest'] = contentDigest;
-	}
+	setHeaderToRequestOrResponse(request, 'Digest', digest);
+	setHeaderToRequestOrResponse(request, 'Content-Digest', contentDigest);
 }
 
 export async function verifyDigestHeader(

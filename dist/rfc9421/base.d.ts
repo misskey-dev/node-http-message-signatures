@@ -17,7 +17,7 @@ export declare class RFC9421SignatureBaseFactory<T extends IncomingRequest | Out
     scheme: string;
     targetUri: string;
     url: URL;
-    requestSignatureInput: SFVSignatureInputDictionary | undefined;
+    requestSignatureInput: SFVSignatureInputDictionary;
     responseSignatureInput: SFVSignatureInputDictionary | undefined;
     /**
      *

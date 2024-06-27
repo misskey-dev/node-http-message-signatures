@@ -36,7 +36,7 @@ var require_types = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.ByteSequence = void 0;
-    var ByteSequence3 = class {
+    var ByteSequence4 = class {
       constructor(base64Value) {
         this.base64Value = base64Value;
       }
@@ -44,7 +44,7 @@ var require_types = __commonJS({
         return this.base64Value;
       }
     };
-    exports2.ByteSequence = ByteSequence3;
+    exports2.ByteSequence = ByteSequence4;
   }
 });
 
@@ -117,7 +117,7 @@ var require_serializer = __commonJS({
     function serializeList2(input) {
       return input.map((value) => {
         if ((0, util_1.isInnerList)(value)) {
-          return serializeInnerList2(value);
+          return serializeInnerList3(value);
         } else {
           return serializeItem2(value);
         }
@@ -132,7 +132,7 @@ var require_serializer = __commonJS({
         } else {
           out += "=";
           if ((0, util_1.isInnerList)(value)) {
-            out += serializeInnerList2(value);
+            out += serializeInnerList3(value);
           } else {
             out += serializeItem2(value);
           }
@@ -142,14 +142,14 @@ var require_serializer = __commonJS({
     }
     exports2.serializeDictionary = serializeDictionary2;
     function serializeItem2(input) {
-      return serializeBareItem(input[0]) + serializeParameters(input[1]);
+      return serializeBareItem2(input[0]) + serializeParameters(input[1]);
     }
     exports2.serializeItem = serializeItem2;
-    function serializeInnerList2(input) {
+    function serializeInnerList3(input) {
       return `(${input[0].map((value) => serializeItem2(value)).join(" ")})${serializeParameters(input[1])}`;
     }
-    exports2.serializeInnerList = serializeInnerList2;
-    function serializeBareItem(input) {
+    exports2.serializeInnerList = serializeInnerList3;
+    function serializeBareItem2(input) {
       if (typeof input === "number") {
         if (Number.isInteger(input)) {
           return serializeInteger(input);
@@ -170,7 +170,7 @@ var require_serializer = __commonJS({
       }
       throw new SerializeError(`Cannot serialize values of type ${typeof input}`);
     }
-    exports2.serializeBareItem = serializeBareItem;
+    exports2.serializeBareItem = serializeBareItem2;
     function serializeInteger(input) {
       if (input < -999999999999999 || input > 999999999999999) {
         throw new SerializeError("Structured headers can only encode integers in the range range of -999,999,999,999,999 to 999,999,999,999,999 inclusive");
@@ -210,7 +210,7 @@ var require_serializer = __commonJS({
       return Array.from(input).map(([key, value]) => {
         let out = ";" + serializeKey(key);
         if (value !== true) {
-          out += "=" + serializeBareItem(value);
+          out += "=" + serializeBareItem2(value);
         }
         return out;
       }).join("");
@@ -235,11 +235,11 @@ var require_parser = __commonJS({
     var types_1 = require_types();
     var token_1 = require_token();
     var util_1 = require_util();
-    function parseDictionary3(input) {
+    function parseDictionary4(input) {
       const parser = new Parser(input);
       return parser.parseDictionary();
     }
-    exports2.parseDictionary = parseDictionary3;
+    exports2.parseDictionary = parseDictionary4;
     function parseList2(input) {
       const parser = new Parser(input);
       return parser.parseList();
@@ -656,6 +656,7 @@ __export(src_exports, {
   getDraftAlgoString: () => getDraftAlgoString,
   getHeaderValue: () => getHeaderValue,
   getMap: () => getMap,
+  getMapWithoutUndefined: () => getMapWithoutUndefined,
   getNistCurveFromOid: () => getNistCurveFromOid,
   getPublicKeyAlgorithmNameFromOid: () => getPublicKeyAlgorithmNameFromOid,
   getValueByLc: () => getValueByLc,
@@ -684,6 +685,7 @@ __export(src_exports, {
   requestTargetDerivedComponents: () => requestTargetDerivedComponents,
   responseTargetDerivedComponents: () => responseTargetDerivedComponents,
   rsaASN1AlgorithmIdentifier: () => rsaASN1AlgorithmIdentifier,
+  setHeaderToRequestOrResponse: () => setHeaderToRequestOrResponse,
   signAsDraftToRequest: () => signAsDraftToRequest,
   signatureHeaderIsDraft: () => signatureHeaderIsDraft,
   splitPer64Chars: () => splitPer64Chars,
@@ -780,6 +782,42 @@ var keyHashAlgosForDraftDecoding = {
   "md5": "MD5"
 };
 
+// src/draft/verify.ts
+var import_rfc4648 = require("rfc4648");
+
+// src/const.ts
+var textEncoder = new TextEncoder();
+
+// src/draft/verify.ts
+var genSignInfoDraft = parseSignInfo;
+async function verifyDraftSignature(parsed, key, errorLogger) {
+  try {
+    const { publicKey, algorithm } = await parseAndImportPublicKey(key, ["verify"], parsed.algorithm);
+    const verify = await (await getWebcrypto()).subtle.verify(
+      algorithm,
+      publicKey,
+      import_rfc4648.base64.parse(parsed.params.signature),
+      textEncoder.encode(parsed.signingString)
+    );
+    if (verify === true)
+      return true;
+    if (verify === false) {
+      if (errorLogger)
+        errorLogger(`verification simply failed`);
+      return false;
+    }
+    if (verify !== true)
+      throw new Error(verify);
+  } catch (e) {
+    if (errorLogger)
+      errorLogger(e);
+  }
+  return false;
+}
+
+// src/rfc9421/verify.ts
+var import_rfc46482 = require("rfc4648");
+
 // src/shared/verify.ts
 var KeyHashValidationError = class extends Error {
   constructor(message) {
@@ -798,7 +836,9 @@ function parseSignInfo(algorithm, real, errorLogger) {
     }
   }
   if (realKeyType === "RSASSA-PKCS1-v1_5") {
-    if (!algorithm || algorithm === "hs2019" || algorithm === "rsa-sha256" || algorithm === "rsa-v1_5-sha256") {
+    if (!algorithm || algorithm === "hs2019" || // Draft
+    algorithm === "rsa-sha256" || // Draft
+    algorithm === "rsa-v1_5-sha256") {
       return { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" };
     }
     if (algorithm === "rsa-pss-sha512") {
@@ -817,7 +857,8 @@ function parseSignInfo(algorithm, real, errorLogger) {
     const namedCurve = "parameter" in real ? getNistCurveFromOid(real.parameter) : real.namedCurve;
     if (!namedCurve)
       throw new KeyHashValidationError("could not get namedCurve");
-    if (!algorithm || algorithm === "hs2019" || algorithm === "ecdsa-sha256") {
+    if (!algorithm || algorithm === "hs2019" || // Draft
+    algorithm === "ecdsa-sha256") {
       return { name: "ECDSA", hash: "SHA-256", namedCurve };
     }
     if (algorithm === "ecdsa-p256-sha256") {
@@ -983,7 +1024,7 @@ async function parseAndImportPublicKey(source, keyUsages = ["verify"], providedA
 }
 
 // src/utils.ts
-var import_rfc4648 = require("rfc4648");
+var import_rfc46483 = require("rfc4648");
 async function getWebcrypto() {
   return globalThis.crypto ?? (await import("node:crypto")).webcrypto;
 }
@@ -1078,6 +1119,19 @@ function collectHeaders(source) {
   }
   throw new Error("Cannot get headers from request object");
 }
+function setHeaderToRequestOrResponse(reqres, key, value) {
+  if ("setHeader" in reqres && typeof reqres.setHeader === "function") {
+    reqres.setHeader(key, value.toString());
+  } else if ("headers" in reqres && typeof reqres.headers === "object") {
+    if (isBrowserHeader(reqres.headers)) {
+      reqres.headers.set(key, value.toString());
+    } else {
+      reqres.headers[key] = value.toString();
+    }
+  } else {
+    throw new Error("Cannot set headers to request object");
+  }
+}
 function isBrowserResponse(input) {
   return "Response" in globalThis && typeof input === "object" && input instanceof Response;
 }
@@ -1104,7 +1158,7 @@ function genASN1Length(length) {
 }
 function encodeArrayBufferToBase64(buffer) {
   const uint8Array = new Uint8Array(buffer);
-  return import_rfc4648.base64.stringify(uint8Array);
+  return import_rfc46483.base64.stringify(uint8Array);
 }
 function compareUint8Array(a, b) {
   if (a.length !== b.length)
@@ -1170,6 +1224,408 @@ function getMap(obj) {
   if (Array.isArray(obj))
     return new Map(obj);
   return new Map(Object.entries(obj));
+}
+function getMapWithoutUndefined(obj) {
+  const map = getMap(obj);
+  for (const [k, v] of map.entries()) {
+    if (v === void 0) {
+      map.delete(k);
+    }
+  }
+  return map;
+}
+
+// src/rfc9421/base.ts
+var sh = __toESM(require_dist(), 1);
+
+// src/rfc9421/sfv.ts
+var knownSfvHeaderTypeDictionary = {
+  /**
+   * RFC 9421 HTTP Message Signatures
+   * https://datatracker.ietf.org/doc/html/rfc9421#name-initial-contents-3
+   */
+  // https://datatracker.ietf.org/doc/html/rfc9421#signature-header
+  "signature": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc9421#signature-input-header
+  "signature-input": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc9421#accept-signature-header
+  "accept-signature": "dict",
+  /**
+   * RFC 9530 Digest Fields
+   * https://datatracker.ietf.org/doc/html/rfc9530#name-http-field-name-registratio
+   */
+  // https://datatracker.ietf.org/doc/html/rfc9530#name-the-content-digest-field
+  "content-digest": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc9530#name-the-repr-digest-field
+  "repr-digest": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc9530#name-integrity-preference-fields
+  "want-content-digest": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc9530#want-fields
+  "want-repr-digest": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc8942#name-the-accept-ch-response-head
+  "accept-ch": "list",
+  // https://datatracker.ietf.org/doc/html/rfc9209#name-the-proxy-status-http-field
+  "proxy-status": "list",
+  // https://datatracker.ietf.org/doc/html/rfc9211#name-the-cache-status-http-respo
+  "cache-status": "list",
+  // https://datatracker.ietf.org/doc/html/rfc9218#name-priority-parameters
+  "priority": "dict",
+  // https://datatracker.ietf.org/doc/html/rfc9440#name-client-cert-http-header-fie
+  "client-cert": "bs",
+  // https://datatracker.ietf.org/doc/html/rfc9440#name-client-cert-chain-http-head
+  "client-cert-chain": "list"
+};
+
+// src/rfc9421/base.ts
+var requestTargetDerivedComponents = [
+  "@method",
+  "@authority",
+  "@scheme",
+  "@target-uri",
+  "@request-target",
+  "@path",
+  "@query"
+];
+var responseTargetDerivedComponents = [
+  "@status"
+];
+var RFC9421SignatureBaseFactory = class {
+  isRequest() {
+    return this.response === null;
+  }
+  isResponse() {
+    return this.response !== null;
+  }
+  /**
+   *
+   * @param source request or response, must include 'signature-input' header
+   *	If source is node response, it must include 'req' property.
+   * @param scheme optional, used when source request url starts with '/'
+   * @param additionalSfvTypeDictionary additional SFV type dictionary
+   * @param request optional, used when source is a browser Response
+   */
+  constructor(source, scheme = "https", additionalSfvTypeDictionary = {}, request) {
+    this.sfvTypeDictionary = lcObjectKey({ ...knownSfvHeaderTypeDictionary, ...additionalSfvTypeDictionary });
+    if ("req" in source) {
+      this.response = source;
+      this.responseHeaders = collectHeaders(source);
+      this.request = source.req;
+      this.requestHeaders = collectHeaders(this.request);
+    } else if (isBrowserResponse(source)) {
+      if (!request)
+        throw new Error("Request is not provided");
+      this.response = source;
+      this.responseHeaders = collectHeaders(source);
+      this.request = request;
+      this.requestHeaders = collectHeaders(this.request);
+    } else {
+      this.response = null;
+      this.responseHeaders = null;
+      this.request = source;
+      this.requestHeaders = collectHeaders(source);
+    }
+    if (!this.request.url) {
+      throw new Error("Request URL is empty");
+    }
+    if (!this.request.method) {
+      throw new Error("Request method is empty");
+    }
+    if (!("signature-input" in this.requestHeaders))
+      throw new Error("Signature-Input header is not found in request");
+    this.requestSignatureInput = sh.parseDictionary(canonicalizeHeaderValue(this.requestHeaders["signature-input"]));
+    if (this.isResponse()) {
+      if (!this.responseHeaders)
+        throw new Error("responseHeaders is empty");
+      if (!("signature-input" in this.responseHeaders))
+        throw new Error("Signature-Input header is not found in response");
+      this.responseSignatureInput = sh.parseDictionary(canonicalizeHeaderValue(this.responseHeaders["signature-input"]));
+    }
+    this.sfvTypeDictionary = lcObjectKey(additionalSfvTypeDictionary);
+    this.scheme = this.request.url.startsWith("/") ? scheme : new URL(this.request.url).protocol.replace(":", "");
+    const rawHost = "httpVersionMajor" in this.request && this.request.httpVersionMajor === 2 ? this.requestHeaders[":authority"] : this.requestHeaders["host"];
+    if (!isBrowserRequest(this.request) && !rawHost)
+      throw new Error("Host header is empty");
+    const host = canonicalizeHeaderValue(rawHost);
+    this.targetUri = this.request.url.startsWith("/") ? new URL(this.request.url, `${scheme}://${host}`).href : this.request.url;
+    this.url = new URL(this.targetUri);
+  }
+  get(name, paramsLike = /* @__PURE__ */ new Map()) {
+    const params = getMap(paramsLike);
+    const componentIdentifier = sh.serializeItem([name, params]);
+    if (!name) {
+      throw new Error(`Type is empty: ${componentIdentifier}`);
+    }
+    if (name.startsWith('"')) {
+      if (name.endsWith('"')) {
+        name = name.slice(1, -1);
+      } else {
+        throw new Error(`Invalid component type string: ${componentIdentifier}`);
+      }
+    }
+    if (this.isResponse() && params.get("req") !== true && requestTargetDerivedComponents.includes(name)) {
+      throw new Error(`component is not available in response (must use with ;req, or provided object is unintentionally treated as response (existing req prop.)): ${name}`);
+    }
+    if (this.isRequest() && responseTargetDerivedComponents.includes(name)) {
+      throw new Error(`component is not available in request (provided object is unintentionally treated as request (including req prop.)): ${name}`);
+    }
+    if (this.isRequest() && params.get("req") === true) {
+      throw new Error("req param is not available in request (provided object is treated as request, please set req param with Request)");
+    }
+    const isReq = this.isRequest() || params.get("req") === true;
+    if (name === "@signature-params") {
+      throw new Error(`@signature-params is not available in get method: ${componentIdentifier}`);
+    } else if (name === "@method") {
+      if (!this.request.method) {
+        throw new Error("Request method is empty");
+      }
+      return this.request.method.toUpperCase();
+    } else if (name === "@authority") {
+      return this.url.host;
+    } else if (name === "@scheme") {
+      return this.scheme.toLocaleLowerCase();
+    } else if (name === "@target-uri") {
+      return this.targetUri;
+    } else if (name === "@request-target") {
+      if (!this.request.method) {
+        throw new Error("Request method is empty");
+      }
+      return `${this.request.method.toLowerCase()} ${this.url.pathname}`;
+    } else if (name === "@path") {
+      return this.url.pathname;
+    } else if (name === "@query") {
+      return this.url.search;
+    } else if (name === "@query-param") {
+      const key = params.get("name");
+      if (key === void 0) {
+        throw new Error("Query parameter name not found or invalid");
+      }
+      const value = this.url.searchParams.get(key.toString());
+      if (value === null) {
+        throw new Error(`Query parameter not found: ${key} (${componentIdentifier})`);
+      }
+      return value;
+    } else if (name === "@status") {
+      if (!this.response)
+        throw new Error("response is empty (@status)");
+      if (isBrowserResponse(this.response)) {
+        return this.response.status.toString();
+      } else {
+        return this.response.statusCode.toString();
+      }
+    } else if (name.startsWith("@")) {
+      throw new Error(`Unknown derived component: ${name}`);
+    } else {
+      const key = params.get("key");
+      const isSf = params.get("sf") === true;
+      const isBs = params.get("bs") === true;
+      const isTr = params.get("tr") === true;
+      if ([key, isSf, isBs].filter((x) => x).length > 1) {
+        throw new Error(`Invalid component: ${componentIdentifier} (multiple params are specified)`);
+      }
+      const rawValue = (() => {
+        if (isReq) {
+          if (isTr) {
+            if ("trailers" in this.request && this.request.trailers) {
+              return getValueByLc(this.request.trailers, name);
+            }
+            throw new Error(`Trailers not found in request object (${componentIdentifier})`);
+          } else {
+            return this.requestHeaders[name];
+          }
+        } else {
+          if (!this.response || !this.responseHeaders)
+            throw new Error("response is not provided");
+          if (isTr) {
+            if ("trailers" in this.response && this.response.trailers) {
+              return getValueByLc(this.response.trailers, name);
+            }
+            throw new Error(`Trailers not found in response object (${componentIdentifier})`);
+          } else {
+            return this.responseHeaders[name];
+          }
+        }
+      })();
+      if (rawValue === void 0) {
+        throw new Error(`Header not found: ${componentIdentifier}`);
+      }
+      if (isSf) {
+        if (!(name in this.sfvTypeDictionary)) {
+          throw new Error(`Type not found in SFV type dictionary: ${name}`);
+        }
+        const canonicalized = canonicalizeHeaderValue(rawValue);
+        if (this.sfvTypeDictionary[name] === "dict") {
+          return sh.serializeDictionary(sh.parseDictionary(canonicalized));
+        } else if (this.sfvTypeDictionary[name] === "list") {
+          return sh.serializeList(sh.parseList(canonicalized));
+        } else if (["item", "bs", "int", "dec", "str", "bool", "token"].includes(this.sfvTypeDictionary[name])) {
+          return sh.serializeItem(sh.parseItem(canonicalized));
+        }
+      }
+      if (key) {
+        if (!(name in this.sfvTypeDictionary)) {
+          throw new Error(`key specified but type unknown (Type not found in SFV type dictionary): ${componentIdentifier}`);
+        }
+        if (typeof rawValue !== "string") {
+          throw new Error(`Key specified but value is not a string: ${componentIdentifier}`);
+        }
+        if (this.sfvTypeDictionary[name] === "dict") {
+          const dictionary = sh.parseDictionary(rawValue);
+          const value = dictionary.get(key);
+          if (value === void 0) {
+            throw new Error(`Key not found in dictionary: ${key} (${componentIdentifier})`);
+          }
+          if (Array.isArray(value[0])) {
+            return sh.serializeList([value]);
+          } else {
+            return sh.serializeItem(value);
+          }
+        } else {
+          throw new Error(`"${name}" is not dict: ${this.sfvTypeDictionary[name]} (${componentIdentifier})`);
+        }
+      }
+      if (isBs) {
+        const sequences = (Array.isArray(rawValue) ? rawValue : [rawValue]).map((x) => {
+          if (typeof x !== "string") {
+            throw new Error(`Invalid header value type: ${typeof x}`);
+          }
+          return [
+            new sh.ByteSequence(
+              encodeArrayBufferToBase64(
+                textEncoder.encode(canonicalizeHeaderValue(x)).buffer
+              )
+            ),
+            /* @__PURE__ */ new Map()
+          ];
+        });
+        return sh.serializeList(sequences);
+      }
+      return canonicalizeHeaderValue(rawValue);
+    }
+  }
+  generate(label) {
+    const item = this.isRequest() ? this.requestSignatureInput?.get(label) : this.responseSignatureInput?.get(label);
+    if (!item) {
+      throw new Error(`label not found: ${label}`);
+    }
+    if (!Array.isArray(item[0])) {
+      throw new Error(`item is not InnerList: ${sh.serializeDictionary(/* @__PURE__ */ new Map([[label, item]]))}`);
+    }
+    const results = /* @__PURE__ */ new Map();
+    for (const component of item[0]) {
+      let name = component[0];
+      if (name.startsWith('"')) {
+        if (name.endsWith('"')) {
+          name = name.slice(1, -1);
+        } else {
+          throw new Error(`Invalid component identifier name: ${name}`);
+        }
+      }
+      component[0] = name;
+      const componentIdentifier = sh.serializeItem(component);
+      if (results.has(componentIdentifier)) {
+        throw new Error(`Duplicate key: ${name}`);
+      }
+      results.set(componentIdentifier, this.get(name, component[1]));
+    }
+    results.set('"@signature-params"', sh.serializeInnerList(item));
+    return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join("\n");
+  }
+};
+function convertSignatureParamsDictionary(input) {
+  const map = getMap(input);
+  const output = /* @__PURE__ */ new Map();
+  for (const [label, item] of map) {
+    if (!Array.isArray(item))
+      throw new Error("item is not array");
+    const [components, params] = item;
+    output.set(
+      label,
+      [
+        components.map(
+          (identifier) => typeof identifier === "string" ? [identifier, /* @__PURE__ */ new Map()] : [identifier[0], getMapWithoutUndefined(identifier[1])]
+        ),
+        getMapWithoutUndefined(params)
+      ]
+    );
+  }
+  return sh.serializeDictionary(output);
+}
+
+// src/rfc9421/parse.ts
+var sh2 = __toESM(require_dist(), 1);
+function validateRFC9421SignatureInputParameters(input, options) {
+  const labels = input.entries();
+  for (const [, value] of labels) {
+    const params = value[1];
+    if (params.has("alg") && typeof params.get("alg") !== "string")
+      throw new SignatureParamsContentLackedError("alg");
+    if (params.has("nonce") && typeof params.get("nonce") !== "string")
+      throw new SignatureParamsContentLackedError("nonce");
+    if (params.has("tag") && typeof params.get("tag") !== "string")
+      throw new SignatureParamsContentLackedError("tag");
+    if (params.has("created")) {
+      const createdSec = params.get("created");
+      if (typeof createdSec !== "number")
+        throw new SignatureParamsClockInvalidError("created");
+      const nowTime = (options?.clockSkew?.now || /* @__PURE__ */ new Date()).getTime();
+      if (createdSec * 1e3 > nowTime + (options?.clockSkew?.forward ?? 2e3)) {
+        throw new SignatureParamsClockInvalidError("created");
+      }
+    }
+    if (params.has("expires")) {
+      const expiresSec = params.get("expires");
+      if (typeof expiresSec !== "number")
+        throw new SignatureParamsClockInvalidError("expires");
+      const nowTime = (options?.clockSkew?.now || /* @__PURE__ */ new Date()).getTime();
+      if (expiresSec * 1e3 < nowTime - (options?.clockSkew?.forward ?? 2e3)) {
+        throw new SignatureParamsClockInvalidError("expires");
+      }
+    }
+  }
+  return true;
+}
+function parseSingleRFC9421Signature(label, factory, params, signature) {
+  const base = factory.generate(label);
+  if (!params)
+    throw new SignatureInputLackedError(`label not found: ${label}`);
+  const bareKeyid = params[1].get("keyid");
+  return {
+    keyid: bareKeyid ? typeof bareKeyid === "string" ? bareKeyid : sh2.serializeBareItem(bareKeyid) : void 0,
+    base,
+    signature: signature.toBase64(),
+    params: sh2.serializeInnerList(params),
+    algorithm: params[1].get("alg"),
+    created: params[1].get("created"),
+    expires: params[1].get("expires"),
+    nonce: params[1].get("nonce"),
+    tag: params[1].get("tag")
+  };
+}
+function parseRFC9421RequestOrResponse(request, options, validated) {
+  if (!validated)
+    validated = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
+  if (validated.signatureInput == null)
+    throw new SignatureInputLackedError("signatureInput");
+  const signatureDictionary = sh2.parseDictionary(validated.signatureHeader);
+  const signatureInput = sh2.parseDictionary(validated.signatureInput);
+  const inputIsValid = validateRFC9421SignatureInputParameters(signatureInput, options);
+  if (!inputIsValid)
+    throw new Error("signatureInput");
+  const factory = new RFC9421SignatureBaseFactory(request);
+  return {
+    version: "rfc9421",
+    value: Array.from(signatureInput.keys()).map((label) => {
+      const params = signatureInput.get(label);
+      if (!params)
+        throw new Error("signature input not found (???)");
+      const bs = signatureDictionary.get(label);
+      if (!bs)
+        throw new Error("signature not found");
+      if (!(bs[0] instanceof sh2.ByteSequence))
+        throw new Error("signature not ByteSequence");
+      return [label, parseSingleRFC9421Signature(label, factory, params, bs[0])];
+    })
+  };
 }
 
 // src/draft/string.ts
@@ -1443,7 +1899,7 @@ function validateRequestAndGetSignatureHeader(source, clock) {
 function parseRequestSignature(request, options) {
   const validated = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
   if (validated.signatureInput != null) {
-    throw new Error("Not implemented");
+    return parseRFC9421RequestOrResponse(request, options);
   } else if (signatureHeaderIsDraft(validated.signatureHeader)) {
     return parseDraftRequest(request, options, validated);
   }
@@ -1516,9 +1972,6 @@ async function genEd448KeyPair(keyUsage) {
   };
 }
 
-// src/const.ts
-var textEncoder = new TextEncoder();
-
 // src/digest/utils.ts
 async function createBase64Digest(body, hash = "SHA-256") {
   if (hash === "SHA") {
@@ -1531,7 +1984,7 @@ async function createBase64Digest(body, hash = "SHA-256") {
 }
 
 // src/digest/digest-rfc3230.ts
-var import_rfc46482 = require("rfc4648");
+var import_rfc46484 = require("rfc4648");
 async function genRFC3230DigestHeader(body, hashAlgorithm) {
   return `${hashAlgorithm}=${await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64)}`;
 }
@@ -1564,7 +2017,7 @@ async function verifyRFC3230DigestHeader(request, rawBody, opts = {
   }
   let value;
   try {
-    value = import_rfc46482.base64.parse(match[2]);
+    value = import_rfc46484.base64.parse(match[2]);
   } catch {
     if (errorLogger)
       errorLogger(`Invalid Digest header format. (base64 syntax)`);
@@ -1602,8 +2055,8 @@ async function verifyRFC3230DigestHeader(request, rawBody, opts = {
 }
 
 // src/digest/digest-rfc9530.ts
-var sh = __toESM(require_dist(), 1);
-var import_rfc46483 = require("rfc4648");
+var sh3 = __toESM(require_dist(), 1);
+var import_rfc46485 = require("rfc4648");
 var RFC9530GenerateDigestHeaderError = class extends Error {
   constructor(message) {
     super(message);
@@ -1682,8 +2135,8 @@ async function genSingleRFC9530DigestHeader(body, hashAlgorithm) {
     [
       hashAlgorithm.toLowerCase(),
       [
-        new sh.ByteSequence(
-          await createBase64Digest(body, convertHashAlgorithmFromRFC9530ToWebCrypto(hashAlgorithm)).then((data) => import_rfc46483.base64.stringify(new Uint8Array(data)))
+        new sh3.ByteSequence(
+          await createBase64Digest(body, convertHashAlgorithmFromRFC9530ToWebCrypto(hashAlgorithm)).then((data) => import_rfc46485.base64.stringify(new Uint8Array(data)))
         ),
         /* @__PURE__ */ new Map()
       ]
@@ -1730,7 +2183,7 @@ async function verifyRFC9530DigestHeader(request, rawBody, opts = {
   }
   let dictionary;
   try {
-    dictionary = Array.from(sh.parseDictionary(contentDigestHeader), ([k, v]) => [k.toLowerCase(), v]);
+    dictionary = Array.from(sh3.parseDictionary(contentDigestHeader), ([k, v]) => [k.toLowerCase(), v]);
   } catch (e) {
     if (errorLogger)
       errorLogger("Invalid Digest header");
@@ -1762,10 +2215,10 @@ async function verifyRFC9530DigestHeader(request, rawBody, opts = {
       if (!acceptableAlgorithms.includes(algo.toLowerCase())) {
         return Promise.resolve(null);
       }
-      if (!(value instanceof sh.ByteSequence)) {
+      if (!(value instanceof sh3.ByteSequence)) {
         return Promise.reject(new Error("Invalid dictionary value type"));
       }
-      return createBase64Digest(rawBody, convertHashAlgorithmFromRFC9530ToWebCrypto(algo.toLowerCase())).then((hash) => compareUint8Array(import_rfc46483.base64.parse(value.toBase64()), new Uint8Array(hash)));
+      return createBase64Digest(rawBody, convertHashAlgorithmFromRFC9530ToWebCrypto(algo.toLowerCase())).then((hash) => compareUint8Array(import_rfc46485.base64.parse(value.toBase64()), new Uint8Array(hash)));
     })
   );
   if (!results.some((v) => v.status === "fulfilled" && v.value === true)) {
@@ -1789,16 +2242,11 @@ async function verifyRFC9530DigestHeader(request, rawBody, opts = {
 
 // src/digest/digest.ts
 async function genDigestHeaderBothRFC3230AndRFC9530(request, body, hashAlgorithm = "SHA-256") {
-  const base645 = await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64);
-  const digest = `${hashAlgorithm}=${base645}`;
-  const contentDigest = `${convertHashAlgorithmFromWebCryptoToRFC9530(hashAlgorithm)}=:${base645}:`;
-  if (isBrowserHeader(request.headers)) {
-    request.headers.set("Digest", digest);
-    request.headers.set("Content-Digest", contentDigest);
-  } else {
-    request.headers["Digest"] = digest;
-    request.headers["Content-Digest"] = contentDigest;
-  }
+  const base646 = await createBase64Digest(body, hashAlgorithm).then(encodeArrayBufferToBase64);
+  const digest = `${hashAlgorithm}=${base646}`;
+  const contentDigest = `${convertHashAlgorithmFromWebCryptoToRFC9530(hashAlgorithm)}=:${base646}:`;
+  setHeaderToRequestOrResponse(request, "Digest", digest);
+  setHeaderToRequestOrResponse(request, "Content-Digest", contentDigest);
 }
 async function verifyDigestHeader(request, rawBody, opts = {
   failOnNoDigest: true,
@@ -1867,6 +2315,12 @@ async function importPrivateKey(key, keyUsages = ["sign"], defaults = defaultSig
   return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, extractable, keyUsages);
 }
 
+// src/shared/sign.ts
+async function genSignature(privateKey, signingString, defaults = defaultSignInfoDefaults) {
+  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, textEncoder.encode(signingString));
+  return encodeArrayBufferToBase64(signatureAB);
+}
+
 // src/draft/sign.ts
 function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
   const verifyHash = () => {
@@ -1895,10 +2349,7 @@ function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
   }
   throw new Error(`unsupported keyAlgorithm`);
 }
-async function genDraftSignature(privateKey, signingString, defaults = defaultSignInfoDefaults) {
-  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, textEncoder.encode(signingString));
-  return encodeArrayBufferToBase64(signatureAB);
-}
+var genDraftSignature = genSignature;
 function genDraftSignatureHeader(includeHeaders, keyId, signature, algorithm) {
   return `keyId="${keyId}",algorithm="${algorithm}",headers="${includeHeaders.join(" ")}",signature="${signature}"`;
 }
@@ -1909,7 +2360,7 @@ async function signAsDraftToRequest(request, key, includeHeaders, opts = default
   const privateKey = "privateKey" in key ? key.privateKey : await importPrivateKey(key.privateKeyPem, ["sign"], opts);
   const algoString = getDraftAlgoString(privateKey.algorithm.name, opts.hash);
   const signingString = genDraftSigningString(request, includeHeaders, { keyId: key.keyId, algorithm: algoString });
-  const signature = await genDraftSignature(privateKey, signingString, opts);
+  const signature = await genSignature(privateKey, signingString, opts);
   const signatureHeader = genDraftSignatureHeader(includeHeaders, key.keyId, signature, algoString);
   Object.assign(request.headers, {
     Signature: signatureHeader
@@ -1919,331 +2370,6 @@ async function signAsDraftToRequest(request, key, includeHeaders, opts = default
     signature,
     signatureHeader
   };
-}
-
-// src/draft/verify.ts
-var import_rfc46484 = require("rfc4648");
-var genSignInfoDraft = parseSignInfo;
-async function verifyDraftSignature(parsed, key, errorLogger) {
-  try {
-    const { publicKey, algorithm } = await parseAndImportPublicKey(key, ["verify"], parsed.algorithm);
-    const verify = await (await getWebcrypto()).subtle.verify(algorithm, publicKey, import_rfc46484.base64.parse(parsed.params.signature), textEncoder.encode(parsed.signingString));
-    if (verify !== true)
-      throw new Error(`verification simply failed, result: ${verify}`);
-    return verify;
-  } catch (e) {
-    if (errorLogger)
-      errorLogger(e);
-    return false;
-  }
-}
-
-// src/rfc9421/sfv.ts
-var knownSfvHeaderTypeDictionary = {
-  /**
-   * RFC 9421 HTTP Message Signatures
-   * https://datatracker.ietf.org/doc/html/rfc9421#name-initial-contents-3
-   */
-  // https://datatracker.ietf.org/doc/html/rfc9421#signature-header
-  "signature": "dict",
-  // https://datatracker.ietf.org/doc/html/rfc9421#signature-input-header
-  "signature-input": "dict",
-  // https://datatracker.ietf.org/doc/html/rfc9421#accept-signature-header
-  "accept-signature": "dict",
-  /**
-   * RFC 9530 Digest Fields
-   * https://datatracker.ietf.org/doc/html/rfc9530#name-http-field-name-registratio
-   */
-  // https://datatracker.ietf.org/doc/html/rfc9530#name-the-content-digest-field
-  "content-digest": "dict",
-  // https://datatracker.ietf.org/doc/html/rfc9530#name-the-repr-digest-field
-  "repr-digest": "dict",
-  // https://datatracker.ietf.org/doc/html/rfc9530#name-integrity-preference-fields
-  "want-content-digest": "dict",
-  // https://datatracker.ietf.org/doc/html/rfc9530#want-fields
-  "want-repr-digest": "dict",
-  // https://datatracker.ietf.org/doc/html/rfc8942#name-the-accept-ch-response-head
-  "accept-ch": "list",
-  // https://datatracker.ietf.org/doc/html/rfc9209#name-the-proxy-status-http-field
-  "proxy-status": "list",
-  // https://datatracker.ietf.org/doc/html/rfc9211#name-the-cache-status-http-respo
-  "cache-status": "list",
-  // https://datatracker.ietf.org/doc/html/rfc9218#name-priority-parameters
-  "priority": "dict",
-  // https://datatracker.ietf.org/doc/html/rfc9440#name-client-cert-http-header-fie
-  "client-cert": "bs",
-  // https://datatracker.ietf.org/doc/html/rfc9440#name-client-cert-chain-http-head
-  "client-cert-chain": "list"
-};
-
-// src/rfc9421/base.ts
-var sh2 = __toESM(require_dist(), 1);
-var requestTargetDerivedComponents = [
-  "@method",
-  "@authority",
-  "@scheme",
-  "@target-uri",
-  "@request-target",
-  "@path",
-  "@query"
-];
-var responseTargetDerivedComponents = [
-  "@status"
-];
-var RFC9421SignatureBaseFactory = class {
-  isRequest() {
-    return this.response === null;
-  }
-  isResponse() {
-    return this.response !== null;
-  }
-  /**
-   *
-   * @param source request or response, must include 'signature-input' header
-   *	If source is node response, it must include 'req' property.
-   * @param scheme optional, used when source request url starts with '/'
-   * @param additionalSfvTypeDictionary additional SFV type dictionary
-   * @param request optional, used when source is a browser Response
-   */
-  constructor(source, scheme = "https", additionalSfvTypeDictionary = {}, request) {
-    this.sfvTypeDictionary = lcObjectKey({ ...knownSfvHeaderTypeDictionary, ...additionalSfvTypeDictionary });
-    if ("req" in source) {
-      this.response = source;
-      this.responseHeaders = collectHeaders(source);
-      this.request = source.req;
-      this.requestHeaders = collectHeaders(this.request);
-    } else if (isBrowserResponse(source)) {
-      if (!request)
-        throw new Error("Request is not provided");
-      this.response = source;
-      this.responseHeaders = collectHeaders(source);
-      this.request = request;
-      this.requestHeaders = collectHeaders(this.request);
-    } else {
-      this.response = null;
-      this.responseHeaders = null;
-      this.request = source;
-      this.requestHeaders = collectHeaders(source);
-    }
-    if (!this.request.url) {
-      throw new Error("Request URL is empty");
-    }
-    if (!this.request.method) {
-      throw new Error("Request method is empty");
-    }
-    if (!("signature-input" in this.requestHeaders))
-      throw new Error("Signature-Input header is not found in request");
-    this.requestSignatureInput = sh2.parseDictionary(canonicalizeHeaderValue(this.requestHeaders["signature-input"]));
-    if (this.isResponse()) {
-      if (!this.responseHeaders)
-        throw new Error("responseHeaders is empty");
-      if (!("signature-input" in this.responseHeaders))
-        throw new Error("Signature-Input header is not found in response");
-      this.responseSignatureInput = sh2.parseDictionary(canonicalizeHeaderValue(this.responseHeaders["signature-input"]));
-    }
-    this.sfvTypeDictionary = lcObjectKey(additionalSfvTypeDictionary);
-    this.scheme = this.request.url.startsWith("/") ? scheme : new URL(this.request.url).protocol.replace(":", "");
-    const rawHost = "httpVersionMajor" in this.request && this.request.httpVersionMajor === 2 ? this.requestHeaders[":authority"] : this.requestHeaders["host"];
-    if (!isBrowserRequest(this.request) && !rawHost)
-      throw new Error("Host header is empty");
-    const host = canonicalizeHeaderValue(rawHost);
-    this.targetUri = this.request.url.startsWith("/") ? new URL(this.request.url, `${scheme}://${host}`).href : this.request.url;
-    this.url = new URL(this.targetUri);
-  }
-  get(name, paramsLike = /* @__PURE__ */ new Map()) {
-    const params = getMap(paramsLike);
-    const componentIdentifier = sh2.serializeItem([name, params]);
-    if (!name) {
-      throw new Error(`Type is empty: ${componentIdentifier}`);
-    }
-    if (name.startsWith('"')) {
-      if (name.endsWith('"')) {
-        name = name.slice(1, -1);
-      } else {
-        throw new Error(`Invalid component type string: ${componentIdentifier}`);
-      }
-    }
-    if (this.isResponse() && params.get("req") !== true && requestTargetDerivedComponents.includes(name)) {
-      throw new Error(`component is not available in response (must use with ;req, or provided object is unintentionally treated as response (existing req prop.)): ${name}`);
-    }
-    if (this.isRequest() && responseTargetDerivedComponents.includes(name)) {
-      throw new Error(`component is not available in request (provided object is unintentionally treated as request (including req prop.)): ${name}`);
-    }
-    if (this.isRequest() && params.get("req") === true) {
-      throw new Error("req param is not available in request (provided object is treated as request, please set req param with Request)");
-    }
-    const isReq = this.isRequest() || params.get("req") === true;
-    if (name === "@signature-params") {
-      throw new Error(`@signature-params is not available in get method: ${componentIdentifier}`);
-    } else if (name === "@method") {
-      if (!this.request.method) {
-        throw new Error("Request method is empty");
-      }
-      return this.request.method.toUpperCase();
-    } else if (name === "@authority") {
-      return this.url.host;
-    } else if (name === "@scheme") {
-      return this.scheme.toLocaleLowerCase();
-    } else if (name === "@target-uri") {
-      return this.targetUri;
-    } else if (name === "@request-target") {
-      if (!this.request.method) {
-        throw new Error("Request method is empty");
-      }
-      return `${this.request.method.toLowerCase()} ${this.url.pathname}`;
-    } else if (name === "@path") {
-      return this.url.pathname;
-    } else if (name === "@query") {
-      return this.url.search;
-    } else if (name === "@query-param") {
-      const key = params.get("name");
-      if (key === void 0) {
-        throw new Error("Query parameter name not found or invalid");
-      }
-      const value = this.url.searchParams.get(key.toString());
-      if (value === null) {
-        throw new Error(`Query parameter not found: ${key} (${componentIdentifier})`);
-      }
-      return value;
-    } else if (name === "@status") {
-      if (!this.response)
-        throw new Error("response is empty (@status)");
-      if (isBrowserResponse(this.response)) {
-        return this.response.status.toString();
-      } else {
-        return this.response.statusCode.toString();
-      }
-    } else if (name.startsWith("@")) {
-      throw new Error(`Unknown derived component: ${name}`);
-    } else {
-      const key = params.get("key");
-      const isSf = params.get("sf") === true;
-      const isBs = params.get("bs") === true;
-      const isTr = params.get("tr") === true;
-      if ([key, isSf, isBs].filter((x) => x).length > 1) {
-        throw new Error(`Invalid component: ${componentIdentifier} (multiple params are specified)`);
-      }
-      const rawValue = (() => {
-        if (isReq) {
-          if (isTr) {
-            if ("trailers" in this.request && this.request.trailers) {
-              return getValueByLc(this.request.trailers, name);
-            }
-            throw new Error(`Trailers not found in request object (${componentIdentifier})`);
-          } else {
-            return this.requestHeaders[name];
-          }
-        } else {
-          if (!this.response || !this.responseHeaders)
-            throw new Error("response is not provided");
-          if (isTr) {
-            if ("trailers" in this.response && this.response.trailers) {
-              return getValueByLc(this.response.trailers, name);
-            }
-            throw new Error(`Trailers not found in response object (${componentIdentifier})`);
-          } else {
-            return this.responseHeaders[name];
-          }
-        }
-      })();
-      if (rawValue === void 0) {
-        throw new Error(`Header not found: ${componentIdentifier}`);
-      }
-      if (isSf) {
-        if (!(name in this.sfvTypeDictionary)) {
-          throw new Error(`Type not found in SFV type dictionary: ${name}`);
-        }
-        const canonicalized = canonicalizeHeaderValue(rawValue);
-        if (this.sfvTypeDictionary[name] === "dict") {
-          return sh2.serializeDictionary(sh2.parseDictionary(canonicalized));
-        } else if (this.sfvTypeDictionary[name] === "list") {
-          return sh2.serializeList(sh2.parseList(canonicalized));
-        } else if (["item", "bs", "int", "dec", "str", "bool", "token"].includes(this.sfvTypeDictionary[name])) {
-          return sh2.serializeItem(sh2.parseItem(canonicalized));
-        }
-      }
-      if (key) {
-        if (!(name in this.sfvTypeDictionary)) {
-          throw new Error(`key specified but type unknown (Type not found in SFV type dictionary): ${componentIdentifier}`);
-        }
-        if (typeof rawValue !== "string") {
-          throw new Error(`Key specified but value is not a string: ${componentIdentifier}`);
-        }
-        if (this.sfvTypeDictionary[name] === "dict") {
-          const dictionary = sh2.parseDictionary(rawValue);
-          const value = dictionary.get(key);
-          if (value === void 0) {
-            throw new Error(`Key not found in dictionary: ${key} (${componentIdentifier})`);
-          }
-          if (Array.isArray(value[0])) {
-            return sh2.serializeList([value]);
-          } else {
-            return sh2.serializeItem(value);
-          }
-        } else {
-          throw new Error(`"${name}" is not dict: ${this.sfvTypeDictionary[name]} (${componentIdentifier})`);
-        }
-      }
-      if (isBs) {
-        const sequences = (Array.isArray(rawValue) ? rawValue : [rawValue]).map((x) => {
-          if (typeof x !== "string") {
-            throw new Error(`Invalid header value type: ${typeof x}`);
-          }
-          return [
-            new sh2.ByteSequence(
-              encodeArrayBufferToBase64(
-                textEncoder.encode(canonicalizeHeaderValue(x)).buffer
-              )
-            ),
-            /* @__PURE__ */ new Map()
-          ];
-        });
-        return sh2.serializeList(sequences);
-      }
-      return canonicalizeHeaderValue(rawValue);
-    }
-  }
-  generate(label) {
-    const item = this.isRequest() ? this.requestSignatureInput?.get(label) : this.responseSignatureInput?.get(label);
-    if (!item) {
-      throw new Error(`label not found: ${label}`);
-    }
-    if (!Array.isArray(item[0])) {
-      throw new Error(`item is not InnerList: ${sh2.serializeDictionary(/* @__PURE__ */ new Map([[label, item]]))}`);
-    }
-    const results = /* @__PURE__ */ new Map();
-    for (const component of item[0]) {
-      let name = component[0];
-      if (name.startsWith('"')) {
-        if (name.endsWith('"')) {
-          name = name.slice(1, -1);
-        } else {
-          throw new Error(`Invalid component identifier name: ${name}`);
-        }
-      }
-      component[0] = name;
-      const componentIdentifier = sh2.serializeItem(component);
-      if (results.has(componentIdentifier)) {
-        throw new Error(`Duplicate key: ${name}`);
-      }
-      results.set(componentIdentifier, this.get(name, component[1]));
-    }
-    results.set('"@signature-params"', sh2.serializeInnerList(item));
-    return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join("\n");
-  }
-};
-function convertSignatureParamsDictionary(input) {
-  const output = getMap(input);
-  for (const [label, item] of output) {
-    if (Array.isArray(item)) {
-      const [components, params] = item;
-      for (let i = 0; i < components.length; i++) {
-        components[i][1] = getMap(components[i][1]);
-      }
-      output.set(label, [components, getMap(params)]);
-    }
-  }
-  return sh2.serializeDictionary(output);
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
@@ -2299,6 +2425,7 @@ function convertSignatureParamsDictionary(input) {
   getDraftAlgoString,
   getHeaderValue,
   getMap,
+  getMapWithoutUndefined,
   getNistCurveFromOid,
   getPublicKeyAlgorithmNameFromOid,
   getValueByLc,
@@ -2327,6 +2454,7 @@ function convertSignatureParamsDictionary(input) {
   requestTargetDerivedComponents,
   responseTargetDerivedComponents,
   rsaASN1AlgorithmIdentifier,
+  setHeaderToRequestOrResponse,
   signAsDraftToRequest,
   signatureHeaderIsDraft,
   splitPer64Chars,

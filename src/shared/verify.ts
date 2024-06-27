@@ -2,10 +2,12 @@
  * Verify Request (Parsed)
  */
 
-import type { ECNamedCurve, SignInfo } from '../types.js';
+import type { ECNamedCurve, ParsedSignature, SignInfo } from '../types.js';
 import { ParsedAlgorithmIdentifier, getNistCurveFromOid, getPublicKeyAlgorithmNameFromOid } from '../pem/spki.js';
 import type { SignatureHashAlgorithmUpperSnake } from '../types.js';
 import { keyHashAlgosForDraftDecoding } from '../draft/const.js';
+import { verifyDraftSignature } from 'src/draft/verify.js';
+import { verifyRFC9421Signature } from 'src/rfc9421/verify.js';
 
 export class KeyHashValidationError extends Error {
 	constructor(message: string) { super(message); }
@@ -23,7 +25,10 @@ function buildErrorMessage(providedAlgorithm: string, real: string) {
  */
 export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorithmIdentifier | CryptoKey['algorithm'], errorLogger?: ((message: any) => any)): SignInfo {
 	algorithm = algorithm?.toLowerCase();
-	const realKeyType = typeof real === 'string' ? real : 'algorithm' in real ? getPublicKeyAlgorithmNameFromOid(real.algorithm) : real.name;
+	const realKeyType = typeof real === 'string' ? real
+		: 'algorithm' in real ?
+			getPublicKeyAlgorithmNameFromOid(real.algorithm)
+			: real.name;
 
 	if (realKeyType === 'RSA-PSS') {
 		// 公開鍵にこれが使われることはないが、一応
@@ -35,17 +40,17 @@ export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorit
 	if (realKeyType === 'RSASSA-PKCS1-v1_5') {
 		if (
 			!algorithm ||
-			algorithm === 'hs2019' ||
-			algorithm === 'rsa-sha256' ||
-			algorithm === 'rsa-v1_5-sha256' // Draftでこれが使われることはないが、一応
+			algorithm === 'hs2019' || // Draft
+			algorithm === 'rsa-sha256' || // Draft
+			algorithm === 'rsa-v1_5-sha256' // RFC9421
 		) {
 			return { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' };
 		}
-		if (algorithm === 'rsa-pss-sha512') {
+		if (algorithm === 'rsa-pss-sha512') { // RFC9421
 			return { name: 'RSA-PSS', hash: 'SHA-512' };
 		}
 
-		//#region draft parsing
+		//#region Draft
 		const [parsedName, hash] = algorithm.split('-') as [string, SignatureHashAlgorithmUpperSnake];
 		if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
 			throw new KeyHashValidationError(`unsupported hash: ${hash}`);
@@ -63,25 +68,25 @@ export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorit
 
 		if (
 			!algorithm ||
-			algorithm === 'hs2019' ||
-			algorithm === 'ecdsa-sha256'
+			algorithm === 'hs2019' || // Draft
+			algorithm === 'ecdsa-sha256' // Draft
 		) {
 			return { name: 'ECDSA', hash: 'SHA-256', namedCurve };
 		}
-		if (algorithm === 'ecdsa-p256-sha256') {
+		if (algorithm === 'ecdsa-p256-sha256') { // RFC9421
 			if (namedCurve !== 'P-256') {
 				throw new KeyHashValidationError(`curve is not P-256: ${namedCurve}`);
 			}
 			return { name: 'ECDSA', hash: 'SHA-256', namedCurve };
 		}
-		if (algorithm === 'ecdsa-p384-sha384') {
+		if (algorithm === 'ecdsa-p384-sha384') { // RFC9421
 			if (namedCurve !== 'P-384') {
 				throw new KeyHashValidationError(`curve is not P-384: ${namedCurve}`);
 			}
 			return { name: 'ECDSA', hash: 'SHA-256', namedCurve };
 		}
 
-		//#region draft parsing
+		//#region Draft
 		const [dsaOrDH, hash] = algorithm.split('-') as [string, SignatureHashAlgorithmUpperSnake];
 		if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
 			throw new KeyHashValidationError(`unsupported hash: ${hash}`);
@@ -119,4 +124,13 @@ export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorit
 	}
 
 	throw new KeyHashValidationError(`unsupported keyAlgorithm: ${realKeyType} (provided: ${algorithm})`);
+}
+
+export function verifyParsedSignature(parsed: ParsedSignature, key: string | CryptoKey, errorLogger?: ((message: any) => any)): Promise<boolean> {
+	if (parsed.version === 'draft') {
+		return verifyDraftSignature(parsed.value, key, errorLogger);
+	} else if (parsed.version === 'rfc9421') {
+		return verifyRFC9421Signature(parsed.value, key, undefined, errorLogger);
+	}
+	throw new Error(`unsupported parsed signature`);
 }

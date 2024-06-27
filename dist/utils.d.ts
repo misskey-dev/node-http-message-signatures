@@ -32,6 +32,7 @@ export declare function correctHeadersFromFlatArray(src: HeadersValueLike[]): Re
  * Collect request or response headers
  */
 export declare function collectHeaders(source: IncomingRequest | OutgoingResponse): HeadersLike;
+export declare function setHeaderToRequestOrResponse(reqres: IncomingRequest | OutgoingResponse, key: string, value: string | number): void;
 export declare function isBrowserResponse(input: any): input is Response;
 export declare function isBrowserRequest(input: any): input is Request;
 export declare function isBrowserHeader(input: any): input is Headers;
@@ -69,3 +70,4 @@ export declare function genAlgorithmForSignAndVerify(keyAlgorithm: KeyAlgorithm,
 };
 export declare function splitPer64Chars(str: string): string[];
 export declare function getMap<T extends MapLikeObj<K, V>, K, V>(obj: T): Map<K, V>;
+export declare function getMapWithoutUndefined<T extends MapLikeObj<K, V>, K, V>(obj: T): Map<K, NonNullable<V>>;

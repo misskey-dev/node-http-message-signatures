@@ -1,7 +1,7 @@
 /**
  * Verify Request (Parsed)
  */
-import type { SignInfo } from '../types.js';
+import type { ParsedSignature, SignInfo } from '../types.js';
 import { ParsedAlgorithmIdentifier } from '../pem/spki.js';
 export declare class KeyHashValidationError extends Error {
     constructor(message: string);
@@ -13,3 +13,4 @@ export declare class KeyHashValidationError extends Error {
  * @param publicKey 実際の公開鍵
  */
 export declare function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorithmIdentifier | CryptoKey['algorithm'], errorLogger?: ((message: any) => any)): SignInfo;
+export declare function verifyParsedSignature(parsed: ParsedSignature, key: string | CryptoKey, errorLogger?: ((message: any) => any)): Promise<boolean>;
