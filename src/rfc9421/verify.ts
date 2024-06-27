@@ -75,7 +75,8 @@ export async function verifyRFC9421Signature(
 
 		if (parsed.keyid && options.verifyAll === true) {
 			// verifyAllの場合、keyidで見つからないときはエラーにする
-			if (errorLogger) errorLogger(`key not found in privided keys (verifyAll: true), label: ${label} keyid: ${parsed.keyid}`);
+			// If verifyAll is true, an error will be thrown if the keyid is not found.
+			if (errorLogger) errorLogger(`key not found in provided keys (verifyAll: true), label: ${label} keyid: ${parsed.keyid}`);
 			return false;
 		}
 
@@ -124,18 +125,27 @@ export async function verifyRFC9421Signature(
 				algorithm, publicKey, base64.parse(parsed.signature), textEncoder.encode(parsed.base)
 			);
 
-			if (verify === false) {
-				if (errorLogger) errorLogger(`verification simply failed, label: ${label}`);
-				return false;
+			if (options.verifyAll === true) {
+				if (verify === true) continue;
+				if (verify === false) {
+					if (errorLogger) errorLogger(`verification simply failed, label: ${label}`);
+					return false;
+				}
+			} else {
+				if (verify === true) return true;
+				if (verify === false) {
+					if (errorLogger) errorLogger(`verification simply failed, label: ${label}`);
+					continue;
+				}
 			}
-			if (verify === true && options.verifyAll === false) {
-				return true;
-			}
-			if (verify !== true) throw new Error(verify); // unknown result
+			if (typeof verify !== 'boolean') throw new Error(verify); // unknown result
 		} catch (e) {
 			if (errorLogger) errorLogger(`Something happend in ${label}: ${e}`);
 			return false;
 		}
 	}
-	return true;
+
+	// If verifyAll is true, all signatures have been verified
+	// If verifyAll is false, no signature has been verified
+	return options.verifyAll === true ? true : false;
 }

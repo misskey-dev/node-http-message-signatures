@@ -1,9 +1,11 @@
 import { HeadersLike, RequestLike } from "@/types";
 import { RFC9421SignSource, processSingleRFC9421SignSource, signAsRFC9421ToRequestOrResponse } from "@/rfc9421/sign";
-import { ed25519, rsa4096 } from "test/keys";
+import { ed25519, ed448, rsa4096 } from "test/keys";
 import { getMap } from "@/utils";
 import { parseRFC9421RequestOrResponse } from "@/rfc9421/parse";
 import { verifyParsedSignature } from "@/shared/verify";
+import { verifyRFC9421Signature } from "@/rfc9421/verify";
+import { jest } from "@jest/globals";
 
 //#region data
 const theDate = new Date('2024-02-28T17:44:06.000Z');
@@ -193,46 +195,140 @@ describe('RFC9421', () => {
 	});
 
 	describe('integrated multiple', () => {
-		let request: RequestLike;
-		let result: Awaited<ReturnType<typeof signAsRFC9421ToRequestOrResponse>>;
-		beforeAll(async () => {
-			request = getBasicRequest();
-			result = await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
-		});
-		test('parse and verify', async () => {
-			const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
-			expect(parsed.value).toStrictEqual([
-				[
-					'sig1',
-					{
-						algorithm: 'rsa-v1_5-sha256',
-						base: result.signatureBases.get('sig1'),
-						created: 1618884475,
-						expires: undefined,
-						keyid: 'x',
-						nonce: undefined,
-						params: sig1ExpectedParams,
-						signature: sig1ExpectedSign,
-						tag: undefined,
-					},
-				],
-				[
-					'sig2',
-					{
-						algorithm: 'ed25519',
-						base: result.signatureBases.get('sig2'),
-						created: 1618884475,
-						expires: undefined,
-						keyid: 'y',
-						nonce: undefined,
-						params: sig2ExpectedParams,
-						signature: sig2ExpectedSign,
-						tag: undefined,
-					},
-				],
-			]);
-			const verified = await verifyParsedSignature(parsed, rsa4096.publicKey);
-			expect(verified).toBe(true);
+		describe('parse and verify', () => {
+			test('one sign by one verification (succ)', async () => {
+				const request = getBasicRequest();
+				const result = await signAsRFC9421ToRequestOrResponse(request, getMap(basicSources));
+				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+				expect(parsed.value).toStrictEqual([
+					[
+						'sig1',
+						{
+							algorithm: 'rsa-v1_5-sha256',
+							base: result.signatureBases.get('sig1'),
+							created: 1618884475,
+							expires: undefined,
+							keyid: 'x',
+							nonce: undefined,
+							params: sig1ExpectedParams,
+							signature: sig1ExpectedSign,
+							tag: undefined,
+						},
+					],
+				]);
+				const verified = await verifyParsedSignature(parsed, rsa4096.publicKey);
+				expect(verified).toBe(true);
+			});
+
+			test('one sign by one verification (fail)', async () => {
+				const request = getBasicRequest();
+				await signAsRFC9421ToRequestOrResponse(request, getMap(basicSources));
+				request.headers['Signature'] = `sig1=:${sig2ExpectedSign}:`;
+				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+				const logger = jest.fn();
+				const verified = await verifyParsedSignature(parsed, rsa4096.publicKey, logger);
+				expect(verified).toBe(false);
+				expect(logger).toHaveBeenCalledWith('verification simply failed, label: sig1');
+			});
+
+			test('two sign by one verification (succ)', async () => {
+				const request = getBasicRequest();
+				const result = await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+				expect(parsed.value).toStrictEqual([
+					[
+						'sig1',
+						{
+							algorithm: 'rsa-v1_5-sha256',
+							base: result.signatureBases.get('sig1'),
+							created: 1618884475,
+							expires: undefined,
+							keyid: 'x',
+							nonce: undefined,
+							params: sig1ExpectedParams,
+							signature: sig1ExpectedSign,
+							tag: undefined,
+						},
+					],
+					[
+						'sig2',
+						{
+							algorithm: 'ed25519',
+							base: result.signatureBases.get('sig2'),
+							created: 1618884475,
+							expires: undefined,
+							keyid: 'y',
+							nonce: undefined,
+							params: sig2ExpectedParams,
+							signature: sig2ExpectedSign,
+							tag: undefined,
+						},
+					],
+				]);
+				const verified = await verifyParsedSignature(parsed, rsa4096.publicKey);
+				expect(verified).toBe(true);
+			});
+
+			test('two sign by one verification (fail)', async () => {
+				const request = getBasicRequest();
+				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				request.headers['Signature'] = `sig1=:${sig2ExpectedSign}:, sig2=:${sig1ExpectedSign}:`;
+				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+				const logger = jest.fn();
+				const verified = await verifyParsedSignature(parsed, rsa4096.publicKey, logger);
+				expect(verified).toBe(false);
+				expect(logger).toHaveBeenCalledWith('verification simply failed, label: sig1');
+			});
+
+			test('two sign by two verification; verifyAll: true (succ)', async () => {
+				const request = getBasicRequest();
+				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+				const verified = await verifyRFC9421Signature(parsed.value, new Map([['sig1', rsa4096.publicKey], ['sig2', ed25519.publicKey]]), { verifyAll: true });
+				expect(verified).toBe(true);
+			});
+
+			test('two sign by two verification; verifyAll: true (one fail)', async () => {
+				const request = getBasicRequest();
+				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				request.headers['Signature'] = `sig1=:${sig2ExpectedSign}:, sig2=:${sig2ExpectedSign}:`;
+				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+				const verified = await verifyRFC9421Signature(parsed.value, new Map([['sig1', rsa4096.publicKey], ['sig2', ed25519.publicKey]]), { verifyAll: true });
+				expect(verified).toBe(false);
+			});
+
+			test('two sign by two verification; verifyAll: false (succ)', async () => {
+				const request = getBasicRequest();
+				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+				const logger = jest.fn();
+				const verified = await verifyRFC9421Signature(parsed.value, new Map([['sig1', rsa4096.publicKey], ['sig2', ed25519.publicKey]]), { verifyAll: false }, logger);
+				expect(verified).toBe(true);
+				expect(logger).not.toHaveBeenCalled();
+			});
+
+			test('two sign by two verification; verifyAll: false (one succ)', async () => {
+				const request = getBasicRequest();
+				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				request.headers['Signature'] = `sig1=:${sig2ExpectedSign}:, sig2=:${sig2ExpectedSign}:`;
+				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+				const logger = jest.fn();
+				const verified = await verifyRFC9421Signature(parsed.value, new Map([['sig1', rsa4096.publicKey], ['sig2', ed25519.publicKey]]), { verifyAll: false }, logger);
+				expect(verified).toBe(true);
+				expect(logger).toHaveBeenCalledWith('verification simply failed, label: sig1');
+			});
+
+			test('two sign by two verification; verifyAll: false (fail)', async () => {
+				const request = getBasicRequest();
+				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				request.headers['Signature'] = `sig1=:${sig2ExpectedSign}:, sig2=:${sig1ExpectedSign}:`;
+				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+				const logger = jest.fn();
+				const verified = await verifyRFC9421Signature(parsed.value, new Map([['sig1', rsa4096.publicKey], ['sig2', ed25519.publicKey]]), { verifyAll: false }, logger);
+				expect(verified).toBe(false);
+				expect(logger).toHaveBeenCalledWith('verification simply failed, label: sig1');
+				expect(logger).toHaveBeenCalledWith('verification simply failed, label: sig2');
+			});
 		});
 	});
 });
