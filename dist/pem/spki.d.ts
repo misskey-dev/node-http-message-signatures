@@ -1,4 +1,4 @@
-import ASN1 from '@lapo/asn1js';
+import { ASN1 } from '@lapo/asn1js';
 import { ECNamedCurve, KeyAlgorithmName } from '../types.js';
 import { SignInfoDefaults } from '../utils.js';
 export declare class SpkiParseError extends Error {
@@ -109,7 +109,7 @@ export declare function importPublicKey(key: ASN1.StreamOrBinary, keyUsages?: Ke
  * @returns
  */
 export declare function parseAndImportPublicKey(source: ASN1.StreamOrBinary | CryptoKey, keyUsages?: KeyUsage[], providedAlgorithm?: string, errorLogger?: ((message: any) => any)): Promise<{
-    publicKey: CryptoKey;
+    publicKey: any;
     algorithm: {
         name: string;
         hash: import("../types.js").SignatureHashAlgorithmUpperSnake;

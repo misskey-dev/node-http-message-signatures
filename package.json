@@ -55,7 +55,7 @@
     "LICENSE"
   ],
   "dependencies": {
-    "@lapo/asn1js": "^1.2.4",
+    "@lapo/asn1js": "^2.0.4",
     "rfc4648": "^1.5.3",
     "structured-headers": "^1.0.1"
   },

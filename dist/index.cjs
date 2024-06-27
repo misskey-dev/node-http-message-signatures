@@ -701,19 +701,19 @@ __export(src_exports, {
 module.exports = __toCommonJS(src_exports);
 
 // src/pem/spki.ts
-var import_asn1js2 = __toESM(require("@lapo/asn1js"), 1);
-var import_hex = __toESM(require("@lapo/asn1js/hex.js"), 1);
-var import_base64 = __toESM(require("@lapo/asn1js/base64.js"), 1);
+var import_asn1js2 = require("@lapo/asn1js");
+var import_hex = require("@lapo/asn1js/hex.js");
+var import_base64 = require("@lapo/asn1js/base64.js");
 
 // src/pem/pkcs1.ts
-var import_asn1js = __toESM(require("@lapo/asn1js"), 1);
+var import_asn1js = require("@lapo/asn1js");
 var Pkcs1ParseError = class extends Error {
   constructor(message) {
     super(message);
   }
 };
 function parsePkcs1(input) {
-  const parsed = import_asn1js.default.decode(decodePem(input));
+  const parsed = import_asn1js.ASN1.decode(decodePem(input));
   if (!parsed.sub || parsed.sub.length !== 2)
     throw new Pkcs1ParseError("Invalid SPKI (invalid sub length)");
   const modulus = parsed.sub[0];
@@ -958,7 +958,7 @@ function asn1ToArrayBuffer(asn1, contentOnly = false) {
 }
 var reHex = /^\s*(?:[0-9A-Fa-f][0-9A-Fa-f]\s*)+$/;
 function decodePem(input) {
-  const der = typeof input === "string" ? reHex.test(input) ? import_hex.default.decode(input) : import_base64.default.unarmor(input) : input;
+  const der = typeof input === "string" ? reHex.test(input) ? import_hex.Hex.decode(input) : import_base64.Base64.unarmor(input) : input;
   return der;
 }
 function parseAlgorithmIdentifier(input) {
@@ -981,7 +981,7 @@ function parseAlgorithmIdentifier(input) {
   };
 }
 function parseSpki(input) {
-  const parsed = import_asn1js2.default.decode(decodePem(input));
+  const parsed = import_asn1js2.ASN1.decode(decodePem(input));
   if (!parsed.sub || parsed.sub.length === 0 || parsed.sub.length > 2)
     throw new SpkiParseError("Invalid SPKI (invalid sub)");
   return {
@@ -2281,14 +2281,14 @@ async function verifyDigestHeader(request, rawBody, opts = {
 }
 
 // src/pem/pkcs8.ts
-var import_asn1js3 = __toESM(require("@lapo/asn1js"), 1);
+var import_asn1js3 = require("@lapo/asn1js");
 var Pkcs8ParseError = class extends Error {
   constructor(message) {
     super(message);
   }
 };
 function parsePkcs8(input) {
-  const parsed = import_asn1js3.default.decode(decodePem(input));
+  const parsed = import_asn1js3.ASN1.decode(decodePem(input));
   if (!parsed.sub || parsed.sub.length < 3 || parsed.sub.length > 4)
     throw new Pkcs8ParseError("Invalid PKCS#8 (invalid sub length)");
   const version = parsed.sub[0];

@@ -1,4 +1,4 @@
-import ASN1 from '@lapo/asn1js';
+import { ASN1 } from '@lapo/asn1js';
 import { ParsedAlgorithmIdentifierBase } from './spki.js';
 import { SignInfoDefaults } from '../utils.js';
 export declare class Pkcs8ParseError extends Error {
