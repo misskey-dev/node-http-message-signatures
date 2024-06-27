@@ -62,10 +62,10 @@ Misskey added the `additionalPublicKeys` property to Actor to allow it to have m
     "publicKeyPem": "-----BEGIN PUBLIC KEY-----..."
   },
 	"additionalPublicKeys": [{
-    "id": "https://misskey.io/users/7rkrarq81i#ed25519-key",
+  	"id": "https://misskey.io/users/7rkrarq81i#ed25519-key",
 		"type": "Key",
-    "owner": "https://misskey.io/users/7rkrarq81i",
-    "publicKeyPem": "-----BEGIN PUBLIC KEY-----..."
+  	"owner": "https://misskey.io/users/7rkrarq81i",
+  	"publicKeyPem": "-----BEGIN PUBLIC KEY-----..."
 	}]
 }
 ```
