@@ -30,7 +30,7 @@ var require_types = __commonJS({
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
     exports.ByteSequence = void 0;
-    var ByteSequence4 = class {
+    var ByteSequence5 = class {
       constructor(base64Value) {
         this.base64Value = base64Value;
       }
@@ -38,7 +38,7 @@ var require_types = __commonJS({
         return this.base64Value;
       }
     };
-    exports.ByteSequence = ByteSequence4;
+    exports.ByteSequence = ByteSequence5;
   }
 });
 
@@ -118,7 +118,7 @@ var require_serializer = __commonJS({
       }).join(", ");
     }
     exports.serializeList = serializeList2;
-    function serializeDictionary2(input) {
+    function serializeDictionary3(input) {
       return Array.from(input.entries()).map(([key, value]) => {
         let out = serializeKey(key);
         if (value[0] === true) {
@@ -134,7 +134,7 @@ var require_serializer = __commonJS({
         return out;
       }).join(", ");
     }
-    exports.serializeDictionary = serializeDictionary2;
+    exports.serializeDictionary = serializeDictionary3;
     function serializeItem2(input) {
       return serializeBareItem2(input[0]) + serializeParameters(input[1]);
     }
@@ -712,6 +712,119 @@ async function verifyDraftSignature(parsed, key, errorLogger) {
 
 // src/rfc9421/verify.ts
 import { base64 as base642 } from "rfc4648";
+var algorithmsDefault = ["ed25519", "rsa-pss-sha512", "ecdsa-p384-sha384", "ecdsa-p256-sha256", "hmac-sha256", "rsa-v1_5-sha256"];
+async function verifyRFC9421Signature(parsedEntries, keys, options = {
+  verifyAll: false,
+  algorithms: algorithmsDefault
+}, errorLogger) {
+  if (parsedEntries.length === 0)
+    throw new Error("parsedEntries is empty");
+  if (options.verifyAll === true && !(keys instanceof Map) && parsedEntries.length > 1) {
+    throw new Error("If you want to verify multiple signatures, you need to use Map as the keys");
+  }
+  const algorithms = options?.algorithms?.map((x) => x.toLowerCase()) ?? algorithmsDefault;
+  if (algorithms.length === 0)
+    throw new Error("algorithms is empty");
+  const toVerify = [];
+  let importedKeys = [];
+  for (const [label, parsed] of parsedEntries) {
+    const alg = parsed.algorithm?.toLowerCase();
+    if (alg && !algorithms.includes(alg)) {
+      continue;
+    }
+    if (!(keys instanceof Map)) {
+      toVerify.push([label, parsed, keys, alg]);
+      continue;
+    }
+    const keyByName = keys instanceof Map ? keys.get(label) ?? (parsed.keyid && keys.get(parsed.keyid)) : keys;
+    if (keyByName) {
+      toVerify.push([label, parsed, keyByName, alg]);
+      continue;
+    }
+    if (parsed.keyid && options.verifyAll === true) {
+      if (errorLogger)
+        errorLogger(`key not found in provided keys (verifyAll: true), label: ${label} keyid: ${parsed.keyid}`);
+      return false;
+    }
+    if (!alg) {
+      if (errorLogger)
+        errorLogger(`key not found by label or keyid, but algorithm also not found. label: ${label}`);
+      return false;
+    }
+    if (importedKeys.length === 0) {
+      importedKeys = await Promise.all(
+        Array.from(keys.values()).map((key) => parseAndImportPublicKey(key, ["verify"]))
+      );
+    }
+    const keyByAlgorithm = importedKeys.find(({ algorithm }) => {
+      try {
+        parseSignInfo(alg, algorithm);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    });
+    if (keyByAlgorithm) {
+      toVerify.push([label, parsed, keyByAlgorithm.publicKey, alg]);
+      continue;
+    }
+    if (options.verifyAll === true) {
+      if (errorLogger)
+        errorLogger(`key not found, label: ${label}, keyid: ${parsed.keyid}`);
+      return false;
+    }
+  }
+  if (toVerify.length === 0) {
+    if (errorLogger)
+      errorLogger("No matched signature found");
+    return false;
+  }
+  if (options.verifyAll === false) {
+    toVerify.sort((a, b) => {
+      const algA = a[3]?.toLowerCase() ?? "";
+      const algB = b[3]?.toLowerCase() ?? "";
+      console.log(algA, algB);
+      return algorithms.indexOf(algA) - algorithms.indexOf(algB);
+    });
+  }
+  console.log("");
+  for (const [label, parsed, key] of toVerify) {
+    try {
+      const { publicKey, algorithm } = await parseAndImportPublicKey(key, ["verify"], parsed.algorithm);
+      console.log(algorithm);
+      const verify = await (await getWebcrypto()).subtle.verify(
+        algorithm,
+        publicKey,
+        base642.parse(parsed.signature),
+        textEncoder.encode(parsed.base)
+      );
+      if (options.verifyAll === true) {
+        if (verify === true)
+          continue;
+        if (verify === false) {
+          if (errorLogger)
+            errorLogger(`verification simply failed, label: ${label}`);
+          return false;
+        }
+      } else {
+        if (verify === true)
+          return true;
+        if (verify === false) {
+          if (errorLogger)
+            errorLogger(`verification simply failed, label: ${label}`);
+          continue;
+        }
+      }
+      if (typeof verify !== "boolean")
+        throw new Error(verify);
+    } catch (e) {
+      if (errorLogger)
+        errorLogger(`Something happend in ${label}: ${e}`);
+      return false;
+    }
+  }
+  return options.verifyAll === true ? true : false;
+}
 
 // src/shared/verify.ts
 var KeyHashValidationError = class extends Error {
@@ -741,7 +854,7 @@ function parseSignInfo(algorithm, real, errorLogger) {
     }
     const [parsedName, hash] = algorithm.split("-");
     if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
-      throw new KeyHashValidationError(`unsupported hash: ${hash}`);
+      throw new KeyHashValidationError(`unsupported hash(RSASSA-PKCS1-v1_5): ${hash} / ${algorithm}`);
     }
     if (parsedName === "rsa") {
       return { name: "RSASSA-PKCS1-v1_5", hash: keyHashAlgosForDraftDecoding[hash] };
@@ -770,7 +883,7 @@ function parseSignInfo(algorithm, real, errorLogger) {
     }
     const [dsaOrDH, hash] = algorithm.split("-");
     if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
-      throw new KeyHashValidationError(`unsupported hash: ${hash}`);
+      throw new KeyHashValidationError(`unsupported hash(EC): ${hash}`);
     }
     if (dsaOrDH === "ecdsa") {
       return { name: "ECDSA", hash: keyHashAlgosForDraftDecoding[hash], namedCurve };
@@ -1115,7 +1228,7 @@ function splitPer64Chars(str) {
 }
 function getMap(obj) {
   if (obj instanceof Map)
-    return obj;
+    return new Map(obj);
   if (Array.isArray(obj))
     return new Map(obj);
   return new Map(Object.entries(obj));
@@ -1448,6 +1561,7 @@ function convertSignatureParamsDictionary(input) {
 
 // src/rfc9421/parse.ts
 var sh2 = __toESM(require_dist(), 1);
+var RFC9421SignatureParams = ["created", "expires", "nonce", "alg", "keyid", "tag"];
 function validateRFC9421SignatureInputParameters(input, options) {
   const labels = input.entries();
   for (const [, value] of labels) {
@@ -2266,6 +2380,102 @@ async function signAsDraftToRequest(request, key, includeHeaders, opts = default
     signatureHeader
   };
 }
+
+// src/rfc9421/sign.ts
+var sh4 = __toESM(require_dist(), 1);
+function getRFC9421AlgoString(keyAlgorithm, hashAlgorithm) {
+  if (typeof keyAlgorithm === "string") {
+    keyAlgorithm = { name: keyAlgorithm };
+  }
+  if (keyAlgorithm.name === "RSASSA-PKCS1-v1_5") {
+    if (hashAlgorithm === "SHA-256")
+      return "rsa-v1_5-sha256";
+    if (hashAlgorithm === "SHA-512")
+      return "rsa-v1_5-sha512";
+    throw new Error(`unsupported hash(RSASSA-PKCS1-v1_5): ${hashAlgorithm}`);
+  }
+  if (keyAlgorithm.name === "ECDSA") {
+    if (keyAlgorithm.namedCurve === "P-256" && hashAlgorithm === "SHA-256") {
+      return `ecdsa-p256-sha256`;
+    }
+    if (keyAlgorithm.namedCurve === "P-384" && hashAlgorithm === "SHA-384") {
+      return `ecdsa-p384-sha384`;
+    }
+    throw new Error(`unsupported curve(${keyAlgorithm.namedCurve}) or hash(${hashAlgorithm})`);
+  }
+  if (keyAlgorithm.name === "Ed25519") {
+    return `ed25519`;
+  }
+  throw new Error(`unsupported keyAlgorithm(${JSON.stringify(keyAlgorithm)}) or hash(${hashAlgorithm})`);
+}
+async function processSingleRFC9421SignSource(source) {
+  const defaults = source.defaults ?? defaultSignInfoDefaults;
+  const privateKey = "privateKey" in source.key ? source.key.privateKey : await importPrivateKey(source.key.privateKeyPem, ["sign"], defaults);
+  const alg = getRFC9421AlgoString(privateKey.algorithm, defaults.hash);
+  const created = source.created ?? Math.round(Date.now() / 1e3);
+  const expires = source.expiresAfter ? created + source.expiresAfter : void 0;
+  return {
+    key: privateKey,
+    params: [
+      source.identifiers,
+      {
+        keyid: source.key.keyId,
+        alg,
+        created,
+        expires,
+        nonce: source.nonce,
+        tag: source.tag
+      }
+    ]
+  };
+}
+async function signAsRFC9421ToRequestOrResponse(request, sources, signatureBaseOptions = {
+  scheme: "https",
+  additionalSfvTypeDictionary: {}
+}) {
+  const sourcesMap = getMap(sources);
+  const keys = /* @__PURE__ */ new Map();
+  const inputDictionary = /* @__PURE__ */ new Map();
+  for (const [label, source] of sourcesMap) {
+    const { key, params } = await processSingleRFC9421SignSource(source);
+    keys.set(label, key);
+    inputDictionary.set(label, params);
+  }
+  const inputHeader = convertSignatureParamsDictionary(inputDictionary);
+  setHeaderToRequestOrResponse(request, "Signature-Input", inputHeader);
+  const factory = new RFC9421SignatureBaseFactory(
+    request,
+    signatureBaseOptions.scheme,
+    signatureBaseOptions.additionalSfvTypeDictionary,
+    signatureBaseOptions.request
+  );
+  const signaturesEntries = (factory.isRequest() ? factory.requestSignatureInput : factory.responseSignatureInput)?.keys();
+  if (!signaturesEntries)
+    throw new Error(`signaturesEntries is undefined`);
+  const signatureDictionary = /* @__PURE__ */ new Map();
+  const signatureBases = /* @__PURE__ */ new Map();
+  for (const label of signaturesEntries) {
+    const base = factory.generate(label);
+    const key = keys.get(label);
+    if (!key)
+      throw new Error(`key not found: ${label}`);
+    signatureBases.set(label, base);
+    signatureDictionary.set(label, [
+      new sh4.ByteSequence(
+        await genSignature(key, base, sourcesMap.get(label)?.defaults ?? defaultSignInfoDefaults)
+      ),
+      /* @__PURE__ */ new Map()
+    ]);
+  }
+  const signatureHeader = sh4.serializeDictionary(signatureDictionary);
+  setHeaderToRequestOrResponse(request, "Signature", signatureHeader);
+  return {
+    inputHeader,
+    signatureHeader,
+    signatureDictionary,
+    signatureBases
+  };
+}
 export {
   ClockSkewInvalidError,
   DraftSignatureHeaderKeys,
@@ -2275,6 +2485,7 @@ export {
   Pkcs1ParseError,
   Pkcs8ParseError,
   RFC9421SignatureBaseFactory,
+  RFC9421SignatureParams,
   RFC9530GenerateDigestHeaderError,
   RFC9530HashAlgorithmRegistry,
   RequestHasMultipleDateHeadersError,
@@ -2322,6 +2533,7 @@ export {
   getMapWithoutUndefined,
   getNistCurveFromOid,
   getPublicKeyAlgorithmNameFromOid,
+  getRFC9421AlgoString,
   getValueByLc,
   getWebcrypto,
   importPrivateKey,
@@ -2342,22 +2554,28 @@ export {
   parsePkcs1,
   parsePkcs8,
   parsePublicKey,
+  parseRFC9421RequestOrResponse,
   parseRequestSignature,
+  parseSingleRFC9421Signature,
   parseSpki,
+  processSingleRFC9421SignSource,
   removeObsoleteLineFolding,
   requestTargetDerivedComponents,
   responseTargetDerivedComponents,
   rsaASN1AlgorithmIdentifier,
   setHeaderToRequestOrResponse,
   signAsDraftToRequest,
+  signAsRFC9421ToRequestOrResponse,
   signatureHeaderIsDraft,
   splitPer64Chars,
   supportedHashAlgorithmsWithRFC9530AndWebCrypto,
   toStringOrToLc,
   validateAndProcessParsedDraftSignatureHeader,
+  validateRFC9421SignatureInputParameters,
   validateRequestAndGetSignatureHeader,
   verifyDigestHeader,
   verifyDraftSignature,
   verifyRFC3230DigestHeader,
+  verifyRFC9421Signature,
   verifyRFC9530DigestHeader
 };

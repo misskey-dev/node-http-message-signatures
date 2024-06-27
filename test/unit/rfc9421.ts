@@ -1,7 +1,6 @@
 import { HeadersLike, RequestLike } from "@/types";
 import { RFC9421SignSource, processSingleRFC9421SignSource, signAsRFC9421ToRequestOrResponse } from "@/rfc9421/sign";
-import { ed25519, ed448, rsa4096 } from "test/keys";
-import { getMap } from "@/utils";
+import { ed25519, rsa4096 } from "test/keys";
 import { parseRFC9421RequestOrResponse } from "@/rfc9421/parse";
 import { verifyParsedSignature } from "@/shared/verify";
 import { verifyRFC9421Signature } from "@/rfc9421/verify";
@@ -126,13 +125,13 @@ describe('RFC9421', () => {
 	describe(signAsRFC9421ToRequestOrResponse, () => {
 		test('basic', async () => {
 			const request = getBasicRequest();
-			await signAsRFC9421ToRequestOrResponse(request, getMap(basicSources));
+			await signAsRFC9421ToRequestOrResponse(request, basicSources);
 			expect(request.headers['Signature-Input']).toBe(`sig1=${sig1ExpectedParams}`);
 			expect(request.headers['Signature']).toBe(`sig1=:${sig1ExpectedSign}:`);
 		});
 		test('multiple', async () => {
 			const request = getBasicRequest();
-			await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+			await signAsRFC9421ToRequestOrResponse(request, multipleSources);
 			expect(request.headers['Signature-Input']).toBe(`sig1=${sig1ExpectedParams}, sig2=${sig2ExpectedParams}`);
 			expect(request.headers['Signature']).toBe(`sig1=:${sig1ExpectedSign}:, sig2=:${sig2ExpectedSign}:`);
 		});
@@ -143,7 +142,7 @@ describe('RFC9421', () => {
 		let result: Awaited<ReturnType<typeof signAsRFC9421ToRequestOrResponse>>;
 		beforeAll(async () => {
 			request = getBasicRequest();
-			result = await signAsRFC9421ToRequestOrResponse(request, getMap(basicSources));
+			result = await signAsRFC9421ToRequestOrResponse(request, basicSources);
 		});
 		test('parse (invalid skew fail)', () => {
 			expect(() => parseRFC9421RequestOrResponse(request)).toThrow();
@@ -199,7 +198,7 @@ describe('RFC9421', () => {
 		describe('parse and verify', () => {
 			test('two sign by one verification (integrated succ)', async () => {
 				const request = getBasicRequest();
-				const result = await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				const result = await signAsRFC9421ToRequestOrResponse(request, multipleSources);
 				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 				expect(parsed.value).toStrictEqual([
 					[
@@ -237,7 +236,7 @@ describe('RFC9421', () => {
 
 			test('two sign by one verification (integrated fail)', async () => {
 				const request = getBasicRequest();
-				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				await signAsRFC9421ToRequestOrResponse(request, multipleSources);
 				request.headers['Signature'] = `sig1=:${sig2ExpectedSign}:, sig2=:${sig1ExpectedSign}:`;
 				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 				const logger = jest.fn();
@@ -248,7 +247,7 @@ describe('RFC9421', () => {
 
 			test('two sign by two verification; verifyAll: true (succ)', async () => {
 				const request = getBasicRequest();
-				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				await signAsRFC9421ToRequestOrResponse(request, multipleSources);
 				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
 				const verified = await verifyRFC9421Signature(parsed.value, new Map([['sig1', rsa4096.publicKey], ['sig2', ed25519.publicKey]]), { verifyAll: true });
 				expect(verified).toBe(true);
@@ -256,7 +255,7 @@ describe('RFC9421', () => {
 
 			test('two sign by two verification; verifyAll: true (one fail)', async () => {
 				const request = getBasicRequest();
-				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				await signAsRFC9421ToRequestOrResponse(request, multipleSources);
 				request.headers['Signature'] = `sig1=:${sig2ExpectedSign}:, sig2=:${sig2ExpectedSign}:`;
 				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
 				const verified = await verifyRFC9421Signature(parsed.value, new Map([['sig1', rsa4096.publicKey], ['sig2', ed25519.publicKey]]), { verifyAll: true });
@@ -265,7 +264,7 @@ describe('RFC9421', () => {
 
 			test('two sign by two verification; verifyAll: false (succ)', async () => {
 				const request = getBasicRequest();
-				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				await signAsRFC9421ToRequestOrResponse(request, multipleSources);
 				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
 				const logger = jest.fn();
 				const verified = await verifyRFC9421Signature(parsed.value, new Map([['sig1', rsa4096.publicKey], ['sig2', ed25519.publicKey]]), { verifyAll: false }, logger);
@@ -275,18 +274,18 @@ describe('RFC9421', () => {
 
 			test('two sign by two verification; verifyAll: false (one succ)', async () => {
 				const request = getBasicRequest();
-				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
-				request.headers['Signature'] = `sig1=:${sig2ExpectedSign}:, sig2=:${sig2ExpectedSign}:`;
+				await signAsRFC9421ToRequestOrResponse(request, multipleSources);
+				request.headers['Signature'] = `sig1=:${sig1ExpectedSign}:, sig2=:${sig1ExpectedSign}:`;
 				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
 				const logger = jest.fn();
 				const verified = await verifyRFC9421Signature(parsed.value, new Map([['sig1', rsa4096.publicKey], ['sig2', ed25519.publicKey]]), { verifyAll: false }, logger);
 				expect(verified).toBe(true);
-				expect(logger).toHaveBeenCalledWith('verification simply failed, label: sig1');
+				expect(logger).toHaveBeenCalledWith('verification simply failed, label: sig2');
 			});
 
 			test('two sign by two verification; verifyAll: false (fail)', async () => {
 				const request = getBasicRequest();
-				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
+				await signAsRFC9421ToRequestOrResponse(request, multipleSources);
 				request.headers['Signature'] = `sig1=:${sig2ExpectedSign}:, sig2=:${sig1ExpectedSign}:`;
 				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
 				const logger = jest.fn();

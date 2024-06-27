@@ -1,36 +1,69 @@
-import type { IncomingRequest, MapLikeObj, OutgoingResponse, SFVSignatureInputDictionary, SFVSignatureInputDictionaryForInput, HeadersLike } from "../types.js";
-import { SFVHeaderTypeDictionary } from "./sfv.js";
-export declare const requestTargetDerivedComponents: string[];
-export declare const responseTargetDerivedComponents: string[];
-export type Kot<T> = keyof T extends 'req' ? T : null;
-/**
- * Class for creating signature base,
- * construct with a request or a response
- */
-export declare class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingResponse> {
-    sfvTypeDictionary: SFVHeaderTypeDictionary;
-    response: OutgoingResponse | null;
-    responseHeaders: HeadersLike | null;
-    isRequest(): boolean;
-    isResponse(): boolean;
-    request: IncomingRequest;
-    requestHeaders: HeadersLike;
-    scheme: string;
-    targetUri: string;
-    url: URL;
-    requestSignatureInput: SFVSignatureInputDictionary | undefined;
-    responseSignatureInput: SFVSignatureInputDictionary | undefined;
+import type { IncomingRequest, MapLikeObj, OutgoingResponse, PrivateKey, SFVSignatureParamsForInput, SignatureHashAlgorithmUpperSnake } from '../types.js';
+import { type SignInfoDefaults } from '../utils.js';
+import { SFVHeaderTypeDictionary } from './sfv.js';
+import * as sh from 'structured-headers';
+export type RFC9421SignSource = {
+    key: PrivateKey;
+    defaults?: SignInfoDefaults;
     /**
-     *
-     * @param source request or response, must include 'signature-input' header
-     *	If source is node response, it must include 'req' property.
-     * @param scheme optional, used when source request url starts with '/'
-     * @param additionalSfvTypeDictionary additional SFV type dictionary
-     * @param request optional, used when source is a browser Response
+     * @examples
+     *	```
+     *	[
+     *		'@method',
+     *		[
+     *			'@query-param',
+     *			{ name: 'foo' },
+     *		],
+     *	]
+     *	```
      */
-    constructor(source: T, scheme?: string, additionalSfvTypeDictionary?: SFVHeaderTypeDictionary, request?: Request);
-    get(name: '@query-param', paramsLike?: MapLikeObj<'name', string>): string;
-    get(name: string, paramsLike?: MapLikeObj<'req' | 'key', string> | MapLikeObj<'sf' | 'bs' | 'tr', boolean>): string;
-    generate(label: string): string;
-}
-export declare function convertSignatureParamsDictionary(input: SFVSignatureInputDictionaryForInput): string;
+    identifiers: SFVSignatureParamsForInput[0];
+    /**
+     * seconds, unix time
+     * @default `Math.round(Date.now() / 1000)`
+     */
+    created?: number;
+    /**
+     * seconds from `created`
+     * @default (not set, no expiration)
+     */
+    expiresAfter?: number;
+    /**
+     * TODO
+     */
+    nonce?: string;
+    /**
+     * tag
+     */
+    tag?: string;
+};
+/**
+ * Get the algorithm string for RFC 9421 encoding
+ * https://datatracker.ietf.org/doc/html/rfc9421#name-http-signature-algorithms-r
+ * @param keyAlgorithm Comes from `privateKey.algorithm.name` e.g. 'RSASSA-PKCS1-v1_5'
+ * @param hashAlgorithm e.g. 'SHA-256'
+ * @returns string e.g. 'rsa-v1_5-sha256'
+ */
+export declare function getRFC9421AlgoString(keyAlgorithm: CryptoKey['algorithm'], hashAlgorithm: SignatureHashAlgorithmUpperSnake): "ed25519" | "rsa-v1_5-sha256" | "ecdsa-p256-sha256" | "ecdsa-p384-sha384" | "rsa-v1_5-sha512";
+export declare function processSingleRFC9421SignSource(source: RFC9421SignSource): Promise<{
+    key: CryptoKey;
+    params: SFVSignatureParamsForInput;
+}>;
+/**
+ *
+ * @param request Request object to sign
+ * @param sources MapLikeObj<label, RFC9421SiginingOptions>
+ * @param signatureBaseOptions Options for RFC9421SignatureBaseFactory
+ * @param opts
+ * @returns result object
+ */
+export declare function signAsRFC9421ToRequestOrResponse(request: IncomingRequest | OutgoingResponse, sources: MapLikeObj<string, RFC9421SignSource>, signatureBaseOptions?: {
+    scheme?: string;
+    additionalSfvTypeDictionary?: SFVHeaderTypeDictionary;
+    request?: Request;
+}): Promise<{
+    inputHeader: string;
+    signatureHeader: string;
+    signatureDictionary: Map<string, [sh.ByteSequence, Map<any, any>]>;
+    signatureBases: Map<string, string>;
+}>;

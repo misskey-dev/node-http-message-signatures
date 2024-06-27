@@ -253,7 +253,7 @@ export function splitPer64Chars(str: string): string[] {
 export function getMap<T extends MapLikeObj<K, V>, K, V>(
 	obj: T,
 ): Map<K, V> {
-	if (obj instanceof Map) return obj;
+	if (obj instanceof Map) return new Map(obj);
 	if (Array.isArray(obj)) return new Map(obj);
 	return new Map(Object.entries(obj) as [K, V][]);
 }

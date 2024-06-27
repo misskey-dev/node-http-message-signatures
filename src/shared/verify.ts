@@ -24,6 +24,10 @@ function buildErrorMessage(providedAlgorithm: string, real: string) {
  * @param publicKey 実際の公開鍵
  */
 export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorithmIdentifier | CryptoKey['algorithm'], errorLogger?: ((message: any) => any)): SignInfo {
+	if (typeof real !== 'object' && typeof real !== 'string') {
+		console.error('invalid real', algorithm, real);
+		throw new KeyHashValidationError('invalid real');
+	}
 	algorithm = algorithm?.toLowerCase();
 	const realKeyType = typeof real === 'string' ? real
 		: 'algorithm' in real ?
@@ -53,7 +57,7 @@ export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorit
 		//#region Draft
 		const [parsedName, hash] = algorithm.split('-') as [string, SignatureHashAlgorithmUpperSnake];
 		if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
-			throw new KeyHashValidationError(`unsupported hash: ${hash}`);
+			throw new KeyHashValidationError(`unsupported hash(RSASSA-PKCS1-v1_5): ${hash} / ${algorithm}`);
 		}
 		if (parsedName === 'rsa') {
 			return { name: 'RSASSA-PKCS1-v1_5', hash: keyHashAlgosForDraftDecoding[hash] };
@@ -89,7 +93,7 @@ export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorit
 		//#region Draft
 		const [dsaOrDH, hash] = algorithm.split('-') as [string, SignatureHashAlgorithmUpperSnake];
 		if (!hash || !(hash in keyHashAlgosForDraftDecoding)) {
-			throw new KeyHashValidationError(`unsupported hash: ${hash}`);
+			throw new KeyHashValidationError(`unsupported hash(EC): ${hash}`);
 		}
 		if (dsaOrDH === 'ecdsa') {
 			return { name: 'ECDSA', hash: keyHashAlgosForDraftDecoding[hash], namedCurve };

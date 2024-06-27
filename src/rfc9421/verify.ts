@@ -5,11 +5,6 @@ import { getWebcrypto } from "../utils.js";
 import { base64 } from "rfc4648";
 import { textEncoder } from "../const.js";
 
-/**
- * @deprecated Use `parseSignInfo`
- */
-export const genSignInfoDraft = parseSignInfo;
-
 const algorithmsDefault = ['ed25519', 'rsa-pss-sha512', 'ecdsa-p384-sha384', 'ecdsa-p256-sha256', 'hmac-sha256', 'rsa-v1_5-sha256'] satisfies RFC9421SignatureAlgorithm[];
 
 /**
@@ -51,7 +46,7 @@ export async function verifyRFC9421Signature(
 	const algorithms = options?.algorithms?.map(x => x.toLowerCase()) ?? algorithmsDefault;
 	if (algorithms.length === 0) throw new Error('algorithms is empty');
 
-	const toVerify = [] as [string, ParsedRFC9421SignatureValueWithBase, string | CryptoKey][];
+	const toVerify = [] as [string, ParsedRFC9421SignatureValueWithBase, string | CryptoKey, string | undefined][];
 	let importedKeys: Awaited<ReturnType<typeof parseAndImportPublicKey>>[] = [];
 
 	for (const [label, parsed] of parsedEntries) {
@@ -61,17 +56,19 @@ export async function verifyRFC9421Signature(
 		}
 
 		if (!(keys instanceof Map)) {
-			toVerify.push([label, parsed, keys]);
+			toVerify.push([label, parsed, keys, alg]);
 			continue;
 		}
 
+		//#region Find key by label or keyid
 		const keyByName = keys instanceof Map ?
 			(keys.get(label) ?? (parsed.keyid && keys.get(parsed.keyid)))
 			: keys;
 		if (keyByName) {
-			toVerify.push([label, parsed, keyByName]);
+			toVerify.push([label, parsed, keyByName, alg]);
 			continue;
 		}
+		//#endregion
 
 		if (parsed.keyid && options.verifyAll === true) {
 			// verifyAllの場合、keyidで見つからないときはエラーにする
@@ -80,6 +77,7 @@ export async function verifyRFC9421Signature(
 			return false;
 		}
 
+		//#region Find key by algorithm
 		if (!alg) {
 			if (errorLogger) errorLogger(`key not found by label or keyid, but algorithm also not found. label: ${label}`);
 			return false;
@@ -88,7 +86,7 @@ export async function verifyRFC9421Signature(
 		if (importedKeys.length === 0) {
 			importedKeys = await Promise.all(
 				Array.from(keys.values())
-					.map(key => parseAndImportPublicKey(key, ['verify'], parsed.algorithm))
+					.map(key => parseAndImportPublicKey(key, ['verify']))
 			);
 		}
 
@@ -102,7 +100,7 @@ export async function verifyRFC9421Signature(
 		});
 
 		if (keyByAlgorithm) {
-			toVerify.push([label, parsed, keyByAlgorithm.publicKey]);
+			toVerify.push([label, parsed, keyByAlgorithm.publicKey, alg]);
 			continue;
 		}
 
@@ -110,6 +108,7 @@ export async function verifyRFC9421Signature(
 			if (errorLogger) errorLogger(`key not found, label: ${label}, keyid: ${parsed.keyid}`);
 			return false;
 		}
+		//#endregion
 	}
 
 	if (toVerify.length === 0) {
@@ -117,9 +116,18 @@ export async function verifyRFC9421Signature(
 		return false;
 	}
 
+	if (options.verifyAll === false) {
+		// Sort by algorithm
+		toVerify.sort((a, b) => {
+			const algA = a[3]?.toLowerCase() ?? '';
+			const algB = b[3]?.toLowerCase() ?? '';
+			return algorithms.indexOf(algA as RFC9421SignatureAlgorithm) - algorithms.indexOf(algB as RFC9421SignatureAlgorithm);
+		});
+	}
+
 	for (const [label, parsed, key] of toVerify) {
 		try {
-			const { publicKey, algorithm } = await parseAndImportPublicKey(key, ['verify'], parsed.algorithm);
+			const { publicKey, algorithm } = await parseAndImportPublicKey(key, ['verify']);
 
 			const verify = await (await getWebcrypto()).subtle.verify(
 				algorithm, publicKey, base64.parse(parsed.signature), textEncoder.encode(parsed.base)

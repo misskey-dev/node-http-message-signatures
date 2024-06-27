@@ -1,42 +1,10 @@
-import type { IncomingRequest, OutgoingResponse, PrivateKey, SFVSignatureParamsForInput, SignatureHashAlgorithmUpperSnake } from '../types.js';
-import { type SignInfoDefaults, defaultSignInfoDefaults, setHeaderToRequestOrResponse } from '../utils.js';
+import type { IncomingRequest, MapLikeObj, OutgoingResponse, PrivateKey, SFVSignatureParamsForInput, SignatureHashAlgorithmUpperSnake } from '../types.js';
+import { type SignInfoDefaults, defaultSignInfoDefaults, setHeaderToRequestOrResponse, getMap } from '../utils.js';
 import { importPrivateKey } from '../pem/pkcs8.js';
 import { RFC9421SignatureBaseFactory, convertSignatureParamsDictionary } from './base.js';
 import { SFVHeaderTypeDictionary } from './sfv.js';
 import * as sh from 'structured-headers';
 import { genSignature } from '../shared/sign.js';
-
-/**
- * Get the algorithm string for RFC 9421 encoding
- * https://datatracker.ietf.org/doc/html/rfc9421#name-http-signature-algorithms-r
- * @param keyAlgorithm Comes from `privateKey.algorithm.name` e.g. 'RSASSA-PKCS1-v1_5'
- * @param hashAlgorithm e.g. 'SHA-256'
- * @returns string e.g. 'rsa-v1_5-sha256'
- */
-export function getRFC9421AlgoString(keyAlgorithm: CryptoKey['algorithm'], hashAlgorithm: SignatureHashAlgorithmUpperSnake) {
-	if (typeof keyAlgorithm === 'string') {
-		keyAlgorithm = { name: keyAlgorithm };
-	}
-
-	if (keyAlgorithm.name === 'RSASSA-PKCS1-v1_5') {
-		if (hashAlgorithm === 'SHA-256') return 'rsa-v1_5-sha256';
-		if (hashAlgorithm === 'SHA-512') return 'rsa-v1_5-sha512';
-		throw new Error(`unsupported hash: ${hashAlgorithm}`);
-	}
-	if (keyAlgorithm.name === 'ECDSA') {
-		if ((keyAlgorithm as EcKeyAlgorithm).namedCurve === 'P-256' && hashAlgorithm === 'SHA-256') {
-			return `ecdsa-p256-sha256`;
-		}
-		if ((keyAlgorithm as EcKeyAlgorithm).namedCurve === 'P-384' && hashAlgorithm === 'SHA-384') {
-			return `ecdsa-p384-sha384`;
-		}
-		throw new Error(`unsupported curve(${(keyAlgorithm as any).namedCurve}) or hash(${hashAlgorithm})`);
-	}
-	if (keyAlgorithm.name === 'Ed25519') {
-		return `ed25519`; // Joyent/@peertube/http-signatureではこう指定する必要がある
-	}
-	throw new Error(`unsupported keyAlgorithm(${JSON.stringify(keyAlgorithm)}) or hash(${hashAlgorithm})`);
-}
 
 export type RFC9421SignSource = {
 	key: PrivateKey;
@@ -74,6 +42,38 @@ export type RFC9421SignSource = {
 	tag?: string;
 };
 
+/**
+ * Get the algorithm string for RFC 9421 encoding
+ * https://datatracker.ietf.org/doc/html/rfc9421#name-http-signature-algorithms-r
+ * @param keyAlgorithm Comes from `privateKey.algorithm.name` e.g. 'RSASSA-PKCS1-v1_5'
+ * @param hashAlgorithm e.g. 'SHA-256'
+ * @returns string e.g. 'rsa-v1_5-sha256'
+ */
+export function getRFC9421AlgoString(keyAlgorithm: CryptoKey['algorithm'], hashAlgorithm: SignatureHashAlgorithmUpperSnake) {
+	if (typeof keyAlgorithm === 'string') {
+		keyAlgorithm = { name: keyAlgorithm };
+	}
+
+	if (keyAlgorithm.name === 'RSASSA-PKCS1-v1_5') {
+		if (hashAlgorithm === 'SHA-256') return 'rsa-v1_5-sha256';
+		if (hashAlgorithm === 'SHA-512') return 'rsa-v1_5-sha512';
+		throw new Error(`unsupported hash(RSASSA-PKCS1-v1_5): ${hashAlgorithm}`);
+	}
+	if (keyAlgorithm.name === 'ECDSA') {
+		if ((keyAlgorithm as EcKeyAlgorithm).namedCurve === 'P-256' && hashAlgorithm === 'SHA-256') {
+			return `ecdsa-p256-sha256`;
+		}
+		if ((keyAlgorithm as EcKeyAlgorithm).namedCurve === 'P-384' && hashAlgorithm === 'SHA-384') {
+			return `ecdsa-p384-sha384`;
+		}
+		throw new Error(`unsupported curve(${(keyAlgorithm as any).namedCurve}) or hash(${hashAlgorithm})`);
+	}
+	if (keyAlgorithm.name === 'Ed25519') {
+		return `ed25519`; // Joyent/@peertube/http-signatureではこう指定する必要がある
+	}
+	throw new Error(`unsupported keyAlgorithm(${JSON.stringify(keyAlgorithm)}) or hash(${hashAlgorithm})`);
+}
+
 export async function processSingleRFC9421SignSource(source: RFC9421SignSource) {
 	const defaults = source.defaults ?? defaultSignInfoDefaults;
 	const privateKey = 'privateKey' in source.key ?
@@ -102,14 +102,14 @@ export async function processSingleRFC9421SignSource(source: RFC9421SignSource) 
 /**
  *
  * @param request Request object to sign
- * @param sources Map<label, RFC9421SiginingOptions>
+ * @param sources MapLikeObj<label, RFC9421SiginingOptions>
  * @param signatureBaseOptions Options for RFC9421SignatureBaseFactory
  * @param opts
  * @returns result object
  */
 export async function signAsRFC9421ToRequestOrResponse(
 	request: IncomingRequest | OutgoingResponse,
-	sources: Map<string, RFC9421SignSource>,
+	sources: MapLikeObj<string, RFC9421SignSource>,
 	signatureBaseOptions: {
 		// e.g. https
 		scheme?: string;
@@ -120,9 +120,10 @@ export async function signAsRFC9421ToRequestOrResponse(
 			additionalSfvTypeDictionary: {}
 		},
 ) {
-	const keys = new Map<string, CryptoKey>;
+	const sourcesMap = getMap(sources) as Map<string, RFC9421SignSource>;
+	const keys = new Map<string, CryptoKey>();
 	const inputDictionary = new Map<string, SFVSignatureParamsForInput>();
-	for (const [label, source] of sources) {
+	for (const [label, source] of sourcesMap) {
 		const { key, params } = await processSingleRFC9421SignSource(source);
 		keys.set(label, key);
 		inputDictionary.set(label, params);
@@ -150,7 +151,7 @@ export async function signAsRFC9421ToRequestOrResponse(
 		signatureBases.set(label, base);
 		signatureDictionary.set(label, [
 			new sh.ByteSequence(
-				await genSignature(key, base, sources.get(label)?.defaults ?? defaultSignInfoDefaults)
+				await genSignature(key, base, sourcesMap.get(label)?.defaults ?? defaultSignInfoDefaults)
 			),
 			new Map(),
 		]);

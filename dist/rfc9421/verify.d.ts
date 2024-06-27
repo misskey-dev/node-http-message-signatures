@@ -1,9 +1,4 @@
 import { ParsedRFC9421Signature, RFC9421SignatureAlgorithm } from "../types.js";
-import { parseSignInfo } from "../shared/verify.js";
-/**
- * @deprecated Use `parseSignInfo`
- */
-export declare const genSignInfoDraft: typeof parseSignInfo;
 /**
  * Verify a draft signature
  * All provided algorithms are verified. If you want to limit the algorithms, use options when parsing the signature.
