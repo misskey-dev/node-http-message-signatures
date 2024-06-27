@@ -6,6 +6,7 @@ import { parseRFC9421RequestOrResponse } from "@/rfc9421/parse";
 import { verifyParsedSignature } from "@/shared/verify";
 import { verifyRFC9421Signature } from "@/rfc9421/verify";
 import { jest } from "@jest/globals";
+import { parseRequestSignature } from "@/shared/parse";
 
 //#region data
 const theDate = new Date('2024-02-28T17:44:06.000Z');
@@ -148,7 +149,7 @@ describe('RFC9421', () => {
 			expect(() => parseRFC9421RequestOrResponse(request)).toThrow();
 		});
 		test('parse and verify', async () => {
-			const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+			const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 			expect(parsed.value).toStrictEqual([
 				[
 					'sig1',
@@ -172,7 +173,7 @@ describe('RFC9421', () => {
 		test('parse (invalid signature verify false)', async () => {
 			const invalidSignature = `${Array.from({ length: 86 }, () => 'A').join('')}==`;
 			request.headers['Signature'] = `sig1=:${invalidSignature}:`;
-			const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+			const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 			expect(parsed.value).toStrictEqual([
 				[
 					'sig1',
@@ -194,47 +195,12 @@ describe('RFC9421', () => {
 		});
 	});
 
-	describe('integrated multiple', () => {
+	describe('multiple', () => {
 		describe('parse and verify', () => {
-			test('one sign by one verification (succ)', async () => {
-				const request = getBasicRequest();
-				const result = await signAsRFC9421ToRequestOrResponse(request, getMap(basicSources));
-				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
-				expect(parsed.value).toStrictEqual([
-					[
-						'sig1',
-						{
-							algorithm: 'rsa-v1_5-sha256',
-							base: result.signatureBases.get('sig1'),
-							created: 1618884475,
-							expires: undefined,
-							keyid: 'x',
-							nonce: undefined,
-							params: sig1ExpectedParams,
-							signature: sig1ExpectedSign,
-							tag: undefined,
-						},
-					],
-				]);
-				const verified = await verifyParsedSignature(parsed, rsa4096.publicKey);
-				expect(verified).toBe(true);
-			});
-
-			test('one sign by one verification (fail)', async () => {
-				const request = getBasicRequest();
-				await signAsRFC9421ToRequestOrResponse(request, getMap(basicSources));
-				request.headers['Signature'] = `sig1=:${sig2ExpectedSign}:`;
-				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
-				const logger = jest.fn();
-				const verified = await verifyParsedSignature(parsed, rsa4096.publicKey, logger);
-				expect(verified).toBe(false);
-				expect(logger).toHaveBeenCalledWith('verification simply failed, label: sig1');
-			});
-
-			test('two sign by one verification (succ)', async () => {
+			test('two sign by one verification (integrated succ)', async () => {
 				const request = getBasicRequest();
 				const result = await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
-				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 				expect(parsed.value).toStrictEqual([
 					[
 						'sig1',
@@ -269,11 +235,11 @@ describe('RFC9421', () => {
 				expect(verified).toBe(true);
 			});
 
-			test('two sign by one verification (fail)', async () => {
+			test('two sign by one verification (integrated fail)', async () => {
 				const request = getBasicRequest();
 				await signAsRFC9421ToRequestOrResponse(request, getMap(multipleSources));
 				request.headers['Signature'] = `sig1=:${sig2ExpectedSign}:, sig2=:${sig1ExpectedSign}:`;
-				const parsed = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
+				const parsed = parseRequestSignature(request, { clockSkew: { now: theDate } });
 				const logger = jest.fn();
 				const verified = await verifyParsedSignature(parsed, rsa4096.publicKey, logger);
 				expect(verified).toBe(false);

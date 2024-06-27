@@ -15,21 +15,6 @@ export type RequestParseOptions = {
         rfc9421?: string[];
     };
     clockSkew?: ClockSkewSettings;
-    /**
-     * Only used in RFC 9421.
-     * If set to true, all algorithms are verified.
-     * @default false
-     */
-    verifyAll?: boolean;
-    /**
-     * Specify sign algorithms you accept.
-     *
-     * If `verifyAll: false`, it is also used to choose the hash algorithm to verify.
-     * (Younger index is preferred.)
-     */
-    algorithms?: {
-        rfc9421?: string[];
-    };
 };
 export declare class HTTPMessageSignaturesParseError extends Error {
     constructor(message: string);

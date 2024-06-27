@@ -136,14 +136,14 @@ var require_serializer = __commonJS({
     }
     exports.serializeDictionary = serializeDictionary2;
     function serializeItem2(input) {
-      return serializeBareItem(input[0]) + serializeParameters(input[1]);
+      return serializeBareItem2(input[0]) + serializeParameters(input[1]);
     }
     exports.serializeItem = serializeItem2;
     function serializeInnerList3(input) {
       return `(${input[0].map((value) => serializeItem2(value)).join(" ")})${serializeParameters(input[1])}`;
     }
     exports.serializeInnerList = serializeInnerList3;
-    function serializeBareItem(input) {
+    function serializeBareItem2(input) {
       if (typeof input === "number") {
         if (Number.isInteger(input)) {
           return serializeInteger(input);
@@ -164,7 +164,7 @@ var require_serializer = __commonJS({
       }
       throw new SerializeError(`Cannot serialize values of type ${typeof input}`);
     }
-    exports.serializeBareItem = serializeBareItem;
+    exports.serializeBareItem = serializeBareItem2;
     function serializeInteger(input) {
       if (input < -999999999999999 || input > 999999999999999) {
         throw new SerializeError("Structured headers can only encode integers in the range range of -999,999,999,999,999 to 999,999,999,999,999 inclusive");
@@ -204,7 +204,7 @@ var require_serializer = __commonJS({
       return Array.from(input).map(([key, value]) => {
         let out = ";" + serializeKey(key);
         if (value !== true) {
-          out += "=" + serializeBareItem(value);
+          out += "=" + serializeBareItem2(value);
         }
         return out;
       }).join("");
@@ -1452,9 +1452,7 @@ function validateRFC9421SignatureInputParameters(input, options) {
   const labels = input.entries();
   for (const [, value] of labels) {
     const params = value[1];
-    if (!params.has("keyid") || typeof params.get("keyid") !== "string")
-      throw new SignatureParamsContentLackedError("keyid");
-    if (!params.has("alg") || typeof params.get("alg") !== "string")
+    if (params.has("alg") && typeof params.get("alg") !== "string")
       throw new SignatureParamsContentLackedError("alg");
     if (params.has("nonce") && typeof params.get("nonce") !== "string")
       throw new SignatureParamsContentLackedError("nonce");
@@ -1485,8 +1483,9 @@ function parseSingleRFC9421Signature(label, factory, params, signature) {
   const base = factory.generate(label);
   if (!params)
     throw new SignatureInputLackedError(`label not found: ${label}`);
+  const bareKeyid = params[1].get("keyid");
   return {
-    keyid: params[1].get("keyid"),
+    keyid: bareKeyid ? typeof bareKeyid === "string" ? bareKeyid : sh2.serializeBareItem(bareKeyid) : void 0,
     base,
     signature: signature.toBase64(),
     params: sh2.serializeInnerList(params),
@@ -1507,37 +1506,10 @@ function parseRFC9421RequestOrResponse(request, options, validated) {
   const inputIsValid = validateRFC9421SignatureInputParameters(signatureInput, options);
   if (!inputIsValid)
     throw new Error("signatureInput");
-  if (options?.algorithms?.rfc9421 && options.algorithms.rfc9421.length === 0) {
-    throw new Error("No algorithms specified by options.algorithms.rfc9421");
-  }
-  const labels = Array.from(signatureInput.entries()).reduce((acc, [label, value]) => {
-    const alg = value[1].get("alg");
-    if (!alg || typeof alg !== "string")
-      throw new Error("alg not found or not string");
-    if (options?.algorithms?.rfc9421) {
-      if (!options?.algorithms?.rfc9421?.includes(alg)) {
-        return acc;
-      }
-    }
-    if (options?.verifyAll !== true) {
-      if (acc.length === 1) {
-        if (!options?.algorithms?.rfc9421)
-          return acc;
-        const prevAlg = acc[0][1];
-        if (options.algorithms.rfc9421.findIndex((v) => v === prevAlg) > options.algorithms.rfc9421.findIndex((v) => v === alg)) {
-          acc[0] = [label, alg];
-        }
-      }
-    }
-    acc.push([label, alg]);
-    return acc;
-  }, []).map(([label]) => label);
-  if (labels.length === 0)
-    throw new Error("No valid signature found");
   const factory = new RFC9421SignatureBaseFactory(request);
   return {
     version: "rfc9421",
-    value: labels.map((label) => {
+    value: Array.from(signatureInput.keys()).map((label) => {
       const params = signatureInput.get(label);
       if (!params)
         throw new Error("signature input not found (???)");
