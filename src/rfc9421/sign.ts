@@ -116,9 +116,9 @@ export async function signAsRFC9421ToRequestOrResponse(
 		additionalSfvTypeDictionary?: SFVHeaderTypeDictionary;
 		request?: Request;
 	} = {
-		scheme: 'https',
-		additionalSfvTypeDictionary: {}
-	},
+			scheme: 'https',
+			additionalSfvTypeDictionary: {}
+		},
 ) {
 	const keys = new Map<string, CryptoKey>;
 	const inputDictionary = new Map<string, SFVSignatureParamsForInput>();
