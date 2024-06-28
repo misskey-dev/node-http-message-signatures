@@ -47,15 +47,15 @@ fastify.post('/inbox', async (request, reply) => {
 		// If in production, you may be needed to pick public keys from a database or something
 		const result = await verifyParsedSignature(parsedSignature, publicKeyMap, (...args) => console.log(args));
 		if (result === true) {
-			reply.code(200);
-			return 'true';
+			reply.code(202);
+			return '';
 		}
 	} catch (e) {
 		reply.code(401);
 		return e;
 	}
 	reply.code(401);
-	return 'false';
+	return 'signature verification failed';
 });
 
 //#region test
@@ -99,7 +99,7 @@ describe('parse and verify usage', () => {		//#region sign logic
 			await createRequest(url, body, { keyId: 'https://sender.example.com/users/0001#ed25519-key', privateKeyPem: ed25519.privateKey })
 		);
 
-		expect(response.body).toBe('true');
+		expect(response.body).toBe('');
 	});
 
 	test('draft fastify invalid', async () => {
@@ -108,7 +108,7 @@ describe('parse and verify usage', () => {		//#region sign logic
 			await createRequest(url, body, { keyId: 'https://sender.example.com/users/0001#ed25519-key', privateKeyPem: rsa4096.privateKey })
 		);
 
-		expect(response.body).toBe('false');
+		expect(response.body).toBe('signature verification failed');
 	});
 });
 //#endregion
