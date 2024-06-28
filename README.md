@@ -80,8 +80,8 @@ npm install @misskey-dev/node-http-message-signatures
 ### Parse and verify
 Parse and verify in fastify web server, implements ActivityPub inbox
 
-See: [./test/unit/readme-usage/parse-and-verify-fastify.ts]
+See [the usage (parse-and-verify-fastify.ts)](./test/unit/readme-usage/parse-and-verify-fastify.ts)
 
 ### Sign and Post
 
-See: [./test/unit/readme-usage/sign-and-post.ts]
+See [the usage (sign-and-post.ts)](./test/unit/readme-usage/sign-and-post.ts)

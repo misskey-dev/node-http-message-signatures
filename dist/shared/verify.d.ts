@@ -13,4 +13,4 @@ export declare class KeyHashValidationError extends Error {
  * @param publicKey 実際の公開鍵
  */
 export declare function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorithmIdentifier | CryptoKey['algorithm'], errorLogger?: ((message: any) => any)): SignInfo;
-export declare function verifyParsedSignature(parsed: ParsedSignature, key: string | CryptoKey, errorLogger?: ((message: any) => any)): Promise<boolean>;
+export declare function verifyParsedSignature(parsed: ParsedSignature, key: string | CryptoKey | Map<string, string | CryptoKey>, errorLogger?: ((message: any) => any)): Promise<boolean>;

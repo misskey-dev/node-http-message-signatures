@@ -25,7 +25,7 @@ function buildErrorMessage(providedAlgorithm: string, real: string) {
  */
 export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorithmIdentifier | CryptoKey['algorithm'], errorLogger?: ((message: any) => any)): SignInfo {
 	if (typeof real !== 'object' && typeof real !== 'string') {
-		console.error('invalid real', algorithm, real);
+		console.error('invalid real:', algorithm, real);
 		throw new KeyHashValidationError('invalid real');
 	}
 	algorithm = algorithm?.toLowerCase();
@@ -130,11 +130,24 @@ export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorit
 	throw new KeyHashValidationError(`unsupported keyAlgorithm: ${realKeyType} (provided: ${algorithm})`);
 }
 
-export function verifyParsedSignature(parsed: ParsedSignature, key: string | CryptoKey, errorLogger?: ((message: any) => any)): Promise<boolean> {
+/**
+ * Verify Parsed Signature.
+ * This function is a wrapper for `verifyDraftSignature` and `verifyRFC9421Signature`.
+ * `verifyRFC9421Signature` is fixed to verifyAll: false.
+ */
+export function verifyParsedSignature(
+	parsed: ParsedSignature,
+	keys: string | CryptoKey | Map<string, string | CryptoKey>,
+	errorLogger?: ((message: any) => any)
+): Promise<boolean> {
 	if (parsed.version === 'draft') {
-		return verifyDraftSignature(parsed.value, key, errorLogger);
+		if (keys instanceof Map) {
+			keys = keys.get(parsed.value.keyId)!;
+			if (!keys) throw new Error(`key not found: ${parsed.value.keyId}`);
+		}
+		return verifyDraftSignature(parsed.value, keys, errorLogger);
 	} else if (parsed.version === 'rfc9421') {
-		return verifyRFC9421Signature(parsed.value, key, undefined, errorLogger);
+		return verifyRFC9421Signature(parsed.value, keys, undefined, errorLogger);
 	}
 	throw new Error(`unsupported parsed signature`);
 }

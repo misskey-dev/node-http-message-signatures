@@ -1,5 +1,7 @@
 export type * from './types.js';
 export * from './shared/parse.js';
+export * from './shared/sign.js';
+export * from './shared/verify.js';
 export * from './utils.js';
 export * from './keypair.js';
 export * from './digest/digest.js';

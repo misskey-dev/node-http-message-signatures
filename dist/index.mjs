@@ -783,15 +783,12 @@ async function verifyRFC9421Signature(parsedEntries, keys, options = {
     toVerify.sort((a, b) => {
       const algA = a[3]?.toLowerCase() ?? "";
       const algB = b[3]?.toLowerCase() ?? "";
-      console.log(algA, algB);
       return algorithms.indexOf(algA) - algorithms.indexOf(algB);
     });
   }
-  console.log("");
   for (const [label, parsed, key] of toVerify) {
     try {
-      const { publicKey, algorithm } = await parseAndImportPublicKey(key, ["verify"], parsed.algorithm);
-      console.log(algorithm);
+      const { publicKey, algorithm } = await parseAndImportPublicKey(key, ["verify"]);
       const verify = await (await getWebcrypto()).subtle.verify(
         algorithm,
         publicKey,
@@ -836,6 +833,10 @@ function buildErrorMessage(providedAlgorithm, real) {
   return `Provided algorithm does not match the public key type: provided=${providedAlgorithm}, real=${real}`;
 }
 function parseSignInfo(algorithm, real, errorLogger) {
+  if (typeof real !== "object" && typeof real !== "string") {
+    console.error("invalid real:", algorithm, real);
+    throw new KeyHashValidationError("invalid real");
+  }
   algorithm = algorithm?.toLowerCase();
   const realKeyType = typeof real === "string" ? real : "algorithm" in real ? getPublicKeyAlgorithmNameFromOid(real.algorithm) : real.name;
   if (realKeyType === "RSA-PSS") {
@@ -906,6 +907,19 @@ function parseSignInfo(algorithm, real, errorLogger) {
     throw new KeyHashValidationError(buildErrorMessage(algorithm, realKeyType));
   }
   throw new KeyHashValidationError(`unsupported keyAlgorithm: ${realKeyType} (provided: ${algorithm})`);
+}
+function verifyParsedSignature(parsed, key, errorLogger) {
+  if (parsed.version === "draft") {
+    if (key instanceof Map) {
+      key = key.get(parsed.value.keyId);
+      if (!key)
+        throw new Error(`key not found: ${parsed.value.keyId}`);
+    }
+    return verifyDraftSignature(parsed.value, key, errorLogger);
+  } else if (parsed.version === "rfc9421") {
+    return verifyRFC9421Signature(parsed.value, key, void 0, errorLogger);
+  }
+  throw new Error(`unsupported parsed signature`);
 }
 
 // src/pem/spki.ts
@@ -1915,6 +1929,12 @@ function parseRequestSignature(request, options) {
   throw new UnknownSignatureHeaderFormatError();
 }
 
+// src/shared/sign.ts
+async function genSignature(privateKey, signingString, defaults = defaultSignInfoDefaults) {
+  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, textEncoder.encode(signingString));
+  return encodeArrayBufferToBase64(signatureAB);
+}
+
 // src/keypair.ts
 async function exportPublicKeyPem(key) {
   const ab = await (await getWebcrypto()).subtle.exportKey("spki", key);
@@ -2324,12 +2344,6 @@ async function importPrivateKey(key, keyUsages = ["sign"], defaults = defaultSig
   return await (await getWebcrypto()).subtle.importKey("pkcs8", parsedPrivateKey.der, importParams, extractable, keyUsages);
 }
 
-// src/shared/sign.ts
-async function genSignature(privateKey, signingString, defaults = defaultSignInfoDefaults) {
-  const signatureAB = await (await getWebcrypto()).subtle.sign(genAlgorithmForSignAndVerify(privateKey.algorithm, defaults.hash), privateKey, textEncoder.encode(signingString));
-  return encodeArrayBufferToBase64(signatureAB);
-}
-
 // src/draft/sign.ts
 function getDraftAlgoString(keyAlgorithm, hashAlgorithm) {
   const verifyHash = () => {
@@ -2481,6 +2495,7 @@ export {
   DraftSignatureHeaderKeys,
   HTTPMessageSignaturesParseError,
   InvalidRequestError,
+  KeyHashValidationError,
   KeyValidationError,
   Pkcs1ParseError,
   Pkcs8ParseError,
@@ -2525,6 +2540,7 @@ export {
   genRsaKeyPair,
   genSignInfo,
   genSignInfoDraft,
+  genSignature,
   genSingleRFC9530DigestHeader,
   genSpkiFromPkcs1,
   getDraftAlgoString,
@@ -2556,6 +2572,7 @@ export {
   parsePublicKey,
   parseRFC9421RequestOrResponse,
   parseRequestSignature,
+  parseSignInfo,
   parseSingleRFC9421Signature,
   parseSpki,
   processSingleRFC9421SignSource,
@@ -2575,6 +2592,7 @@ export {
   validateRequestAndGetSignatureHeader,
   verifyDigestHeader,
   verifyDraftSignature,
+  verifyParsedSignature,
   verifyRFC3230DigestHeader,
   verifyRFC9421Signature,
   verifyRFC9530DigestHeader
