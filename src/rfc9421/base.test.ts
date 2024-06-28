@@ -315,7 +315,7 @@ describe(RFC9421SignatureBaseFactory, () => {
 		});
 	});
 	describe('generate', () => {
-		test('request', () => {
+		describe('request', () => {
 			const input = {
 				sig1: [
 					[['date', {}], ['@authority', {}]],
@@ -329,14 +329,40 @@ describe(RFC9421SignatureBaseFactory, () => {
 					'signature-input': convertSignatureParamsDictionary(input),
 				},
 			};
-			const factory = new RFC9421SignatureBaseFactory(
-				request,
-			);
-			expect(factory.generate('sig1')).toBe(
-				`"date": ${requestBase.headers.Date}\n` +
-				`"@authority": example.com\n` +
-				`"@signature-params": ("date" "@authority");keyid="https://example.com/users/:id#main-key";algo="rsa-pss-sha512"`
-			);
+			test('simple', () => {
+				const factory = new RFC9421SignatureBaseFactory(
+					request,
+				);
+				expect(factory.generate('sig1')).toBe(
+					`"date": ${requestBase.headers.Date}\n` +
+					`"@authority": example.com\n` +
+					`"@signature-params": ("date" "@authority");keyid="https://example.com/users/:id#main-key";algo="rsa-pss-sha512"`
+				);
+			});
+			test('with requirecComponents', () => {
+				const factory = new RFC9421SignatureBaseFactory(
+					request,
+					undefined,
+					undefined,
+					undefined,
+					['date'],
+				);
+				expect(factory.generate('sig1')).toBe(
+					`"date": ${requestBase.headers.Date}\n` +
+					`"@authority": example.com\n` +
+					`"@signature-params": ("date" "@authority");keyid="https://example.com/users/:id#main-key";algo="rsa-pss-sha512"`
+				);
+			});
+			test('with requirecComponents (lacked required components)', () => {
+				const factory = new RFC9421SignatureBaseFactory(
+					request,
+					undefined,
+					undefined,
+					undefined,
+					['@path'],
+				);
+				expect(() => factory.generate('sig1')).toThrow('Required component not found: "@path"');
+			});
 		});
 		test('response', () => {
 			const input = {

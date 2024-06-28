@@ -16,6 +16,11 @@ export type DraftSignatureHeaderParsed = {
     expires?: string;
     opaque?: string;
 };
+/**
+ * Parser for draft signature header
+ * @param signatureHeader Signature header string
+ * @returns Parsed signature header (raw)
+ */
 export declare function parseDraftRequestSignatureHeader(signatureHeader: string): DraftSignatureHeaderParsedRaw;
 export declare function validateAndProcessParsedDraftSignatureHeader(parsed: DraftSignatureHeaderParsedRaw, options?: RequestParseOptions): DraftSignatureHeaderParsed;
 export declare function parseDraftRequest(request: IncomingRequest, options?: RequestParseOptions, validated?: ReturnType<typeof validateRequestAndGetSignatureHeader>): ParsedDraftSignature;

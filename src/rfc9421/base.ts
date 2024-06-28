@@ -23,8 +23,8 @@ export const responseTargetDerivedComponents = [
 ];
 
 /**
- * Class for creating signature base,
- * construct with a request or a response
+ * Class for creating signature base.
+ * Construct with a request or a response, and generate signature base with `generate` method
  */
 export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingResponse> {
 	public sfvTypeDictionary: SFVHeaderTypeDictionary;
@@ -46,6 +46,8 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 	public requestSignatureInput: SFVSignatureInputDictionary;
 	public responseSignatureInput: SFVSignatureInputDictionary | undefined;
 
+	public requiredComponents: string[] | null;
+
 	/**
 	 *
 	 * @param source request or response, must include 'signature-input' header
@@ -53,13 +55,35 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 	 * @param scheme optional, used when source request url starts with '/'
 	 * @param additionalSfvTypeDictionary additional SFV type dictionary
 	 * @param request optional, used when source is a browser Response
+	 * @param requiredComponents
+	 *   Required components for the signature base. If provided, generate method will throw an error if the label lacks any of the components.
+	 *   e.g. `['@method', '@authority', '@path', '@query', '"@query-param";name="foo"', 'content-digest', 'accept']`
 	 */
 	constructor(
 		source: T,
 		scheme: string = 'https',
 		additionalSfvTypeDictionary: SFVHeaderTypeDictionary = {},
 		request?: Request,
+		requiredComponents: string[] | null = null,
 	) {
+		//#region required components
+		if (requiredComponents && !Array.isArray(requiredComponents)) {
+			throw new Error('requiredComponents must be an array');
+		} else if (requiredComponents && requiredComponents.length > 0) {
+			this.requiredComponents = requiredComponents.map(component => {
+				let item: sh.Item;
+				if (component.startsWith('"')) {
+					item = sh.parseItem(component);
+				} else {
+					item = [component, new Map()];
+				}
+				return sh.serializeItem(item);
+			});
+		} else {
+			this.requiredComponents = null;
+		}
+		//#endregion
+
 		this.sfvTypeDictionary = lcObjectKey({ ...knownSfvHeaderTypeDictionary, ...additionalSfvTypeDictionary });
 
 		if ('req' in source) {
@@ -110,6 +134,11 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 		this.url = new URL(this.targetUri);
 	}
 
+	/**
+	 * Get component value to generate signature base
+	 * @param name component name
+	 * @param paramsLike parameters
+	 */
 	public get(
 		name: '@query-param',
 		paramsLike?: MapLikeObj<'name', string>,
@@ -289,6 +318,12 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 		}
 	}
 
+	/**
+	 * Generate signature base for the label
+	 * If `requiredComponents` is set by the constructor, this method will throw an error if the label lacks any of the components.
+	 * @param label label of the signature input
+	 * @returns signature base
+	 */
 	public generate(label: string): string {
 		const item = this.isRequest() ? this.requestSignatureInput?.get(label) : this.responseSignatureInput?.get(label);
 		if (!item) {
@@ -298,6 +333,7 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 			throw new Error(`item is not InnerList: ${sh.serializeDictionary(new Map([[label, item]]))}`);
 		}
 
+		// Map<serialized component identifier, value>
 		const results = new Map<string, string>();
 		for (const component of item[0]) {
 			let name = component[0];
@@ -309,13 +345,23 @@ export class RFC9421SignatureBaseFactory<T extends IncomingRequest | OutgoingRes
 					throw new Error(`Invalid component identifier name: ${name}`);
 				}
 			}
-			component[0] = name; // Must be wrapped with double quotes while serializing
+			component[0] = name; // Unquote
 			const componentIdentifier = sh.serializeItem(component);
 			if (results.has(componentIdentifier)) {
 				throw new Error(`Duplicate key: ${name}`);
 			}
 			results.set(componentIdentifier, this.get(name, component[1] as any));
 		}
+
+		//#region Check required components
+		if (this.requiredComponents) {
+			for (const component of this.requiredComponents) {
+				if (!results.has(component)) {
+					throw new Error(`Required component not found: ${component}`);
+				}
+			}
+		}
+		//#endregion
 
 		results.set('"@signature-params"', sh.serializeInnerList(item));
 
@@ -341,5 +387,6 @@ export function convertSignatureParamsDictionary(input: SFVSignatureInputDiction
 			],
 		);
 	}
+
 	return sh.serializeDictionary(output);
 }

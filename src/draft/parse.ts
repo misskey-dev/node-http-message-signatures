@@ -20,6 +20,11 @@ export type DraftSignatureHeaderParsed = {
 	opaque?: string;
 };
 
+/**
+ * Parser for draft signature header
+ * @param signatureHeader Signature header string
+ * @returns Parsed signature header (raw)
+ */
 export function parseDraftRequestSignatureHeader(signatureHeader: string): DraftSignatureHeaderParsedRaw {
 	const result: Record<string, string> = {};
 	let prevStatus = 'none' as 'none' | 'name' | 'equal' | 'startQuote' | 'value' | 'valueWithoutQuote' | 'endQuote';

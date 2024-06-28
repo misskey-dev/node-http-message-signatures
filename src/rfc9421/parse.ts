@@ -10,11 +10,18 @@ import * as sh from 'structured-headers';
 // https://datatracker.ietf.org/doc/html/rfc9421#name-signature-parameters
 export const RFC9421SignatureParams = ['created', 'expires', 'nonce', 'alg', 'keyid', 'tag'] as const;
 
-export function validateRFC9421SignatureInputParameters(input: sh.Dictionary, options?: RequestParseOptions): input is SFVSignatureInputDictionary {
-	const labels = input.entries();
+/**
+ * Validate signature-input parameters
+ * * The check of components by requiredComponents is not performed here, but is performed during Factory.generate in parseSingleRFC9421Signature.
+ */
+export function validateRFC9421SignatureInputParameters(
+	input: sh.Dictionary,
+	options?: RequestParseOptions
+): input is SFVSignatureInputDictionary {
+	const labels = input.entries(); // [label, [components, params]]
 
 	for (const [, value] of labels) {
-		const params = value[1];
+		const params = value[1]; // [components, params]
 		if (params.has('alg') && typeof params.get('alg') !== 'string') throw new SignatureParamsContentLackedError('alg');
 		if (params.has('nonce') && typeof params.get('nonce') !== 'string') throw new SignatureParamsContentLackedError('nonce');
 		if (params.has('tag') && typeof params.get('tag') !== 'string') throw new SignatureParamsContentLackedError('tag');
@@ -40,6 +47,10 @@ export function validateRFC9421SignatureInputParameters(input: sh.Dictionary, op
 	return true;
 }
 
+/**
+ * Generates base and returns parsed signature.
+ * * The check of components by requiredComponents will be performed here.
+ */
 export function parseSingleRFC9421Signature(
 	label: string,
 	factory: RFC9421SignatureBaseFactory<IncomingRequest | OutgoingResponse>,
@@ -67,7 +78,8 @@ export function parseSingleRFC9421Signature(
 export function parseRFC9421RequestOrResponse(
 	request: IncomingRequest | OutgoingResponse,
 	options?: RequestParseOptions,
-	validated?: ReturnType<typeof validateRequestAndGetSignatureHeader>
+	validated?: ReturnType<typeof validateRequestAndGetSignatureHeader>,
+	errorLogger?: (message: any) => any,
 ): ParsedRFC9421Signature {
 	if (!validated) validated = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
 	if (validated.signatureInput == null) throw new SignatureInputLackedError('signatureInput');
@@ -77,53 +89,35 @@ export function parseRFC9421RequestOrResponse(
 	const inputIsValid = validateRFC9421SignatureInputParameters(signatureInput, options);
 	if (!inputIsValid) throw new Error('signatureInput');
 
-	/**
-	//#region choose signature
-	if (options?.algorithms?.rfc9421 && options.algorithms.rfc9421.length === 0) {
-		throw new Error('No algorithms specified by options.algorithms.rfc9421');
+	const factory = new RFC9421SignatureBaseFactory(
+		request, undefined, undefined, undefined,
+		options?.requiredComponents?.rfc9421 || options?.requiredInputs?.rfc9421,
+	);
+	const results = new Map<string, ParsedRFC9421SignatureValueWithBase>();
+
+	for (const [label, params] of Array.from(signatureInput.entries())) {
+		const bs = signatureDictionary.get(label);
+		if (!bs) throw new Error('signature not found');
+		if (!(bs[0] instanceof sh.ByteSequence)) throw new Error('signature not ByteSequence');
+
+		try {
+			results.set(label, parseSingleRFC9421Signature(label, factory, params, bs[0]));
+		} catch (e) {
+			if (errorLogger) errorLogger(`Error while parsing signature ${label}: ${e}`);
+		}
 	}
-	const algorithms = options?.algorithms?.rfc9421?.map(x => x.toLowerCase());
 
-	const labels = Array.from(signatureInput.entries())
-		.reduce((acc, [label, value]) => {
-			let alg = value[1].get('alg');
-			if (!alg || typeof alg !== 'string') throw new Error('alg not found or not string');
-			alg = alg.toLowerCase();
-			if (algorithms) {
-				if (!algorithms.includes(alg)) {
-					return acc;
-				}
-			}
-			if (options?.verifyAll !== true) {
-				if (acc.length === 1) {
-					if (!algorithms) return acc;
-					const prevAlg = acc[0][1];
-					if (algorithms.findIndex(v => v === prevAlg) > algorithms.findIndex(v => v === alg)) {
-						acc[0] = [label, alg];
-					}
-				}
-			}
-			acc.push([label, alg]);
-			return acc;
-		}, [] as [string, string][])
-		.map(([label]) => label);
-	if (labels.length === 0) throw new Error('No valid signature found');
-	**/
-
-	const factory = new RFC9421SignatureBaseFactory(request);
+	if (results.size === 0) {
+		if (options?.requiredComponents?.rfc9421 || options?.requiredInputs?.rfc9421) {
+			throw new Error('No valid signature found. This may have occurred because all signatures were filtered out by requiredComponents.');
+		} else {
+			throw new Error('No valid signature found. Something went wrong.');
+		}
+	}
 
 	return {
 		version: 'rfc9421',
-		value: Array.from(signatureInput.keys()).map(label => {
-			const params = signatureInput.get(label);
-			if (!params) throw new Error('signature input not found (???)');
-
-			const bs = signatureDictionary.get(label);
-			if (!bs) throw new Error('signature not found');
-			if (!(bs[0] instanceof sh.ByteSequence)) throw new Error('signature not ByteSequence');
-
-			return [label, parseSingleRFC9421Signature(label, factory, params, bs[0])];
-		}),
+		value: Array.from(results.entries()),
 	};
 	//#endregion
 }

@@ -1025,16 +1025,16 @@ function parseSignInfo(algorithm, real, errorLogger) {
   }
   throw new KeyHashValidationError(`unsupported keyAlgorithm: ${realKeyType} (provided: ${algorithm})`);
 }
-function verifyParsedSignature(parsed, key, errorLogger) {
+function verifyParsedSignature(parsed, keys, errorLogger) {
   if (parsed.version === "draft") {
-    if (key instanceof Map) {
-      key = key.get(parsed.value.keyId);
-      if (!key)
+    if (keys instanceof Map) {
+      keys = keys.get(parsed.value.keyId);
+      if (!keys)
         throw new Error(`key not found: ${parsed.value.keyId}`);
     }
-    return verifyDraftSignature(parsed.value, key, errorLogger);
+    return verifyDraftSignature(parsed.value, keys, errorLogger);
   } else if (parsed.version === "rfc9421") {
-    return verifyRFC9421Signature(parsed.value, key, void 0, errorLogger);
+    return verifyRFC9421Signature(parsed.value, keys, void 0, errorLogger);
   }
   throw new Error(`unsupported parsed signature`);
 }
@@ -1442,8 +1442,26 @@ var RFC9421SignatureBaseFactory = class {
    * @param scheme optional, used when source request url starts with '/'
    * @param additionalSfvTypeDictionary additional SFV type dictionary
    * @param request optional, used when source is a browser Response
+   * @param requiredComponents
+   *   Required components for the signature base. If provided, generate method will throw an error if the label lacks any of the components.
+   *   e.g. `['@method', '@authority', '@path', '@query', '"@query-param";name="foo"', 'content-digest', 'accept']`
    */
-  constructor(source, scheme = "https", additionalSfvTypeDictionary = {}, request) {
+  constructor(source, scheme = "https", additionalSfvTypeDictionary = {}, request, requiredComponents = null) {
+    if (requiredComponents && !Array.isArray(requiredComponents)) {
+      throw new Error("requiredComponents must be an array");
+    } else if (requiredComponents && requiredComponents.length > 0) {
+      this.requiredComponents = requiredComponents.map((component) => {
+        let item;
+        if (component.startsWith('"')) {
+          item = sh.parseItem(component);
+        } else {
+          item = [component, /* @__PURE__ */ new Map()];
+        }
+        return sh.serializeItem(item);
+      });
+    } else {
+      this.requiredComponents = null;
+    }
     this.sfvTypeDictionary = lcObjectKey({ ...knownSfvHeaderTypeDictionary, ...additionalSfvTypeDictionary });
     if ("req" in source) {
       this.response = source;
@@ -1641,6 +1659,12 @@ var RFC9421SignatureBaseFactory = class {
       return canonicalizeHeaderValue(rawValue);
     }
   }
+  /**
+   * Generate signature base for the label
+   * If `requiredComponents` is set by the constructor, this method will throw an error if the label lacks any of the components.
+   * @param label label of the signature input
+   * @returns signature base
+   */
   generate(label) {
     const item = this.isRequest() ? this.requestSignatureInput?.get(label) : this.responseSignatureInput?.get(label);
     if (!item) {
@@ -1665,6 +1689,13 @@ var RFC9421SignatureBaseFactory = class {
         throw new Error(`Duplicate key: ${name}`);
       }
       results.set(componentIdentifier, this.get(name, component[1]));
+    }
+    if (this.requiredComponents) {
+      for (const component of this.requiredComponents) {
+        if (!results.has(component)) {
+          throw new Error(`Required component not found: ${component}`);
+        }
+      }
     }
     results.set('"@signature-params"', sh.serializeInnerList(item));
     return Array.from(results.entries(), ([key, value]) => `${key}: ${value}`).join("\n");
@@ -1741,7 +1772,7 @@ function parseSingleRFC9421Signature(label, factory, params, signature) {
     tag: params[1].get("tag")
   };
 }
-function parseRFC9421RequestOrResponse(request, options, validated) {
+function parseRFC9421RequestOrResponse(request, options, validated, errorLogger) {
   if (!validated)
     validated = validateRequestAndGetSignatureHeader(request, options?.clockSkew);
   if (validated.signatureInput == null)
@@ -1751,20 +1782,37 @@ function parseRFC9421RequestOrResponse(request, options, validated) {
   const inputIsValid = validateRFC9421SignatureInputParameters(signatureInput, options);
   if (!inputIsValid)
     throw new Error("signatureInput");
-  const factory = new RFC9421SignatureBaseFactory(request);
+  const factory = new RFC9421SignatureBaseFactory(
+    request,
+    void 0,
+    void 0,
+    void 0,
+    options?.requiredComponents?.rfc9421 || options?.requiredInputs?.rfc9421
+  );
+  const results = /* @__PURE__ */ new Map();
+  for (const [label, params] of Array.from(signatureInput.entries())) {
+    const bs = signatureDictionary.get(label);
+    if (!bs)
+      throw new Error("signature not found");
+    if (!(bs[0] instanceof sh2.ByteSequence))
+      throw new Error("signature not ByteSequence");
+    try {
+      results.set(label, parseSingleRFC9421Signature(label, factory, params, bs[0]));
+    } catch (e) {
+      if (errorLogger)
+        errorLogger(`Error while parsing signature ${label}: ${e}`);
+    }
+  }
+  if (results.size === 0) {
+    if (options?.requiredComponents?.rfc9421 || options?.requiredInputs?.rfc9421) {
+      throw new Error("No valid signature found. This may have occurred because all signatures were filtered out by requiredComponents.");
+    } else {
+      throw new Error("No valid signature found. Something went wrong.");
+    }
+  }
   return {
     version: "rfc9421",
-    value: Array.from(signatureInput.keys()).map((label) => {
-      const params = signatureInput.get(label);
-      if (!params)
-        throw new Error("signature input not found (???)");
-      const bs = signatureDictionary.get(label);
-      if (!bs)
-        throw new Error("signature not found");
-      if (!(bs[0] instanceof sh2.ByteSequence))
-        throw new Error("signature not ByteSequence");
-      return [label, parseSingleRFC9421Signature(label, factory, params, bs[0])];
-    })
+    value: Array.from(results.entries())
   };
 }
 

@@ -14,6 +14,8 @@ const request = {
 	method: 'POST',
 };
 
+const theDate = new Date(1618884475000);
+
 describe(parseSingleRFC9421Signature, () => {
 	test('normal', () => {
 		const factory = new RFC9421SignatureBaseFactory(
@@ -38,7 +40,7 @@ describe(parseSingleRFC9421Signature, () => {
 
 describe(parseRFC9421RequestOrResponse, () => {
 	test('normal', () => {
-		const result = parseRFC9421RequestOrResponse(request, { clockSkew: { now: new Date(1618884476000) } });
+		const result = parseRFC9421RequestOrResponse(request, { clockSkew: { now: theDate } });
 		expect(result).toStrictEqual({
 			version: 'rfc9421',
 			value: [
@@ -57,5 +59,35 @@ describe(parseRFC9421RequestOrResponse, () => {
 				],
 			],
 		});
+	});
+	test('requiredComponents (succ)', () => {
+		const result = parseRFC9421RequestOrResponse(request, {
+			clockSkew: { now: theDate },
+			requiredComponents: { rfc9421: ['date'] }
+		});
+		expect(result).toStrictEqual({
+			version: 'rfc9421',
+			value: [
+				[
+					'sig1', {
+						algorithm: 'rsa-v1_5-sha256',
+						base: new RFC9421SignatureBaseFactory(request).generate('sig1'),
+						created: 1618884475,
+						expires: undefined,
+						keyid: 'x',
+						nonce: undefined,
+						params: `("@method" "date");keyid="x";alg="rsa-v1_5-sha256";created=1618884475`,
+						signature: 'ZXhhbXBsZS5jb20=',
+						tag: undefined,
+					},
+				],
+			],
+		});
+	});
+	test('requiredComponents (error)', () => {
+		expect(() => parseRFC9421RequestOrResponse(request, {
+			clockSkew: { now: theDate },
+			requiredComponents: { rfc9421: ['digest'] }
+		})).toThrow();
 	});
 });
