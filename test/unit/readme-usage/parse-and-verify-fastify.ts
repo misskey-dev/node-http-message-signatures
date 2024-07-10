@@ -40,7 +40,7 @@ fastify.post('/inbox', async (request, reply) => {
 		parsedSignature = parseRequestSignature(request.raw);
 	} catch (e) {
 		reply.code(401);
-		return e;
+		return e; // DO NOT return stack trace in production!!!
 	}
 
 	try {
@@ -52,7 +52,7 @@ fastify.post('/inbox', async (request, reply) => {
 		}
 	} catch (e) {
 		reply.code(401);
-		return e;
+		return e; // DO NOT return stack trace in production!!!
 	}
 	reply.code(401);
 	return 'signature verification failed';
