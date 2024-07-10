@@ -1,11 +1,11 @@
 @misskey-dev/node-http-message-signatures
 ----
 
-(WIP) Implementation of [HTTP Signatures "Draft", RFC 9421](https://datatracker.ietf.org/doc/rfc9421/), [RFC 3230](https://datatracker.ietf.org/doc/rfc3230/) and [RFC 9530](https://datatracker.ietf.org/doc/rfc9530/) for JavaScript.
-
-It is created for Misskey's ActivityPub implementation.
+Implementation of [HTTP Signatures "Draft", RFC 9421](https://datatracker.ietf.org/doc/rfc9421/), [RFC 3230](https://datatracker.ietf.org/doc/rfc3230/) and [RFC 9530](https://datatracker.ietf.org/doc/rfc9530/) for JavaScript.
 
 We initially started working on it with the intention of using it in Node.js, but since we rewrote it to Web Crypto API, it may also work in browsers and edge workers.
+
+It is created for Misskey's ActivityPub implementation.
 
 ## Context
 ### HTTP Signatures "Draft" and RFC 9421
