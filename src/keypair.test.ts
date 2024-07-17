@@ -15,7 +15,7 @@ describe('gen keypair', () => {
 		expect(publicKeyObj1.asymmetricKeyType).toBe('rsa');
 		const publicKeyObj2 = crypto.createPublicKey(keypair2.publicKey);
 		expect(publicKeyObj2.asymmetricKeyType).toBe('rsa');
-	});
+	}, 30 * 1000); // GitHub Actionsだと結構長めにとる必要があるらしい
 
 	test('genEd25519KeyPair', async () => {
 		const keypair1 = await genEd25519KeyPair();
