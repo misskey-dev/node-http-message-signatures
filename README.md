@@ -48,25 +48,25 @@ Misskey added the `additionalPublicKeys` property to Actor to allow it to have m
   "@context": [
     "https://www.w3.org/ns/activitystreams",
     "https://w3id.org/security/v1",
-		{
-			"Key": "sec:Key",
-			"additionalPublicKeys": "misskey:additionalPublicKeys"
-		}
+      {
+        "Key": "sec:Key",
+        "additionalPublicKeys": "misskey:additionalPublicKeys"
+      }
   ],
   "id": "https://misskey.io/users/7rkrarq81i",
   "type": "Person",
   "publicKey": {
     "id": "https://misskey.io/users/7rkrarq81i#main-key",
-		"type": "Key",
+    "type": "Key",
     "owner": "https://misskey.io/users/7rkrarq81i",
     "publicKeyPem": "-----BEGIN PUBLIC KEY-----..."
   },
-	"additionalPublicKeys": [{
-  	"id": "https://misskey.io/users/7rkrarq81i#ed25519-key",
-		"type": "Key",
-  	"owner": "https://misskey.io/users/7rkrarq81i",
-  	"publicKeyPem": "-----BEGIN PUBLIC KEY-----..."
-	}]
+  "additionalPublicKeys": [{
+    "id": "https://misskey.io/users/7rkrarq81i#ed25519-key",
+    "type": "Key",
+    "owner": "https://misskey.io/users/7rkrarq81i",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----..."
+  }]
 }
 ```
 
