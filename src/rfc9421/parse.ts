@@ -90,7 +90,7 @@ export function parseRFC9421RequestOrResponse(
 	if (!inputIsValid) throw new Error('signatureInput');
 
 	const factory = new RFC9421SignatureBaseFactory(
-		request, undefined, undefined, undefined,
+		request, undefined, options?.additionalSfvTypeDictionary, undefined,
 		options?.requiredComponents?.rfc9421 || options?.requiredInputs?.rfc9421,
 	);
 	const results = new Map<string, ParsedRFC9421SignatureValueWithBase>();

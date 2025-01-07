@@ -86,7 +86,7 @@ export async function verifyRFC9421Signature(
 		if (importedKeys.length === 0) {
 			importedKeys = await Promise.all(
 				Array.from(keys.values())
-					.map(key => parseAndImportPublicKey(key, ['verify']))
+					.map(key => parseAndImportPublicKey(key, ['verify']), alg)
 			);
 		}
 
@@ -127,7 +127,7 @@ export async function verifyRFC9421Signature(
 
 	for (const [label, parsed, key] of toVerify) {
 		try {
-			const { publicKey, algorithm } = await parseAndImportPublicKey(key, ['verify']);
+			const { publicKey, algorithm } = await parseAndImportPublicKey(key, ['verify'], alg);
 
 			const verify = await (await getWebcrypto()).subtle.verify(
 				algorithm, publicKey, base64.parse(parsed.signature), textEncoder.encode(parsed.base)

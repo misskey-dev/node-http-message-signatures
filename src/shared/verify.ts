@@ -87,7 +87,7 @@ export function parseSignInfo(algorithm: string | undefined, real: ParsedAlgorit
 			if (namedCurve !== 'P-384') {
 				throw new KeyHashValidationError(`curve is not P-384: ${namedCurve}`);
 			}
-			return { name: 'ECDSA', hash: 'SHA-256', namedCurve };
+			return { name: 'ECDSA', hash: 'SHA-384', namedCurve };
 		}
 
 		//#region Draft
